@@ -18,7 +18,7 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
     async layer(name,key='') {
       const current=++generation;
       if(name==='demo'){demo();return true;}
-      if(!key){notice?.('Gadekort, satellit og terræn kræver en MapTiler-kortnøgle under Indstillinger.');return false;}
+      if(!key){notice?.('De geografiske kort er endnu ikke aktiveret af Pejlo. Prøv igen senere.');return false;}
       try {
         const response=await fetch(`https://api.maptiler.com/maps/${mapIds[name]}/256/tiles.json?key=${encodeURIComponent(key)}`,{signal:AbortSignal.timeout(12000)});
         if(!response.ok)throw new Error();
@@ -26,9 +26,9 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
         const url=json.tiles?.[0];if(typeof url!=='string'||!url.startsWith('https://api.maptiler.com/'))throw new Error();
         if(base)map.removeLayer(base);errors=0;
         base=L.tileLayer(url,{maxZoom:20,maxNativeZoom:json.maxzoom||19,attribution:'© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',referrerPolicy:'strict-origin-when-cross-origin'}).addTo(map);
-        base.on('tileerror',()=>{if(++errors===3)notice?.('Kortfliser kunne ikke hentes. Vælg Skematisk eksempel, eller kontrollér kortnøgle og internet.');});
+        base.on('tileerror',()=>{if(++errors===3)notice?.('Kortfliser kunne ikke hentes. Kontrollér internetforbindelsen, eller prøv igen senere.');});
         return true;
-      } catch {if(current===generation)notice?.('Kortlaget kunne ikke indlæses. Kontrollér nøgle, internet og kortadgang. Det tidligere lag beholdes.');return false;}
+      } catch {if(current===generation)notice?.('Kortlaget kunne ikke indlæses. Prøv igen senere. Det tidligere lag beholdes.');return false;}
     },
     profile(p,data,{showRoute=true,showHome=true}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();

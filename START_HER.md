@@ -1,4 +1,4 @@
-# Pejlo 0.4 – start her
+# Pejlo 0.4.1 – start her
 
 Denne version tilføjer personligt login og privat profillagring til dit eksisterende Pejlo-repository. Cloudflare er fortsat vært for appen; Firebase håndterer login og profiler.
 
@@ -44,7 +44,7 @@ Cloudflare-indstillingerne er fortsat:
 6. Log ud og ind igen: profilen skal komme tilbage. Samme konto på en anden enhed skal vise samme profiler. En anden konto skal starte tomt.
 7. Gamle profiler fra denne browser kan importeres aktivt fra velkomstsiden eller Indstillinger. De importeres aldrig automatisk til en konto.
 
-Profiler og kortnøgle gemmes på kontoen. Husk mig bruger vedvarende login på enheden; ellers gælder login for browsersessionen. Ved kontoskift ryddes den viste profiltilstand. Ingen profil åbnes fra lokal cache, før serveren har svaret. Ved mistet forbindelse sættes redigering på pause. Gemning bruger revisionstjek; en samtidig ændring vises i stedet for at blive overskrevet i stilhed. Ved en gemmefejl vises en besked, og seneste servertilstand gendannes.
+Profiler gemmes på kontoen. Kortopsætning er fælles for appen. Husk mig bruger vedvarende login på enheden; ellers gælder login for browsersessionen. Ved kontoskift ryddes den viste profiltilstand. Ingen profil åbnes fra lokal cache, før serveren har svaret. Ved mistet forbindelse sættes redigering på pause. Gemning bruger revisionstjek; en samtidig ændring vises i stedet for at blive overskrevet i stilhed. Ved en gemmefejl vises en besked, og seneste servertilstand gendannes.
 
 Hvis profillagring ikke åbner: kontrollér Firestore, publicerede regler og e-mailbekræftelsen, og tryk Prøv forbindelsen igen. Hvis login fejler: kontrollér Email/Password og Authorized domains.
 
@@ -52,12 +52,18 @@ Hvis profillagring ikke åbner: kontrollér Firestore, publicerede regler og e-m
 
 Alle trackerpositioner, ruter og batterital er EKSEMPLER. Denne udgave modtager ingen data fra Q8 eller andre fysiske trackere. Familieroller og invitationer kommer senere.
 
-Uden MapTiler-nøgle vises et lokalt skematisk eksempel, ikke et geografisk kort. En offentlig MapTiler-nøgle kan gemmes under Indstillinger og bør begrænses til dit domæne. Kontrollér udbyderens abonnement og kvoter.
+Kortene sættes op én gang af appens ejer, ikke af slutbrugerne. I Cloudflare Workers → pejlo → Settings → Build → Build Variables and Secrets: tilføj buildvariablen MAPTILER_API_KEY med selve den offentlige MapTiler-nøgle som værdi. Den skal være tilgængelig under npm run build, ikke kun som runtime-variabel. Gem, og upload denne pakke til GitHub for at udløse et nyt build. Hvis pakken allerede er uploadet, start et nyt build efter at variablen er gemt.
+
+Nøglen indbygges i browserfilerne, som MapTiler kræver, og er dermed offentlig. Begræns den hos MapTiler til pejlo.driftportal-platform.workers.dev. Kun en offentlig kortnøgle må bruges; ingen administrator- eller servicekontonøgler. Kortforbruget hører til appens MapTiler-konto.
+
+Gadekort er standard ved hver åbning. Satellit, terræn og skematisk eksempel kan vælges under Kortlag. Feltet til brugerens kortnøgle er fjernet. Tidligere kontogemte nøgler bruges ikke og erstattes med tomt kompatibilitetsfelt ved næste profilgemning. Eksisterende Firebase-regler kan beholdes uændret.
+
+Hvis buildvariablen mangler, virker login og profiler fortsat, men kun skematisk eksempel kan vises. Et tydeligt mærke adskiller det fra et geografisk kort. En slutbruger bliver ikke bedt om at oprette en MapTiler-konto. Kontrollér udbyderens abonnement og kvoter.
 
 Find-skærmen bruger efter tilladelse mobilens GPS og eventuelt kompas. Afstanden er i fugleflugtslinje til et eksempelpunkt, ikke en gangrute. Automatisk zoom tager højde for GPS-usikkerhed. Mobilplacering og kompas stoppes, når søgesiden forlades eller appen skjules.
 
 ## Verifikation og begrænsninger
 
-14 automatiske tests består for geoberegninger, profilvalidering, migrering, kontoskift og revisionskonflikter. Loginvisningen kontrolleres i browseren. Der er ikke oprettet testkonti eller sendt mails fra udviklingsarbejdet. Firebase-regler og det samlede login-/lagringsforløb er endnu ikke valideret mod dit aktive Firebase-projekt eller en emulator; gennemfør derfor trin 4 før brug med vigtige data.
+16 automatiske tests består for geoberegninger, profilvalidering, migrering, kontoskift og revisionskonflikter. Loginvisningen kontrolleres i browseren. Der er ikke oprettet testkonti eller sendt mails fra udviklingsarbejdet. Firebase-regler og det samlede login-/lagringsforløb er endnu ikke valideret mod dit aktive Firebase-projekt eller en emulator; gennemfør derfor trin 4 før brug med vigtige data.
 
 Kildekode: apps/web/src. Fælles geoberegninger: packages/shared. `npm test` bygger dist og kører tests. Firebase-regler: firestore.rules. Firebase CLI-konfiguration: firebase.json og .firebaserc.
