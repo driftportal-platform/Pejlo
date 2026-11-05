@@ -1,8 +1,10 @@
-# Pejlo 0.5.0 – samlet GitHub-udgave
+# Pejlo 0.5.1 – samlet GitHub-udgave
 
 Denne udgave tilføjer Traccar-forbindelsen og tilknytning med **tracker-ID + parringskode**. Brugerne foretager tilknytningen i Pejlo. Kun administratoren skal sætte infrastrukturen op.
 
-**Vigtigt: opret databasen nedenfor før upload/deploy.** `wrangler.jsonc` indeholder en markeret plads til dit rigtige database-ID. Udgaven er ikke allerede udgivet.
+**Denne pakke er tilrettet din eksisterende database.** Database-ID `88356335-2caf-41d5-9a45-99c31eaea836` er allerede indsat i `wrangler.jsonc`. Tabellen og indekset er oprettet. Du kan springe trin 1 over og uploade pakken; kontrollér fortsat de to runtime-secrets. Udgaven er ikke allerede udgivet.
+
+Version 0.5.1 retter en Cloudflare-kompatibilitetsfejl: serverens udgående HTTP-kald bruger nu `redirect: manual`, og viderestillinger afvises ud fra HTTP-status. Version 0.5.0 brugte `redirect: error`, som Workers afviser, før netværkskaldet sendes.
 
 ## 1. Opret trackerregisteret én gang
 

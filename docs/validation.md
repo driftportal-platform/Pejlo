@@ -1,4 +1,4 @@
-# Kontrol af Pejlo 0.5.0
+# Kontrol af Pejlo 0.5.1
 
 ## Udført
 
@@ -29,3 +29,7 @@ Der er ikke kørt Wrangler dry-run i dette miljø; Worker-koden er syntakskontro
 ## Afgrænsning
 
 Testserver, ikke en produktionsklar tjeneste med SLA. Positionshistorik er indeværende UTC-dag, højst 2000 punkter; kortets linje er kun forbindelsen mellem punkter. Ingen familiedeling, ejeroverdragelse eller UI til gendannelse af mistede parringskoder. Hardwareopsætning kan ikke udføres alene ved at registrere ID i en webapp.
+
+## Rettelse i 0.5.1
+
+Begge udgående kald bruger nu Cloudflare-understøttet redirect manual. Tests efterligner runtime-begrænsningen og afviser redirect error. Yderligere tests bekræfter, at en HTTP-viderestilling fra Google/Traccar ikke følges, og at credentials derfor ikke sendes videre. Database-ID fra brugerens screenshot er indsat; eksisterende tabel og indeks skal ikke genoprettes. 31 tests består. Livekontrol efter brugerens nye deploy afventes fortsat.

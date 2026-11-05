@@ -21,8 +21,8 @@ export async function handleAPI(request,env,fetcher=fetch){
   const token=request.headers.get('Authorization')?.match(/^Bearer ([^\s]+)$/)?.[1];
   if(!token||token.length>12000)return json({error:'Log ind igen.'},401);
   let lookup;
-  try{lookup=await fetcher(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseConfig.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:token}),redirect:'error',signal:AbortSignal.timeout(10000)});}catch{throw new Failure(503,'Loginserveren kunne ikke kontaktes. Prøv igen.');}
-  if(!lookup.ok){if(lookup.status>=500)throw new Failure(503,'Loginserveren er midlertidigt utilgængelig.');throw new Failure(401,'Log ind igen.');}
+  try{lookup=await fetcher(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseConfig.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:token}),redirect:'manual',signal:AbortSignal.timeout(10000)});}catch{throw new Failure(503,'Loginserveren kunne ikke kontaktes. Prøv igen.');}
+  if(!lookup.ok){if(lookup.status>=300&&lookup.status<400)throw new Failure(503,'Loginserveren svarede med en uventet viderestilling.');if(lookup.status>=500)throw new Failure(503,'Loginserveren er midlertidigt utilgængelig.');throw new Failure(401,'Log ind igen.');}
   const account=(await lookup.json()).users?.[0];
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
@@ -44,7 +44,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!env.TRACCAR_TOKEN)throw new Failure(503,'Traccar-adgangsnøglen mangler i Cloudflare.');
   const base=env.TRACCAR_URL||'https://demo3.traccar.org';
   if(base!=='https://demo3.traccar.org')throw new Failure(503,'Testforbindelsen skal bruge https://demo3.traccar.org.');
-  const traccar=async(path,options={})=>checkedJSON(await fetcher(base+path,{...options,headers:{Authorization:`Bearer ${env.TRACCAR_TOKEN}`,Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{})},redirect:'error',signal:AbortSignal.timeout(12000)}));
+  const traccar=async(path,options={})=>checkedJSON(await fetcher(base+path,{...options,headers:{Authorization:`Bearer ${env.TRACCAR_TOKEN}`,Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{})},redirect:'manual',signal:AbortSignal.timeout(12000)}));
   if(path==='/api/admin/trackers'){
    const input=await body(request);
    if(!identifierOK(input.identifier)||typeof input.name!=='string'||!input.name.trim()||input.name.length>60)throw new Failure(400,'Skriv tracker-ID og et navn på højst 60 tegn.');

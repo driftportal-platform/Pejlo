@@ -79,3 +79,18 @@ test('admin provisioning creates device and returns a one-time code while storin
  const response=await handleAPI(post('admin/trackers',{identifier:id,name:'Ny tracker'}),{...env,DB},fetcher),result=await response.json();
  assert.equal(response.status,201);assert.match(result.code,/^[A-F0-9]{32}$/);assert.equal(DB.rows.get(id).code_hash,await codeHash(result.code));assert.equal(DB.rows.get(id).owner_uid,null);assert.equal(JSON.stringify(DB.rows.get(id)).includes(result.code),false);assert.equal(calls.length,3);
 });
+test('Cloudflare-compatible redirect mode is used for Google and Traccar',async()=>{
+ const f=fixture(),calls=[];
+ const workersFetch=async(url,options)=>{if(options.redirect==='error')throw new TypeError('Unsupported redirect mode');assert.equal(options.redirect,'manual');calls.push(url);return f.fetcher(url,options);};
+ const response=await handleAPI(req(),env,workersFetch);assert.equal(response.status,200);assert.equal(calls.length,4);
+});
+test('Google and Traccar redirects fail closed without forwarding credentials',async()=>{
+ for(const provider of ['google','traccar']){
+  const f=fixture(),calls=[];
+  const fetcher=async(url,options)=>{calls.push(url);assert.equal(options.redirect,'manual');
+   if(provider==='google'||!url.includes('accounts:lookup'))return new Response(null,{status:302,headers:{Location:'https://other.example/collect'}});
+   return f.fetcher(url,options);
+  };
+  const response=await handleAPI(req(),env,fetcher);assert.equal(response.status,provider==='google'?503:502);assert.equal(calls.length,provider==='google'?1:2);assert.ok(calls.every(url=>!url.startsWith('https://other.example')));assert.equal((await response.text()).includes('server-secret'),false);
+ }
+});

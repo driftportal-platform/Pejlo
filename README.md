@@ -1,4 +1,4 @@
-# Pejlo 0.5.0
+# Pejlo 0.5.1
 
 Dansk tracker-app med Firebase-login, private profiler, fælles kort og Traccar-testforbindelse. Brugeren tilknytter en klargjort tracker med ID og parringskode i appen. Læs **START_HER.md før upload**: et D1-database-ID samt to runtime-secrets skal sættes én gang.
 
