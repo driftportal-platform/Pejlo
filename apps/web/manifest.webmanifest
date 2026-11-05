@@ -1,0 +1,18 @@
+{
+  "name": "Find Loui – dyr og ting",
+  "short_name": "Find Loui",
+  "lang": "da",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f1",
+  "theme_color": "#183e35",
+  "icons": [
+    {
+      "src": "./src/assets/icons/paw.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
