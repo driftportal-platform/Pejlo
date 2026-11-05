@@ -1,7 +1,7 @@
 {
   "name": "pejlo",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -10,5 +10,8 @@
     "build": "node scripts/build.mjs",
     "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
     "deploy": "npx wrangler deploy"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0"
   }
 }

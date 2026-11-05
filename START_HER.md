@@ -1,3 +1,6 @@
+# Nyt i 0.6.0
+Cirkel eller område tegnet med punkter direkte i Pejlo. Push ved udgang og tilbagekomst er implementeret og kræver tre runtime-værdier én gang i Cloudflare. Se [opsætning og test](docs/geofence.md).
+
 # Pejlo 0.5.1 – samlet GitHub-udgave
 
 Denne udgave tilføjer Traccar-forbindelsen og tilknytning med **tracker-ID + parringskode**. Brugerne foretager tilknytningen i Pejlo. Kun administratoren skal sætte infrastrukturen op.

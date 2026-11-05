@@ -1,3 +1,4 @@
+import {ensureNotifications,pushReady,validSubscription,validHome,sendPush,runNotifications} from './notifications.js';
 import {firebaseConfig} from '../web/src/config/firebase.js';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 class Failure extends Error { constructor(status,message){super(message);this.status=status;} }
@@ -10,11 +11,11 @@ export function point(raw){
 }
 const identifierOK=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{4,100}$/.test(value);
 export async function codeHash(code){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code.trim().toUpperCase()))),x=>x.toString(16).padStart(2,'0')).join('');}
-async function body(request){if(Number(request.headers.get('content-length')||0)>2048)throw new Failure(400,'For mange oplysninger.');const text=await request.text();if(text.length>2048)throw new Failure(400,'For mange oplysninger.');try{return JSON.parse(text);}catch{throw new Failure(400,'Oplysningerne kunne ikke læses.');}}
+async function body(request){if(Number(request.headers.get('content-length')||0)>12000)throw new Failure(400,'For mange oplysninger.');const text=await request.text();if(text.length>12000)throw new Failure(400,'For mange oplysninger.');try{return JSON.parse(text);}catch{throw new Failure(400,'Oplysningerne kunne ikke læses.');}}
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  const routes={'/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(request.method!==routes[path])return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -27,6 +28,32 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
   const uid=account.localId,isAdmin=!!env.TRACCAR_ADMIN_UID&&uid===env.TRACCAR_ADMIN_UID;
+  if(path.startsWith('/api/push/')||path==='/api/fence'){
+   await ensureNotifications(env.DB);
+   if(path==='/api/push/config')return json({ready:pushReady(env),publicKey:pushReady(env)?env.VAPID_PUBLIC_KEY:null});
+   const input=await body(request);
+   if(path==='/api/fence'){
+    if(!identifierOK(input.identifier)||!validHome(input.home)||typeof input.name!=='string'||input.name.length>40||typeof input.enabled!=='boolean')throw new Failure(400,'Kontrollér hjemmeområdet.');
+    if(!await env.DB.prepare('SELECT identifier FROM trackers WHERE identifier = ? AND owner_uid = ?').bind(input.identifier,uid).first())throw new Failure(403,'Trackeren er ikke tilknyttet din konto.');
+    const home={lat:input.home.lat,lon:input.home.lon,radius:input.home.radius,shape:input.home.shape,...(input.home.shape==='polygon'?{points:input.home.points.map(p=>({lat:p.lat,lon:p.lon}))}:{})};
+    await env.DB.prepare("INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,?) ON CONFLICT(identifier) DO UPDATE SET owner_uid=excluded.owner_uid,name=excluded.name,config=excluded.config,enabled=excluded.enabled,state='{}',checked_at=0").bind(input.identifier,uid,input.name,JSON.stringify(home),input.enabled?1:0).run();
+    return json({saved:true});
+   }
+   if(!validSubscription(input.subscription))throw new Failure(400,'Browserens pushabonnement kunne ikke bruges.');
+   const sub=input.subscription;
+   if(path==='/api/push/remove'){await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=? AND owner_uid=?').bind(sub.endpoint,uid).run();return json({removed:true});}
+   if(!pushReady(env))throw new Failure(503,'Push mangler engangsopsætningen hos Pejlo.');
+   if(path==='/api/push/test'){
+    if(!await env.DB.prepare('SELECT endpoint FROM pejlo_push WHERE endpoint=? AND owner_uid=?').bind(sub.endpoint,uid).first())throw new Failure(403,'Aktivér først beskeder på denne enhed.');
+    const result=await sendPush(sub,{title:'Pejlo',body:'Pushbeskeder virker på denne enhed.',tag:'pejlo-test',url:'/#indstillinger'},env,fetcher);
+    if(!result.ok)throw new Failure(502,'Testbeskeden kunne ikke afleveres. Prøv at aktivere beskeder igen.');return json({sent:true});
+   }
+   const count=await env.DB.prepare('SELECT COUNT(*) AS n FROM pejlo_push WHERE owner_uid=?').bind(uid).first();
+   const existing=await env.DB.prepare('SELECT owner_uid FROM pejlo_push WHERE endpoint=?').bind(sub.endpoint).first();
+   if(existing&&existing.owner_uid!==uid)throw new Failure(409,'Slå beskeder fra på den tidligere konto på denne enhed først.');
+   if(!existing&&count.n>=5)throw new Failure(400,'Der er allerede fem enheder med beskeder på kontoen.');
+   await env.DB.prepare('INSERT INTO pejlo_push(endpoint,owner_uid,subscription) VALUES(?,?,?) ON CONFLICT(endpoint) DO UPDATE SET subscription=excluded.subscription WHERE owner_uid=excluded.owner_uid').bind(sub.endpoint,uid,JSON.stringify(sub)).run();return json({saved:true});
+  }
   if(path==='/api/trackers'){
    const rows=await env.DB.prepare('SELECT identifier, name FROM trackers WHERE owner_uid = ? ORDER BY name').bind(uid).all();
    return json({trackers:rows.results,isAdmin,uid});
@@ -77,4 +104,4 @@ export async function handleAPI(request,env,fetcher=fetch){
   return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown'},position,route,historyAvailable,checkedAt:Date.now()});
  }catch(error){return json({error:error instanceof Failure?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error instanceof Failure?error.status:502);}
 }
-export default {fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};
+export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

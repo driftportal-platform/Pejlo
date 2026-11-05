@@ -1,3 +1,6 @@
+# Nyt i 0.6.0
+Cirkel eller område tegnet med punkter direkte i Pejlo. Push ved udgang og tilbagekomst er implementeret og kræver tre runtime-værdier én gang i Cloudflare. Se [opsætning og test](docs/geofence.md).
+
 # Pejlo 0.5.1
 
 Dansk tracker-app med Firebase-login, private profiler, fælles kort og Traccar-testforbindelse. Brugeren tilknytter en klargjort tracker med ID og parringskode i appen. Læs **START_HER.md før upload**: et D1-database-ID samt to runtime-secrets skal sættes én gang.

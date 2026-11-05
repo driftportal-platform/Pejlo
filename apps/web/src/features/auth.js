@@ -37,7 +37,7 @@ export async function startAuthentication(onSession){
    try{await authSDK.sendEmailVerification(result.user,actionSettings);message('Bekræftelsesmail sendt. Se også i spam.');}catch(e){message('Kontoen er oprettet, men mailen kunne ikke sendes. Brug Send bekræftelsesmail igen.');}
   }else{await authSDK.signInWithEmailAndPassword(auth,email,password);$('#auth-password').value='';}
  });};
- $('#account-logout').onclick=async()=>{try{await authSDK.signOut(auth);}catch(e){message(authError(e));}};
+ $('#account-logout').onclick=async()=>{try{if('serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('/');const sub=await registration?.pushManager.getSubscription();if(sub){try{const token=await auth.currentUser.getIdToken();await fetch('/api/push/remove',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON()}),signal:AbortSignal.timeout(5000)});}catch{}await sub.unsubscribe();}}await authSDK.signOut(auth);}catch(e){message(authError(e));}};
  $('#verify-resend').onclick=async e=>{e.target.disabled=true;try{await authSDK.sendEmailVerification(auth.currentUser,actionSettings);message('Bekræftelsesmail sendt. Se også i spam.');}catch(error){message(authError(error));}finally{e.target.disabled=false;}};
  $('#verify-check').onclick=async e=>{e.target.disabled=true;try{await authSDK.reload(auth.currentUser);await auth.currentUser.getIdToken(true);await changed(auth.currentUser);if(!auth.currentUser.emailVerified)message('E-mailen er ikke bekræftet endnu. Åbn linket i mailen, og prøv igen.');}catch(error){message(authError(error));}finally{e.target.disabled=false;}};
  async function changed(user){
