@@ -5,10 +5,11 @@ const identifier='080608317309';
 function database(owner='owner-uid'){
  const rows=new Map([[identifier,{identifier,name:'Pejlo',code_hash:'test-hash',owner_uid:owner}]]);
  return {rows,prepare(sql){let args=[];return {bind(...values){args=values;return this;},async all(){return {results:[...rows.values()].filter(r=>r.owner_uid===args[0]).map(({identifier,name})=>({identifier,name}))};},async first(){
+ if(sql.startsWith('SELECT m.'))return null;
  const row=rows.get(sql.startsWith('UPDATE')?args[1]:args[0]);
  if(sql.startsWith('UPDATE')){if(!row||row.code_hash!==args[2]||(row.owner_uid!==null&&row.owner_uid!==args[3]))return null;row.owner_uid=args[0];return {identifier:row.identifier,name:row.name};}
  return row&&(!sql.includes('AND owner_uid')||row.owner_uid===args[1])?{identifier:row.identifier}:null;
- },async run(){if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
+ },async run(){if(sql.startsWith('CREATE'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
 }
 const env={DB:database(),TRACCAR_ADMIN_UID:'owner-uid',TRACCAR_TOKEN:'server-secret'};
 const position={id:42,deviceId:7,valid:true,latitude:56.55,longitude:8.31,fixTime:new Date().toISOString(),attributes:{batteryLevel:55,secret:'never expose'}};

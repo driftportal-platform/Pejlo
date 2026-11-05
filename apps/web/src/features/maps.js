@@ -1,3 +1,4 @@
+import {routeAnalysis} from '../shared/history.js';
 import {icon} from '../components/icons.js';
 import {distance,searchZoom} from '../shared/geo.js';
 import {types} from './profiles.js';
@@ -30,13 +31,13 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
         return true;
       } catch {if(current===generation)notice?.('Kortlaget kunne ikke indlæses. Prøv igen senere. Det tidligere lag beholdes.');return false;}
     },
-    profile(p,data,{showRoute=true,showHome=true}={}) {
+    profile(p,data,{showRoute=true,showHome=true,history=false}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();
-      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:markerIcon(types[p.type].icon),title:p.name+(data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
-      if(showRoute)L.polyline(data.route.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
-      if(showHome){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
+      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:markerIcon(types[p.type].icon),title:p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
+      if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
+      if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
     },
-    fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},
+    fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.homeConfirmed&&p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},
     search(user,target,auto) {
       phone.clearLayers();if(!user)return;
       L.circleMarker([user.lat,user.lon],{radius:7,color:'white',weight:3,fillColor:'#477fc1',fillOpacity:1}).addTo(phone);

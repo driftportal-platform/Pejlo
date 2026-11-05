@@ -1,3 +1,19 @@
+# Pejlo 0.7.1 – rettet sletning af geofence
+
+Slettede områder vises ikke længere på kortet. Ny tegning starter uden det tidligere omrids. Tegneknappen kræver mindst tre gyldige punkter. Alle funktioner fra 0.7.0 er med. Upload hele pakken som hidtil; ingen nye indstillinger kræves.
+
+# Pejlo 0.7.0
+
+Komplet GitHub-udgave med personlige alarmvalg, familiedeling af samme tracker/profil/geofences og historik med danske døgn, datovalg, afspilning og synlige huller.
+
+**Start her:** [Opsætning og brug af 0.7.0](docs/version-0.7.md). Der kræves ingen nye Cloudflare-nøgler eller Firebase-regler. Behold jeres eksisterende database, pushnøgler og buildopsætning.
+
+`npm test` bygger appen og kører tests. `npm run build` danner `dist`; `npx wrangler deploy` deployer den eksisterende Worker. `MAPTILER_API_KEY` skal fortsat være tilgængelig ved build.
+
+Nedenstående dokumentation beskriver også tidligere trin i projektet; 0.7.0-vejledningen er gældende ved forskelle.
+
+---
+
 # Nyt i 0.6.1
 Navngivne geofences, skift og sletning; margen 0–30 m, standard 5 m. Genbrug Cloudflare-opsætningen. Gem området igen for at opdatere serverens margen.
 
