@@ -1,4 +1,4 @@
-# Find Loui · 0.2.0
+# Pejlo · 0.3.0
 
 Dansk mobilprototype til flere dyr og genstande.
 Læs **START_HER.md** for GitHub-upload og Cloudflare-opsætning.

@@ -33,6 +33,6 @@ test('profiles preserve separate homes through saving and reloading; invalid act
   assert.equal(loadState().activeId,'bike');
   value=JSON.stringify({profiles,activeId:'missing'});
   assert.equal(loadState().activeId,'cat');
-  value='{broken';assert.equal(loadState().profiles[0].name,'Loui');
+  value='{broken';assert.equal(loadState().profiles.length,0);
   delete globalThis.localStorage;
 });

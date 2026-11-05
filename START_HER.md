@@ -1,4 +1,4 @@
-# Find Loui 0.2 – start her
+# Pejlo 0.3 – start her
 
 Denne pakke er til dit eget GitHub-repository og din egen Cloudflare-udgivelse.
 Der kræves ikke ChatGPT-login til appen, når du selv udgiver den.
@@ -6,9 +6,9 @@ Der kræves ikke ChatGPT-login til appen, når du selv udgiver den.
 ## 1. Upload til GitHub
 
 1. Pak ZIP-filen ud.
-2. Opret et nyt repository, fx `find-loui` (gerne privat).
+2. Opret et nyt repository, fx `pejlo` (gerne privat).
 3. Upload indholdet, så `package.json`, `wrangler.jsonc`, `apps`, `packages`, `scripts` og `dist` ligger i repositoryets rod.
-4. Upload filerne og mapperne – ikke ZIP-filen. Undgå at lægge en ekstra `Find_Loui...`-mappe udenom hele projektet.
+4. Upload filerne og mapperne – ikke ZIP-filen. Undgå at lægge en ekstra `Find_dit dyr...`-mappe udenom hele projektet.
 
 ## 2. Cloudflare Workers (GitHub-forbindelse)
 
@@ -16,7 +16,7 @@ Der kræves ikke ChatGPT-login til appen, når du selv udgiver den.
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 - Root directory: repositoryets rod (tomt felt eller `/`).
-- Worker-navn: `find-loui`, som i `wrangler.jsonc`. Hvis du vælger et andet navn, skal konfigurationen bruge samme navn.
+- Worker-navn: `pejlo`, som i `wrangler.jsonc`. Hvis du vælger et andet navn, skal konfigurationen bruge samme navn.
 - `dist` er allerede angivet som mappen med webfiler i `wrangler.jsonc`.
 
 Der er ingen Hello World-worker, som skal indsættes. Hele appen ligger i pakken.
@@ -54,13 +54,14 @@ afstand/retning fra mobilens GPS til et eksempelpunkt, kompasstøtte og automati
 Den kan have flere lokale trackerprofiler, men modtager endnu ingen fysiske trackerdata.
 Alle målpositioner, ruter og batteriprocenter er eksempeldata. Den bruger ikke din rigtige Q8.
 Forskellige profiler viser forskellige, men stadig opdigtede, eksempelruter.
+Appen starter uden profiler. Brugeren vælger selv navn og type.
 
 Kortlag med din egen nøgle og mobilkompas er ikke afprøvet på din iPhone endnu.
 Retning er fugleflugtsretning, ikke gangnavigation. Ved lav GPS-præcision dæmpes pilen
 og zoom begrænses. En gammel position kan være et sted, enheden har forladt.
 
 Næste udviklingstrin er login, kundekonti, serverkontrollerede rettigheder og
-Traccar-tilknytning pr. profil. Så kommer synkronisering mellem dine og Louises telefoner.
+Traccar-tilknytning pr. profil. Så kommer synkronisering mellem dine og dit dyrses telefoner.
 Firebase er ikke oprettet og er ikke nødvendigt for at prøve denne udgave.
 Der ligger ingen adgangskoder, tracker-ID'er, hemmelige nøgler eller rigtig hjemmeposition i pakken.
 
@@ -86,3 +87,10 @@ Lokalt: Node.js 20 eller nyere. Kør `npm test` for bygning og test.
 - https://docs.maptiler.com/guides/developer/credentials/api-key/
 - https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/watchPosition
 - https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/requestPermission_static
+
+## Opdatering fra 0.2 til Pejlo 0.3
+Upload hele pakkens indhold til det eksisterende GitHub-repository Pejlo, og erstat de gamle filer. Cloudflare bygger automatisk, når GitHub-forbindelsen er aktiv. Worker-navnet er `pejlo`.
+
+Den urørte, automatisk oprettede Loui-eksempelprofil fjernes ved første start af 0.3. Egne profiler og ændrede gamle profiler bevares. Profiler, som brugeren selv kalder Loui, fjernes ikke. Kortnøgle bevares. Browseren gemmer herefter under en ny Pejlo-nøgle, så slettede profiler ikke kommer tilbage ved genindlæsning.
+
+Hvis den gamle visning fortsætter efter en vellykket Cloudflare-udgivelse: genindlæs siden med Ctrl+F5 på Windows, eller luk og genåbn siden på mobilen.

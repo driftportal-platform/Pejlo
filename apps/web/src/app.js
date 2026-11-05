@@ -9,23 +9,29 @@ const $=s=>document.querySelector(s);
 const state=loadState();
 let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome=false, user=null, heading=null, headingTime=0, watching=false, simulation=false, demoStep=0, toastTimer;
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
-const data=()=>demoFor(selected());
+const data=()=>selected()?demoFor(selected()):null;
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),6000);}
 function persist(){if(!saveState(state))toast('Browseren kunne ikke gemme. Ændringerne gælder kun, mens siden er åben.');}
 function options(select,items,value){select.replaceChildren();for(const [id,label] of items){const o=document.createElement('option');o.value=id;o.textContent=label;select.append(o);}select.value=value;}
-function renderMap(m){m?.profile(selected(),data(),{showRoute:$('#show-route').checked,showHome:$('#show-home').checked});}
+function renderMap(m){if(!selected())return;m?.profile(selected(),data(),{showRoute:$('#show-route').checked,showHome:$('#show-home').checked});}
 function showPage(name){
-  if(!['kort','ture','indstillinger','soeg'].includes(name))name='kort';
+  if(!selected()){name='velkommen';}
+  else if(!['kort','ture','indstillinger','soeg'].includes(name))name='kort';
   if(currentPage==='soeg'&&name!=='soeg')stopLocation(false);
   currentPage=name;
   document.querySelectorAll('.page').forEach(e=>e.hidden=e.id!==name);
   document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('active',e.dataset.page===name||(name==='soeg'&&e.dataset.page==='kort')));
-  $('#page-title').textContent={kort:'Dit overblik',ture:'Ture og bevægelser',indstillinger:'Dine profiler og indstillinger',soeg:'Find '+selected().name}[name];
+  $('#page-title').textContent={kort:'Dit overblik',ture:'Ture og bevægelser',indstillinger:'Dine profiler og indstillinger',soeg:'Find '+(selected()?.name??''),velkommen:'Velkommen til Pejlo'}[name];
   if(name==='kort')requestAnimationFrame(()=>overviewMap?.fit(selected(),data()));
   if(name==='soeg')requestAnimationFrame(()=>{if(!searchMap){searchMap=createMap('search-map',{notice:toast,onManual:()=>{$('#autozoom').checked=false;}});searchMap?.layer(chosenLayer,state.mapKey);}renderMap(searchMap);searchMap?.fit(selected(),data());updateSearch();});
 }
 function go(name){window.location.hash=name;showPage(name);}
 function refresh(){
+  const empty=!selected();
+  $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
+  document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
+  if(empty){options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();showPage('velkommen');return;}
+  if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   options($('#profile-select'),state.profiles.map(p=>[p.id,p.name+' · '+types[p.type].label]),p.id);
   $('#side-name').textContent=p.name;$('#side-type').textContent=meta.label;
@@ -37,7 +43,7 @@ function refresh(){
   $('#profile-name').value=p.name;$('#profile-type').value=p.type;$('#profile-device').value=p.deviceLabel;
   $('#lat').value=p.home.lat;$('#lon').value=p.home.lon;$('#radius').value=p.home.radius;
   $('#map-key').value=state.mapKey;
-  $('#delete-profile').hidden=state.profiles.length===1;
+  $('#delete-profile').hidden=false;
   $('#profile-context').textContent=meta.category==='dyr'?'Hjemmeområde og ture for '+p.name+'.':'Fast udgangspunkt og bevægelser for '+p.name+'.';
   $('#history-title').textContent='Eksempelrute for '+p.name;
   $('#search-title').textContent='Find '+p.name;
@@ -46,8 +52,9 @@ function refresh(){
   $('#navigate').href=`https://www.google.com/maps/search/?api=1&query=${d.position.lat},${d.position.lon}`;
   renderMap(overviewMap);renderMap(searchMap);updateAge();updateSearch();showPage(currentPage);
 }
-function updateAge(){const seconds=Math.max(0,Math.floor((Date.now()-data().position.timestamp)/1000));const text=seconds<60?seconds+' sek. siden':Math.floor(seconds/60)+' min. siden';$('#age').textContent=text;$('#freshness').textContent=seconds>300?'Gammel eksempelposition':'Eksempel';$('#search-age').textContent=(seconds>300?'OBS: gammel position. ':'')+'Målet er en eksempelposition fra '+text+'.';}
+function updateAge(){if(!selected())return;const seconds=Math.max(0,Math.floor((Date.now()-data().position.timestamp)/1000));const text=seconds<60?seconds+' sek. siden':Math.floor(seconds/60)+' min. siden';$('#age').textContent=text;$('#freshness').textContent=seconds>300?'Gammel eksempelposition':'Eksempel';$('#search-age').textContent=(seconds>300?'OBS: gammel position. ':'')+'Målet er en eksempelposition fra '+text+'.';}
 function updateSearch(){
+  if(!selected())return;
   const target=data().position;
   if(!user){$('#search-distance').textContent='— m';$('#direction-text').textContent='Start placering for at se afstand og retning.';$('#compass-arrow').style.opacity='.25';searchMap?.clearPhone();return;}
   const meters=distance(user,target),b=bearing(user,target),phoneStale=Date.now()-user.timestamp>20000;
@@ -66,7 +73,7 @@ const location=createLocation(p=>{user=p;simulation=false;updateSearch();},messa
 for(const b of document.querySelectorAll('nav button')){b.innerHTML=icon(b.dataset.page)+{kort:'Kort',ture:'Ture',indstillinger:'Indstillinger'}[b.dataset.page];b.onclick=()=>go(b.dataset.page);}
 for(const e of document.querySelectorAll('[data-icon]'))e.innerHTML=icon(e.dataset.icon);
 for(const b of document.querySelectorAll('[data-goto]'))b.onclick=()=>go(b.dataset.goto);
-for(const id of ['profile-type','new-type'])options($('#'+id),Object.entries(types).map(([id,t])=>[id,t.label]),'cat');
+for(const id of ['profile-type','new-type'])options($('#'+id),[...(id==='new-type'?[['','Vælg dyr eller genstand…']]:[]),...Object.entries(types).map(([id,t])=>[id,t.label])],id==='new-type'?'':'cat');
 for(const select of document.querySelectorAll('.layer-select')){options(select,Object.entries(layers),'demo');select.onchange=async()=>{
   const name=select.value;const ok=await overviewMap?.layer(name,state.mapKey);
   if(ok){chosenLayer=name;await searchMap?.layer(name,state.mapKey);document.querySelectorAll('.map-caption').forEach(e=>e.textContent=name==='demo'?'SKEMATISK EKSEMPEL · IKKE GEOGRAFISK KORT':'GEOGRAFISK KORT · POSITIONER ER EKSEMPLER');}
@@ -74,16 +81,17 @@ for(const select of document.querySelectorAll('.layer-select')){options(select,O
 };}
 overviewMap=createMap('map',{notice:toast,onHome:p=>{if(!choosingHome)return;choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';if(confirm('Gem dette som fast udgangspunkt for '+selected().name+'? På eksempelkortet svarer vejene ikke til virkeligheden.')){selected().home={...selected().home,...p};persist();refresh();toast('Fast udgangspunkt gemt.');}}});
 $('#profile-select').onchange=e=>{stopLocation(false);state.activeId=e.target.value;persist();refresh();};
-$('#fit').onclick=()=>overviewMap?.fit(selected(),data());
+$('#fit').onclick=()=>{if(selected())overviewMap?.fit(selected(),data());};
 $('#find').onclick=()=>go('soeg');
 $('#show-route').onchange=()=>{renderMap(overviewMap);renderMap(searchMap);};$('#show-home').onchange=$('#show-route').onchange;
 $('#set-map-home').onclick=()=>{choosingHome=!choosingHome;$('#set-map-home').textContent=choosingHome?'Annuller valg':'Sæt fast udgangspunkt';if(choosingHome)toast('Tryk på kortet. Eksempelkortets veje er skematiske — brug et geografisk kort eller koordinater til dit rigtige hjem.');};
 $('#profile-form').onsubmit=e=>{e.preventDefault();const name=$('#profile-name').value.trim();if(!name)return toast('Skriv et navn.');Object.assign(selected(),{name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim()});persist();refresh();toast('Profil gemt. Navn og ikon er opdateret.');};
 $('#home-form').onsubmit=e=>{e.preventDefault();if(!e.target.reportValidity())return;selected().home={lat:Number($('#lat').value),lon:Number($('#lon').value),radius:Number($('#radius').value)};persist();refresh();toast('Fast udgangspunkt gemt for '+selected().name+'.');};
 $('#use-location').onclick=()=>{if(!navigator.geolocation)return toast('Placering er ikke tilgængelig.');navigator.geolocation.getCurrentPosition(p=>{$('#lat').value=p.coords.latitude.toFixed(6);$('#lon').value=p.coords.longitude.toFixed(6);toast('Kontrollér koordinaterne, og tryk Gem fast udgangspunkt.');},()=>toast('Placering kunne ikke hentes. Kontrollér browserens tilladelse.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});};
-$('#add-profile').onclick=()=>{if(state.profiles.length>=50)return toast('Prototypen har plads til 50 lokale profiler.');$('#new-profile-form').reset();$('#new-profile').showModal();};$('#close-new').onclick=()=>$('#new-profile').close();
+function openNewProfile(){if(state.profiles.length>=50)return toast('Prototypen har plads til 50 lokale profiler.');$('#new-profile-form').reset();$('#new-type').value='';$('#new-profile').showModal();}
+$('#add-profile').onclick=openNewProfile;$('#first-profile').onclick=openNewProfile;$('#close-new').onclick=()=>$('#new-profile').close();
 $('#new-profile-form').onsubmit=e=>{e.preventDefault();const p=newProfile($('#new-name').value.trim(),$('#new-type').value,$('#new-device').value.trim());if(!p)return toast('Vælg type, og skriv et navn.');stopLocation(false);state.profiles.push(p);state.activeId=p.id;persist();$('#new-profile').close();refresh();toast('Profil oprettet med eksempeldata.');};
-$('#delete-profile').onclick=()=>{if(state.profiles.length===1)return;if(!confirm('Fjern den lokale profil '+selected().name+'? Dette sletter ikke en fysisk tracker.'))return;stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0].id;persist();refresh();};
+$('#delete-profile').onclick=()=>{if(!selected())return;if(!confirm('Fjern den lokale profil '+selected().name+'? Dette sletter ikke en fysisk tracker.'))return;stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0]?.id??null;persist();refresh();};
 $('#map-key-form').onsubmit=e=>{e.preventDefault();state.mapKey=$('#map-key').value.trim();persist();if(!state.mapKey){chosenLayer='demo';overviewMap?.layer('demo');searchMap?.layer('demo');document.querySelectorAll('.layer-select').forEach(s=>s.value='demo');document.querySelectorAll('.map-caption').forEach(e=>e.textContent='SKEMATISK EKSEMPEL · IKKE GEOGRAFISK KORT');}toast('Kortnøgle gemt i denne browser. Vælg et kortlag på kortet.');};
 $('#locate').onclick=()=>{stopLocation(false);watching=true;$('#phone-state').textContent='Venter på mobilens placering…';$('#locate').textContent='Start placering igen';location.start();};
 $('#enable-compass').onclick=async()=>{if(await location.compass())toast('Kompas startet. Afventer en brugbar kompasretning fra mobilen.');};
@@ -93,4 +101,4 @@ $('#simulate').onclick=()=>{demoStep=0;simulate();};$('#closer').onclick=()=>{de
 window.addEventListener('hashchange',()=>showPage(window.location.hash.slice(1)));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(watching||simulation||heading!==null))stopLocation(false);});
 window.addEventListener('pagehide',()=>location.stop());
-refresh();showPage(window.location.hash.slice(1));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
+persist();refresh();showPage(window.location.hash.slice(1));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);

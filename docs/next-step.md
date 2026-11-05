@@ -1,4 +1,4 @@
-# Arkitektur og næste trin · 0.2
+# Arkitektur og næste trin · 0.3
 
 ## Implementeret
 
