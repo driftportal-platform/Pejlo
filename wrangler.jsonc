@@ -2,6 +2,22 @@
   "name": "pejlo",
   "compatibility_date": "2026-11-05",
   "assets": {
-    "directory": "./dist"
-  }
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "main": "apps/api/worker.js",
+  "vars": {
+    "TRACCAR_URL": "https://demo3.traccar.org"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pejlo-trackers",
+      "database_id": "88356335-2caf-41d5-9a45-99c31eaea836",
+      "migrations_dir": "apps/api/migrations"
+    }
+  ]
 }

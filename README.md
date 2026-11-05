@@ -1,17 +1,25 @@
-# Pejlo · 0.4.1
+# Pejlo 0.5.0
 
-Dansk trackerprototype med personligt Firebase-login og privat profillagring.
-Start i **START_HER.md**. Firebase skal konfigureres før første brug.
+Dansk tracker-app med Firebase-login, private profiler, fælles kort og Traccar-testforbindelse. Brugeren tilknytter en klargjort tracker med ID og parringskode i appen. Læs **START_HER.md før upload**: et D1-database-ID samt to runtime-secrets skal sættes én gang.
 
-- E-mail/adgangskode, bekræftelsesmail og nulstilling af adgangskode.
-- Tom konto ved første start. Brugeren vælger selv navn og type.
-- Flere profiler med egne ikoner og hjemmeområder, synkroniseret pr. konto.
-- Fælles kortopsætning via buildvariablen MAPTILER_API_KEY. Gadekort åbnes automatisk; satellit og terræn kan vælges. Brugere skal ikke oprette kortkonti.
-- Afstand og retning fra mobilen til et tydeligt mærket eksempelpunkt.
+## Kørsel
 
-Fysiske trackere, familiedeling og medlemsroller er endnu ikke tilsluttet.
-Alle målpositioner, ruter og batterital er fortsat eksempeldata.
+```sh
+npm test
+npm run build
+npx wrangler dev
+```
 
-Node.js 20+: `npm test` bygger og kører 16 tests. `npm run build` bygger dist.
-Kilder ligger i apps/web og packages/shared. Dist genereres automatisk.
-Firebase SDK 13.2.0 indlæses som browsermoduler fra Googles CDN.
+Cloudflare Build: `npm run build`. Deploy: `npx wrangler deploy`.
+
+## Struktur
+
+- `apps/web`: brugerflade, login, profiler, kort og polling.
+- `apps/api/worker.js`: verificerer Firebase-login via Google, autoriserer via D1 og kontakter Traccar.
+- `apps/api/migrations`: trackerregister med ét ejerskab pr. ID og hash af parringskode.
+- `packages/shared`: geografiske beregninger.
+- `tests`: adgang, ejerskab, koder, GPS-validering, kontoskift, profiler og kortopsætning.
+
+`TRACCAR_TOKEN` og `TRACCAR_ADMIN_UID` sættes som runtime-secrets. `MAPTILER_API_KEY` er den offentlige, domænebegrænsede kortnøgle under Builds. Ingen bruger skal oprette sin egen kortnøgle eller Traccar-konto.
+
+Testserveren er låst til `https://demo3.traccar.org`. Denne udgave kræver ingen ny server. Trackerens protokol og mobilnet skal passe til testserveren.

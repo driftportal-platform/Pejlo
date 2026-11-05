@@ -11,7 +11,7 @@ export const types = {
 export const defaultHome = {lat:56.5495,lon:8.311,radius:100};
 export function cleanProfile(p) {
   if (!p || typeof p.id !== 'string' || !p.id || typeof p.name !== 'string' || !p.name.trim() || p.name.length > 40 || !Object.hasOwn(types,p.type) || !validPoint(p.home) || !Number.isFinite(p.home.radius) || p.home.radius < 20 || p.home.radius > 5000) return null;
-  return {id:p.id.slice(0,100), name:p.name.trim(), type:p.type, deviceLabel:typeof p.deviceLabel === 'string' ? p.deviceLabel.slice(0,60) : '', home:{lat:p.home.lat,lon:p.home.lon,radius:p.home.radius}};
+  return {id:p.id.slice(0,100), name:p.name.trim(), type:p.type, deviceLabel:typeof p.deviceLabel === 'string' ? p.deviceLabel.slice(0,60) : '', trackerId:typeof p.trackerId === 'string' ? p.trackerId.slice(0,100) : '', home:{lat:p.home.lat,lon:p.home.lon,radius:p.home.radius}};
 }
 export function newProfile(name, type, deviceLabel = '') {
   return cleanProfile({id:(typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('')),name,type,deviceLabel,home:{...defaultHome}});

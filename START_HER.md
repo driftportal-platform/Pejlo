@@ -1,69 +1,75 @@
-# Pejlo 0.4.1 – start her
+# Pejlo 0.5.0 – samlet GitHub-udgave
 
-Denne version tilføjer personligt login og privat profillagring til dit eksisterende Pejlo-repository. Cloudflare er fortsat vært for appen; Firebase håndterer login og profiler.
+Denne udgave tilføjer Traccar-forbindelsen og tilknytning med **tracker-ID + parringskode**. Brugerne foretager tilknytningen i Pejlo. Kun administratoren skal sætte infrastrukturen op.
 
-## 1. Firebase Authentication
+**Vigtigt: opret databasen nedenfor før upload/deploy.** `wrangler.jsonc` indeholder en markeret plads til dit rigtige database-ID. Udgaven er ikke allerede udgivet.
 
-Åbn projektet **Pejlo (pejlo-a1fed)** i Firebase Console.
+## 1. Opret trackerregisteret én gang
 
-1. Åbn Authentication, og vælg Get started, hvis den vises.
-2. Under Sign-in method: aktivér **Email/Password**. Gem.
-3. Under Settings → Authorized domains: tilføj **pejlo.driftportal-platform.workers.dev** uden https eller skråstreg.
+I Cloudflare: Storage & databases → D1 SQL database → Create Database. Navn: `pejlo-trackers`.
 
-Brugeren skal bekræfte sin e-mail, før appen giver adgang til profillagring. En knap i appen kontrollerer bekræftelsen. Firebase sender selve mailen. Appens webkonfiguration er allerede indsat i `apps/web/src/config/firebase.js`; det er almindelig offentlig klientkonfiguration, ikke en administratornøgle.
+Kopiér databasens ID. Åbn `wrangler.jsonc` i denne pakke, og erstat `INDSAET_DATABASE_ID` med det kopierede ID. Behold bindingens navn `DB`.
 
-## 2. Cloud Firestore og regler
+Åbn D1-databasens Console, og kør indholdet af `apps/api/migrations/0001_trackers.sql`. Filen opretter tabellen og ejerindekset; den sletter ingen eksisterende data.
 
-1. Åbn Cloud Firestore under Databases & Storage.
-2. Opret en **Standard**-database med database-ID **(default)**. Vælg produktionsregler og en passende EU-placering. Kontrollér placeringen før oprettelse; den kan ikke ændres på den eksisterende database.
-3. Åbn fanen Rules.
-4. Erstat reglerne med **hele indholdet af firestore.rules** fra denne pakke, og tryk Publish.
+Alternativ med terminal, fra projektmappen:
 
-GitHub-upload og Cloudflare-build udgiver IKKE Firebase-reglerne. De skal udgives særskilt i Firebase Console. Brug ikke åbne testregler.
+```sh
+npx wrangler d1 create pejlo-trackers
+# Indsæt database-ID'et i wrangler.jsonc, behold binding DB.
+npx wrangler d1 migrations apply pejlo-trackers --remote
+```
 
-Reglerne tillader kun en verificeret bruger at hente og ændre sit eget dokument: `users/{uid}/private/state`. Andre konti har ingen adgang. Der gives ikke tilladelse til at liste brugere. Familiedeling er endnu ikke implementeret.
+## 2. Sæt to runtime-secrets på Workeren
 
-## 3. Opdatér GitHub
+Cloudflare → Workers & Pages → pejlo → Settings → Variables and Secrets, **uden for Builds**:
 
-Pak ZIP-filen ud, og upload hele indholdet til **driftportal-platform/Pejlo**. Erstat de gamle filer. `package.json`, `wrangler.jsonc`, `apps` og `dist` skal ligge i repositoryets rod; upload ikke ZIP-filen eller en ekstra omsluttende mappe.
+| Type | Navn | Værdi |
+| --- | --- | --- |
+| Secret | `TRACCAR_TOKEN` | Token fra den nye Traccar-konto |
+| Secret | `TRACCAR_ADMIN_UID` | Dit Pejlo Firebase-bruger-ID (UID) |
 
-Cloudflare-indstillingerne er fortsat:
+Find UID i Firebase → Authentication → Users → vælg den bruger, du logger på **Pejlo** med. UID er ikke Traccar-ID og ikke din e-mailadresse. Kun den konto får knappen til at klargøre trackere.
 
-- Build: `npm run build`
-- Deploy: `npx wrangler deploy`
-- Worker-navn: `pejlo`
-- Root: repositoryets rod
+Token skal kun indtastes i Cloudflare, aldrig i GitHub eller et profilfelt. Der er intet token indbygget i pakken.
 
-## 4. Afprøv login og profiler
+Den delte kortnøgle `MAPTILER_API_KEY` bliver stående under **Builds → Variables and secrets** som før. Den bruges under build til kortene.
 
-1. Vent på en vellykket Cloudflare-udgivelse, og åbn https://pejlo.driftportal-platform.workers.dev.
-2. Genindlæs med Ctrl+F5, hvis den gamle udgave vises.
-3. Vælg Opret konto med din egen e-mail og mindst 10 tegn i adgangskoden.
-4. Åbn bekræftelsesmailen; se også i spam. Vend tilbage til appen, og tryk Jeg har bekræftet min e-mail.
-5. Opret selv den første profil. Der er ingen Loui-profil fra start.
-6. Log ud og ind igen: profilen skal komme tilbage. Samme konto på en anden enhed skal vise samme profiler. En anden konto skal starte tomt.
-7. Gamle profiler fra denne browser kan importeres aktivt fra velkomstsiden eller Indstillinger. De importeres aldrig automatisk til en konto.
+Testserveren er fortsat `https://demo3.traccar.org`; ingen ny Traccar-server skal lejes eller oprettes.
 
-Profiler gemmes på kontoen. Kortopsætning er fælles for appen. Husk mig bruger vedvarende login på enheden; ellers gælder login for browsersessionen. Ved kontoskift ryddes den viste profiltilstand. Ingen profil åbnes fra lokal cache, før serveren har svaret. Ved mistet forbindelse sættes redigering på pause. Gemning bruger revisionstjek; en samtidig ændring vises i stedet for at blive overskrevet i stilhed. Ved en gemmefejl vises en besked, og seneste servertilstand gendannes.
+## 3. Upload og deploy
 
-Hvis profillagring ikke åbner: kontrollér Firestore, publicerede regler og e-mailbekræftelsen, og tryk Prøv forbindelsen igen. Hvis login fejler: kontrollér Email/Password og Authorized domains.
+Upload hele pakkens indhold til roden af det eksisterende GitHub-repository `driftportal-platform/Pejlo`. Erstat filer ved samme navn. Behold den rettede `wrangler.jsonc`.
 
-## Kort og trackerstatus
+Cloudflare bygger med `npm run build` og udgiver med `npx wrangler deploy` som hidtil. Databasen bindes som `DB` gennem konfigurationen.
 
-Alle trackerpositioner, ruter og batterital er EKSEMPLER. Denne udgave modtager ingen data fra Q8 eller andre fysiske trackere. Familieroller og invitationer kommer senere.
+Eksisterende profiler og login bevares. Firestore-reglerne er de samme som før. D1-registeret er serverens autoritative ejerregister; en ændring af et profilfelt giver aldrig adgang til en anden brugers tracker.
 
-Kortene sættes op én gang af appens ejer, ikke af slutbrugerne. I Cloudflare Workers → pejlo → Settings → Build → Build Variables and Secrets: tilføj buildvariablen MAPTILER_API_KEY med selve den offentlige MapTiler-nøgle som værdi. Den skal være tilgængelig under npm run build, ikke kun som runtime-variabel. Gem, og upload denne pakke til GitHub for at udløse et nyt build. Hvis pakken allerede er uploadet, start et nyt build efter at variablen er gemt.
+## 4. Klargør jeres første tracker i Pejlo
 
-Nøglen indbygges i browserfilerne, som MapTiler kræver, og er dermed offentlig. Begræns den hos MapTiler til pejlo.driftportal-platform.workers.dev. Kun en offentlig kortnøgle må bruges; ingen administrator- eller servicekontonøgler. Kortforbruget hører til appens MapTiler-konto.
+Log på Pejlo med administratorkontoen. Opret en profil, hvis kontoen er tom. Gå til **Indstillinger → Trackerforbindelse → Administrator: klargør tracker**.
 
-Gadekort er standard ved hver åbning. Satellit, terræn og skematisk eksempel kan vælges under Kortlag. Feltet til brugerens kortnøgle er fjernet. Tidligere kontogemte nøgler bruges ikke og erstattes med tomt kompatibilitetsfelt ved næste profilgemning. Eksisterende Firebase-regler kan beholdes uændret.
+Indtast tracker-ID `080608317309` (behold det første nul) og fx navnet `Pejlo`. Tryk **Opret tracker og parringskode**.
 
-Hvis buildvariablen mangler, virker login og profiler fortsat, men kun skematisk eksempel kan vises. Et tydeligt mærke adskiller det fra et geografisk kort. En slutbruger bliver ikke bedt om at oprette en MapTiler-konto. Kontrollér udbyderens abonnement og kvoter.
+Den eksisterende enhed findes på den nye Traccar-konto; den genbruges. For nye ID'er oprettes en enhed på Traccar-kontoen automatisk. Hvis ID allerede er registreret på en anden Traccar-konto, skal det frigøres dér først.
 
-Find-skærmen bruger efter tilladelse mobilens GPS og eventuelt kompas. Afstanden er i fugleflugtslinje til et eksempelpunkt, ikke en gangrute. Automatisk zoom tager højde for GPS-usikkerhed. Mobilplacering og kompas stoppes, når søgesiden forlades eller appen skjules.
+Gem den viste parringskode med det samme. Den vises kun én gang og lagres kun som SHA-256-hash. Giv ID og kode til trackerens ejer.
 
-## Verifikation og begrænsninger
+## 5. Brugerens forløb
 
-16 automatiske tests består for geoberegninger, profilvalidering, migrering, kontoskift og revisionskonflikter. Loginvisningen kontrolleres i browseren. Der er ikke oprettet testkonti eller sendt mails fra udviklingsarbejdet. Firebase-regler og det samlede login-/lagringsforløb er endnu ikke valideret mod dit aktive Firebase-projekt eller en emulator; gennemfør derfor trin 4 før brug med vigtige data.
+1. Opret konto i Pejlo og bekræft e-mailen.
+2. Opret en profil med eget navn og dyre-/genstandstype.
+3. Under **Indstillinger → Trackerforbindelse**: indtast ID og parringskode.
+4. Tryk **Tilføj tracker til denne profil**.
 
-Kildekode: apps/web/src. Fælles geoberegninger: packages/shared. `npm test` bygger dist og kører tests. Firebase-regler: firestore.rules. Firebase CLI-konfiguration: firebase.json og .firebaserc.
+Trackeren knyttes nu til brugerens konto og profilen. Brugeren skal ikke ind i Cloudflare, Firebase eller Traccar. Koden kan ikke overtage en tracker, der allerede tilhører en anden konto. Ejeren kan genvælge en allerede tilknyttet tracker i profilens rullemenu.
+
+## Hardware og test
+
+Trackeren skal være sat til den fælles server og den rigtige protokol/port. ID + parringskode ændrer ikke trackerens mobilnet- eller serverindstillinger. Jeres Q8_H har allerede accepteret `demo3.traccar.org`, port `5015` via SMS. Registreret protokol: jt808.
+
+Appen henter seneste gyldige GPS-position, batteriprocent hvis oplyst og dagens punkter siden midnat UTC. Opdatering cirka hvert minut. En offline-enhed kan stadig have en gammel position; appen viser positionens alder. Manglende GPS vises som afventende, aldrig som en opdigtet position. Profiler uden tilknyttet tracker har stadig tydeligt mærkede eksempeldata.
+
+Familiedeling, overdragelse mellem konti og generel understøttelse/automatisk konfiguration af alle trackermodeller er ikke med endnu. En mistet parringskode kræver administrativ håndtering; denne udgave har ikke en knap til at nulstille den.
+
+Se `docs/validation.md` for præcis teststatus og begrænsninger.
