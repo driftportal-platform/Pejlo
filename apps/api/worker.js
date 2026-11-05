@@ -35,7 +35,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(path==='/api/fence'){
     if(!identifierOK(input.identifier)||!validHome(input.home)||typeof input.name!=='string'||input.name.length>40||typeof input.enabled!=='boolean')throw new Failure(400,'Kontrollér hjemmeområdet.');
     if(!await env.DB.prepare('SELECT identifier FROM trackers WHERE identifier = ? AND owner_uid = ?').bind(input.identifier,uid).first())throw new Failure(403,'Trackeren er ikke tilknyttet din konto.');
-    const home={lat:input.home.lat,lon:input.home.lon,radius:input.home.radius,shape:input.home.shape,...(input.home.shape==='polygon'?{points:input.home.points.map(p=>({lat:p.lat,lon:p.lon}))}:{})};
+    const home={lat:input.home.lat,lon:input.home.lon,radius:input.home.radius,buffer:input.home.buffer??5,shape:input.home.shape,...(input.home.shape==='polygon'?{points:input.home.points.map(p=>({lat:p.lat,lon:p.lon}))}:{})};
     await env.DB.prepare("INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,?) ON CONFLICT(identifier) DO UPDATE SET owner_uid=excluded.owner_uid,name=excluded.name,config=excluded.config,enabled=excluded.enabled,state='{}',checked_at=0").bind(input.identifier,uid,input.name,JSON.stringify(home),input.enabled?1:0).run();
     return json({saved:true});
    }

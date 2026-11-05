@@ -10,13 +10,14 @@ export async function ensureNotifications(db){
 }
 export const pushReady=env=>!!(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
 export function validSubscription(s){try{const u=new URL(s.endpoint);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&s.endpoint.length<2048&&(u.hostname==='fcm.googleapis.com'||u.hostname==='updates.push.services.mozilla.com'||u.hostname==='web.push.apple.com'||u.hostname.endsWith('.push.apple.com')||u.hostname.endsWith('.notify.windows.com'))&&/^[\w-]{87}$/.test(s.keys?.p256dh)&&/^[\w-]{22}$/.test(s.keys?.auth);}catch{return false;}}
-export function validHome(home){return validPoint(home)&&Number.isFinite(home.radius)&&home.radius>=20&&home.radius<=5000&&(['circle','polygon'].includes(home.shape))&&(home.shape!=='polygon'||validPolygon(home.points));}
+export function validHome(home){return validPoint(home)&&Number.isFinite(home.radius)&&home.radius>=20&&home.radius<=5000&&(home.buffer===undefined||(Number.isFinite(home.buffer)&&home.buffer>=0&&home.buffer<=30))&&(['circle','polygon'].includes(home.shape))&&(home.shape!=='polygon'||validPolygon(home.points));}
 export function advanceFence(home,raw,state,now=Date.now()){
  const time=Date.parse(raw?.fixTime);
  if(raw?.valid!==true||!validPoint({lat:raw.latitude,lon:raw.longitude})||!Number.isFinite(time)||time>now+60000||now-time>300000||time<=(state.last||0))return {state};
  const margin=fenceDistance(home,{lat:raw.latitude,lon:raw.longitude});
  if(typeof state.outside!=='boolean')return {state:{outside:margin>0,last:time,pending:0}};
- const crossed=state.outside?margin< -15:margin>15;
+ const buffer=home.buffer??5;
+ const crossed=state.outside?margin< -buffer:margin>buffer;
  const pending=crossed?(state.pending||0)+1:0;
  return pending>=2?{state:{outside:!state.outside,last:time,pending:0},transition:state.outside?'enter':'exit'}:{state:{...state,last:time,pending}};
 }

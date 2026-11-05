@@ -5,7 +5,7 @@ import {startAuthentication} from './features/auth.js';
 import {createCloudState} from './features/cloud-state.js';
 import {emptyState,normalizeAccountState} from './features/account-state.js';
 import {icon} from './components/icons.js';
-import {types,newProfile,profileSubtitle} from './features/profiles.js';
+import {types,newProfile,profileSubtitle,createId} from './features/profiles.js';
 import {loadState} from './features/storage.js';
 import {createTrackerClient} from './features/tracker.js';
 import {demoFor} from './features/demo.js';
@@ -81,6 +81,8 @@ function refresh(){
   if(empty){options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
+  options($('#saved-fences'),[['','Intet gemt område valgt'],...(p.fencePresets||[]).map(f=>[f.id,f.name])],p.activeFenceId||'');
+  $('#fence-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#delete-fence').disabled=!p.activeFenceId;$('#fence-buffer').value=p.home.buffer??5;
   options($('#profile-select'),state.profiles.map(p=>[p.id,p.name+' · '+types[p.type].label]),p.id);
   $('#side-name').textContent=p.name;$('#side-type').textContent=meta.label;
   $('#side-icon').innerHTML=icon(meta.icon,30);$('#select-icon').innerHTML=icon(meta.icon,22);
@@ -108,8 +110,8 @@ function refresh(){
 function updateGeofence(){
  if(!selected())return;
  const result=geofenceMonitor.evaluate(selected(),data(),{unavailable:!!trackerError});
- $('#geofence-status').textContent=result.text;$('.geofence-summary').dataset.state=result.kind;
- if(result.transition)toast(selected().name+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
+ const area=selected().fencePresets?.find(f=>f.id===selected().activeFenceId);$('#geofence-status').textContent=(area?area.name+' · ':'')+result.text;$('#fence-margin-description').textContent='To nye positioner og '+(selected().home.buffer??5)+' meters ekstra margen.';$('.geofence-summary').dataset.state=result.kind;
+ if(result.transition)toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
 }
 function updateAge(){
  updateGeofence();
@@ -159,14 +161,25 @@ async function selectLayer(name){
  labelLayer();document.querySelectorAll('.layer-select').forEach(s=>s.disabled=false);
 }
 for(const select of document.querySelectorAll('.layer-select')){options(select,Object.entries(layers),'demo');select.onchange=()=>selectLayer(select.value);}
-overviewMap=createMap('map',{notice:toast,onHome:p=>{if(polygonDraft){if(polygonDraft.points.length>=50)return toast('Højst 50 punkter.');polygonDraft.points.push(p);updateDraft();return;}if(!choosingHome)return;choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';if(confirm('Gem dette som hjemmeområdets midtpunkt for '+selected().name+'?'+(chosenLayer==='demo'?' Eksempelkortets veje er skematiske.':''))){selected().home={...selected().home,...p};selected().homeConfirmed=true;saveFence(selected()).catch(()=>{});persist();refresh();}}});
+overviewMap=createMap('map',{notice:toast,onHome:p=>{if(polygonDraft){if(polygonDraft.points.length>=50)return toast('Højst 50 punkter.');polygonDraft.points.push(p);updateDraft();return;}if(!choosingHome)return;choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';if(confirm('Gem dette som hjemmeområdets midtpunkt for '+selected().name+'?'+(chosenLayer==='demo'?' Eksempelkortets veje er skematiske.':''))){selected().home={...selected().home,...p};selected().homeConfirmed=true;const stored=selected().fencePresets.find(f=>f.id===selected().activeFenceId);if(stored)stored.home=structuredClone(selected().home);saveFence(selected()).catch(()=>{});persist();refresh();}}});
 $('#profile-select').onchange=e=>{cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
 $('#fit').onclick=()=>{if(selected())overviewMap?.fit(selected(),data());};
 $('#find').onclick=()=>go('soeg');
 $('#show-route').onchange=()=>{renderMap(overviewMap);renderMap(searchMap);};$('#show-home').onchange=$('#show-route').onchange;
 $('#set-map-home').onclick=()=>{choosingHome=!choosingHome;$('#set-map-home').textContent=choosingHome?'Annuller valg':'Sæt fast udgangspunkt';if(choosingHome)toast(chosenLayer==='demo'?'Vælg først et geografisk kortlag til dit rigtige hjem.':'Tryk på dit hjem på kortet for at vælge midtpunkt.');};
 $('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();if(!name)return toast('Skriv et navn.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});persist();refresh();toast('Profil gemt. Navn og ikon er opdateret.');};
-$('#home-form').onsubmit=async e=>{e.preventDefault();if(!e.target.reportValidity())return;if($('#fence-shape').value==='polygon'&&!validPolygon(selected().home.points))return toast('Tegn først et område på kortet.');selected().home={...selected().home,shape:$('#fence-shape').value,lat:Number($('#lat').value),lon:Number($('#lon').value),radius:Number($('#radius').value)};selected().homeConfirmed=true;selected().geofenceEnabled=$('#geofence-enabled').checked;geofenceMonitor.clear();try{await saveFence(selected());}catch{return;}persist();refresh();};
+$('#home-form').onsubmit=async e=>{
+ e.preventDefault();if(!e.target.reportValidity())return;
+ const p=selected(),gen=sessionGeneration;
+ if($('#fence-shape').value==='polygon'&&!validPolygon(p.home.points))return toast('Tegn først et område på kortet.');
+ const candidate=structuredClone(p);candidate.home={...p.home,shape:$('#fence-shape').value,lat:Number($('#lat').value),lon:Number($('#lon').value),radius:Number($('#radius').value),buffer:Number($('#fence-buffer').value)};
+ candidate.homeConfirmed=true;candidate.geofenceEnabled=$('#geofence-enabled').checked;
+ const name=$('#fence-name').value.trim();if(!name)return toast('Giv området et navn.');
+ if(!candidate.activeFenceId){if(candidate.fencePresets.length>=20)return toast('Der er plads til 20 områder per profil.');candidate.activeFenceId=createId();candidate.fencePresets.push({id:candidate.activeFenceId,name,home:structuredClone(candidate.home)});}
+ else Object.assign(candidate.fencePresets.find(f=>f.id===candidate.activeFenceId),{name,home:structuredClone(candidate.home)});
+ try{await saveFence(candidate);}catch{return;}if(gen!==sessionGeneration||selected()?.id!==p.id)return;
+ Object.assign(p,candidate);geofenceMonitor.clear();persist();refresh();
+};
 $('#edit-geofence').onclick=()=>{go('indstillinger');$('#home-form').scrollIntoView({behavior:'smooth',block:'center'});};
 $('#use-location').onclick=()=>{if(!navigator.geolocation)return toast('Placering er ikke tilgængelig.');navigator.geolocation.getCurrentPosition(p=>{$('#lat').value=p.coords.latitude.toFixed(6);$('#lon').value=p.coords.longitude.toFixed(6);toast('Kontrollér koordinaterne, og tryk Gem fast udgangspunkt.');},()=>toast('Placering kunne ikke hentes. Kontrollér browserens tilladelse.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});};
 function openNewProfile(){if(state.profiles.length>=50)return toast('Prototypen har plads til 50 profiler.');$('#new-profile-form').reset();$('#new-type').value='';$('#new-profile').showModal();}
@@ -230,10 +243,10 @@ function fenceShapeUI(){const polygon=$('#fence-shape').value==='polygon';$('#ra
 function updateDraft(){overviewMap?.draft(polygonDraft?.points||[]);$('#draw-count').textContent=(polygonDraft?.points.length||0)+' punkter';}
 function cancelDrawing(){polygonDraft=null;$('#polygon-tools').hidden=true;overviewMap?.draft([]);}
 $('#fence-shape').onchange=fenceShapeUI;
-$('#draw-fence').onclick=()=>{if(chosenLayer==='demo')return toast('Vælg et geografisk kortlag før du tegner.');polygonDraft={profileId:state.activeId,points:[]};choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';go('kort');$('#polygon-tools').hidden=false;updateDraft();$('#polygon-tools').scrollIntoView({behavior:'smooth'});};
+$('#draw-fence').onclick=()=>{if(chosenLayer==='demo')return toast('Vælg et geografisk kortlag før du tegner.');polygonDraft={profileId:state.activeId,points:[],name:$('#fence-name').value,buffer:$('#fence-buffer').value,enabled:$('#geofence-enabled').checked};choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';go('kort');$('#polygon-tools').hidden=false;updateDraft();$('#polygon-tools').scrollIntoView({behavior:'smooth'});};
 $('#undo-point').onclick=()=>{polygonDraft?.points.pop();updateDraft();};
 $('#cancel-fence').onclick=()=>{cancelDrawing();go('indstillinger');};
-$('#finish-fence').onclick=()=>{if(!polygonDraft||polygonDraft.profileId!==state.activeId)return cancelDrawing();if(!validPolygon(polygonDraft.points))return toast('Brug mindst 3 forskellige punkter uden krydsende kanter. Området må højst strække sig 20 km fra første punkt.');const points=polygonDraft.points;selected().home={...selected().home,shape:'polygon',points,lat:points.reduce((s,p)=>s+p.lat,0)/points.length,lon:points.reduce((s,p)=>s+p.lon,0)/points.length};cancelDrawing();refresh();go('indstillinger');$('#home-form').scrollIntoView({behavior:'smooth'});toast('Området er tegnet. Slå overvågning til, og tryk Gem hjemmeområde.');};
+$('#finish-fence').onclick=()=>{if(!polygonDraft||polygonDraft.profileId!==state.activeId)return cancelDrawing();if(!validPolygon(polygonDraft.points))return toast('Brug mindst 3 forskellige punkter uden krydsende kanter. Området må højst strække sig 20 km fra første punkt.');const draft=polygonDraft,points=draft.points;selected().home={...selected().home,shape:'polygon',points,lat:points.reduce((s,p)=>s+p.lat,0)/points.length,lon:points.reduce((s,p)=>s+p.lon,0)/points.length};cancelDrawing();refresh();$('#fence-name').value=draft.name;$('#fence-buffer').value=draft.buffer;$('#geofence-enabled').checked=draft.enabled;go('indstillinger');$('#home-form').scrollIntoView({behavior:'smooth'});toast('Området er tegnet. Slå overvågning til, og tryk Gem hjemmeområde.');};
 
 async function saveFence(profile){
  if(!profile.trackerId){toast('Området gemmes på profilen. Tilknyt en tracker for overvågning.');return;}
@@ -257,3 +270,8 @@ $('#enable-push').onclick=async()=>{
 };
 $('#disable-push').onclick=async()=>{try{const sub=await pushSubscription();if(sub){await trackerRequest('push/remove',{subscription:sub.toJSON()});await sub.unsubscribe();}$('#push-status').textContent='Beskeder er slået fra på denne enhed.';}catch(error){$('#push-status').textContent=error.message;}};
 $('#test-push').onclick=async()=>{try{const sub=await pushSubscription();if(!sub)throw Error('Aktivér først beskeder på denne enhed.');await trackerRequest('push/test',{subscription:sub.toJSON()});$('#push-status').textContent='Testbeskeden er afleveret til push-tjenesten.';}catch(error){$('#push-status').textContent=error.message;}};
+
+async function commitAreaChange(candidate){const p=selected(),gen=sessionGeneration;try{await saveFence(candidate);}catch{return false;}if(gen!==sessionGeneration||selected()?.id!==p.id)return false;Object.assign(p,candidate);geofenceMonitor.clear();cancelDrawing();persist();refresh();return true;}
+$('#saved-fences').onchange=async e=>{const p=selected(),f=p.fencePresets.find(f=>f.id===e.target.value);if(!f){refresh();return;}const next={...structuredClone(p),home:structuredClone(f.home),activeFenceId:f.id,homeConfirmed:true};await commitAreaChange(next);};
+$('#new-fence').onclick=async()=>{const p=selected();if(p.fencePresets.length>=20)return toast('Der er plads til 20 områder per profil.');const next={...structuredClone(p),activeFenceId:null,geofenceEnabled:false,homeConfirmed:false};if(await commitAreaChange(next)){$('#fence-name').focus();toast('Navngiv og tegn det nye område, og tryk Gem hjemmeområde. Overvågningen er sat på pause.');}};
+$('#delete-fence').onclick=async()=>{const p=selected(),f=p.fencePresets.find(f=>f.id===p.activeFenceId);if(!f||!confirm('Slet området '+f.name+'? Overvågningen af dette område slås fra.'))return;const next={...structuredClone(p),activeFenceId:null,geofenceEnabled:false,homeConfirmed:false,fencePresets:p.fencePresets.filter(x=>x.id!==f.id)};if(await commitAreaChange(next))toast('Området er slettet. Vælg et andet område for at fortsætte.');};

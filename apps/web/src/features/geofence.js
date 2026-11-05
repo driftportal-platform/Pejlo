@@ -10,11 +10,11 @@ export function createGeofenceMonitor(){
   if(!profile.trackerId||data?.source!=='traccar')return {text:'Tilknyt en tracker for at overvåge området',kind:'unknown'};
   if(unavailable||!p||!Number.isFinite(p.timestamp)||p.timestamp>now+60000||now-p.timestamp>300000)return {text:'Afventer en frisk position · området kan ikke vurderes',kind:'unknown'};
   const key=JSON.stringify([profile.id,profile.trackerId,profile.home]);
-  let state=states.get(key);const meters=fenceDistance(profile.home,p),radius=0;
+  let state=states.get(key);const meters=fenceDistance(profile.home,p),radius=0,buffer=profile.home.buffer??5;
   if(!state){state={outside:meters>radius,last:p.timestamp,pending:0};states.set(key,state);}
   let transition=null;
   if(p.timestamp>state.last){
-   const crossed=state.outside?meters<radius-15:meters>radius+15;
+   const crossed=state.outside?meters<radius-buffer:meters>radius+buffer;
    state.pending=crossed?state.pending+1:0;state.last=p.timestamp;
    if(state.pending>=2){state.outside=!state.outside;state.pending=0;transition=state.outside?'exit':'enter';}
   }

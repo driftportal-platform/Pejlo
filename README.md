@@ -1,3 +1,6 @@
+# Nyt i 0.6.1
+Navngivne geofences, skift og sletning; margen 0–30 m, standard 5 m. Genbrug Cloudflare-opsætningen. Gem området igen for at opdatere serverens margen.
+
 # Nyt i 0.6.0
 Cirkel eller område tegnet med punkter direkte i Pejlo. Push ved udgang og tilbagekomst er implementeret og kræver tre runtime-værdier én gang i Cloudflare. Se [opsætning og test](docs/geofence.md).
 
