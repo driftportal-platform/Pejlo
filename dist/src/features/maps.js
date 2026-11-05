@@ -44,6 +44,7 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
       L.polyline([[user.lat,user.lon],[target.lat,target.lon]],{color:'#477fc1',dashArray:'4 8',weight:2}).addTo(phone);
       if(auto){map.invalidateSize();map.fitBounds(L.latLngBounds([[user.lat,user.lon],[target.lat,target.lon]]).pad(.25),{padding:[45,55],maxZoom:searchZoom(distance(user,target),user.accuracy),animate:false});}
     },
+    clear(){markers.clearLayers();path.clearLayers();homeLayer.clearLayers();phone.clearLayers();},
     clearPhone(){phone.clearLayers();},
     invalidate(){map.invalidateSize();}
   };

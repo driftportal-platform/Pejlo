@@ -1,17 +1,25 @@
+import {startAuthentication} from './features/auth.js';
+import {createCloudState} from './features/cloud-state.js';
+import {emptyState,normalizeAccountState} from './features/account-state.js';
 import {icon} from './components/icons.js';
 import {types,newProfile,profileSubtitle} from './features/profiles.js';
-import {loadState,saveState} from './features/storage.js';
+import {loadState} from './features/storage.js';
 import {demoFor} from './features/demo.js';
 import {createMap,layers} from './features/maps.js';
 import {createLocation} from './features/location.js';
 import {distance,formatDistance,bearing,relativeBearing,directionName} from './shared/geo.js';
 const $=s=>document.querySelector(s);
-const state=loadState();
+const state=emptyState();
+let saveCloud=null,cloud=null,sessionGeneration=0;
 let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome=false, user=null, heading=null, headingTime=0, watching=false, simulation=false, demoStep=0, toastTimer;
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
 const data=()=>selected()?demoFor(selected()):null;
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),6000);}
-function persist(){if(!saveState(state))toast('Browseren kunne ikke gemme. Ændringerne gælder kun, mens siden er åben.');}
+function persist(){
+ const gen=sessionGeneration;
+ if(!saveCloud){toast('Kontoen er ikke klar. Genindlæs forbindelsen.');return;}
+ saveCloud(structuredClone(state)).catch(e=>{if(gen===sessionGeneration)toast(e.code==='pejlo/conflict'?e.message:'Ændringen blev ikke gemt. Kontrollér forbindelsen, og prøv igen.');});
+}
 function options(select,items,value){select.replaceChildren();for(const [id,label] of items){const o=document.createElement('option');o.value=id;o.textContent=label;select.append(o);}select.value=value;}
 function renderMap(m){if(!selected())return;m?.profile(selected(),data(),{showRoute:$('#show-route').checked,showHome:$('#show-home').checked});}
 function showPage(name){
@@ -30,7 +38,7 @@ function refresh(){
   const empty=!selected();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
-  if(empty){options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();showPage('velkommen');return;}
+  if(empty){options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius','map-key'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   options($('#profile-select'),state.profiles.map(p=>[p.id,p.name+' · '+types[p.type].label]),p.id);
@@ -88,11 +96,11 @@ $('#set-map-home').onclick=()=>{choosingHome=!choosingHome;$('#set-map-home').te
 $('#profile-form').onsubmit=e=>{e.preventDefault();const name=$('#profile-name').value.trim();if(!name)return toast('Skriv et navn.');Object.assign(selected(),{name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim()});persist();refresh();toast('Profil gemt. Navn og ikon er opdateret.');};
 $('#home-form').onsubmit=e=>{e.preventDefault();if(!e.target.reportValidity())return;selected().home={lat:Number($('#lat').value),lon:Number($('#lon').value),radius:Number($('#radius').value)};persist();refresh();toast('Fast udgangspunkt gemt for '+selected().name+'.');};
 $('#use-location').onclick=()=>{if(!navigator.geolocation)return toast('Placering er ikke tilgængelig.');navigator.geolocation.getCurrentPosition(p=>{$('#lat').value=p.coords.latitude.toFixed(6);$('#lon').value=p.coords.longitude.toFixed(6);toast('Kontrollér koordinaterne, og tryk Gem fast udgangspunkt.');},()=>toast('Placering kunne ikke hentes. Kontrollér browserens tilladelse.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});};
-function openNewProfile(){if(state.profiles.length>=50)return toast('Prototypen har plads til 50 lokale profiler.');$('#new-profile-form').reset();$('#new-type').value='';$('#new-profile').showModal();}
+function openNewProfile(){if(state.profiles.length>=50)return toast('Prototypen har plads til 50 profiler.');$('#new-profile-form').reset();$('#new-type').value='';$('#new-profile').showModal();}
 $('#add-profile').onclick=openNewProfile;$('#first-profile').onclick=openNewProfile;$('#close-new').onclick=()=>$('#new-profile').close();
 $('#new-profile-form').onsubmit=e=>{e.preventDefault();const p=newProfile($('#new-name').value.trim(),$('#new-type').value,$('#new-device').value.trim());if(!p)return toast('Vælg type, og skriv et navn.');stopLocation(false);state.profiles.push(p);state.activeId=p.id;persist();$('#new-profile').close();refresh();toast('Profil oprettet med eksempeldata.');};
-$('#delete-profile').onclick=()=>{if(!selected())return;if(!confirm('Fjern den lokale profil '+selected().name+'? Dette sletter ikke en fysisk tracker.'))return;stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0]?.id??null;persist();refresh();};
-$('#map-key-form').onsubmit=e=>{e.preventDefault();state.mapKey=$('#map-key').value.trim();persist();if(!state.mapKey){chosenLayer='demo';overviewMap?.layer('demo');searchMap?.layer('demo');document.querySelectorAll('.layer-select').forEach(s=>s.value='demo');document.querySelectorAll('.map-caption').forEach(e=>e.textContent='SKEMATISK EKSEMPEL · IKKE GEOGRAFISK KORT');}toast('Kortnøgle gemt i denne browser. Vælg et kortlag på kortet.');};
+$('#delete-profile').onclick=()=>{if(!selected())return;if(!confirm('Fjern profilen '+selected().name+'? Dette sletter ikke en fysisk tracker.'))return;stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0]?.id??null;persist();refresh();};
+$('#map-key-form').onsubmit=e=>{e.preventDefault();state.mapKey=$('#map-key').value.trim();persist();if(!state.mapKey){chosenLayer='demo';overviewMap?.layer('demo');searchMap?.layer('demo');document.querySelectorAll('.layer-select').forEach(s=>s.value='demo');document.querySelectorAll('.map-caption').forEach(e=>e.textContent='SKEMATISK EKSEMPEL · IKKE GEOGRAFISK KORT');}toast('Kortnøgle gemt på din konto. Vælg et kortlag på kortet.');};
 $('#locate').onclick=()=>{stopLocation(false);watching=true;$('#phone-state').textContent='Venter på mobilens placering…';$('#locate').textContent='Start placering igen';location.start();};
 $('#enable-compass').onclick=async()=>{if(await location.compass())toast('Kompas startet. Afventer en brugbar kompasretning fra mobilen.');};
 $('#stop-location').onclick=()=>stopLocation();$('#autozoom').onchange=updateSearch;
@@ -101,4 +109,31 @@ $('#simulate').onclick=()=>{demoStep=0;simulate();};$('#closer').onclick=()=>{de
 window.addEventListener('hashchange',()=>showPage(window.location.hash.slice(1)));
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(watching||simulation||heading!==null))stopLocation(false);});
 window.addEventListener('pagehide',()=>location.stop());
-persist();refresh();showPage(window.location.hash.slice(1));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
+refresh();showPage(window.location.hash.slice(1));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
+
+const importLocal=()=>{
+ const old=loadState();if(!old.profiles.length)return toast('Der er ingen gamle lokale profiler at importere.');
+ if(!confirm('Importér '+old.profiles.length+' lokale profiler til den konto, du er logget ind på?'))return;
+ const ids=new Set(state.profiles.map(p=>p.id));state.profiles.push(...old.profiles.filter(p=>!ids.has(p.id)).slice(0,50-state.profiles.length));state.activeId=state.profiles[0]?.id??null;persist();refresh();
+};
+$('#import-local').onclick=importLocal;$('#import-first').onclick=importLocal;
+let slowTimer;
+startAuthentication(async(user,{db,dbSDK,auth})=>{
+ const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();overviewMap?.layer('demo');searchMap?.layer('demo');chosenLayer='demo';choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';document.querySelectorAll('.layer-select').forEach(s=>s.value='demo');document.querySelectorAll('.map-caption').forEach(e=>e.textContent='SKEMATISK EKSEMPEL · IKKE GEOGRAFISK KORT');$('#new-profile').close();Object.assign(state,emptyState());refresh();
+ if(!user?.emailVerified)return;
+ $('#sync-state').textContent='Forbinder…';$('.app').inert=true;$('#cloud-help').textContent='Opretter forbindelse til dine private profiler…';
+ const fail=()=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);$('.app').hidden=true;$('#auth-shell').hidden=false;$('#cloud-help').textContent='Profillagring kunne ikke åbnes. Kontrollér, at Firestore-databasen og reglerne fra pakken er oprettet. Derefter: Prøv forbindelsen igen.';$('#sync-state').textContent='Ingen forbindelse';};
+ slowTimer=setTimeout(fail,15000);
+ cloud=createCloudState({
+  ref:uid=>dbSDK.doc(db,'users',uid,'private','state'),
+  listen:(ref,ok,error)=>dbSDK.onSnapshot(ref,{includeMetadataChanges:true},snap=>ok({fromCache:snap.metadata.fromCache,pending:snap.metadata.hasPendingWrites,data:snap.exists()?snap.data():null}),error),
+  transaction:(ref,update)=>dbSDK.runTransaction(db,async transaction=>{if(auth.currentUser?.uid!==user.uid)throw new Error('Konto skiftet');const snapshot=await transaction.get(ref);const value=update(snapshot.exists()?snapshot.data():null);transaction.set(ref,{...value,updatedAt:dbSDK.serverTimestamp()});})
+ });
+ saveCloud=cloud.open(user,{
+  state:value=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);Object.assign(state,normalizeAccountState(value));refresh();$('#auth-shell').hidden=true;$('.app').hidden=false;$('.app').inert=false;$('#sync-state').textContent='Profiler synkroniseret';},
+  connection:online=>{if(gen!==sessionGeneration)return;$('.app').inert=!online;$('#sync-state').textContent=online?'Forbundet':'Offline · redigering sat på pause';},
+  error:fail,
+  busy:busy=>{if(gen!==sessionGeneration)return;$('.app').inert=busy;$('#sync-state').textContent=busy?'Gemmer…':'Forbundet';},
+  saved:()=>{if(gen===sessionGeneration)$('#sync-state').textContent='Gemt på din konto';}
+ });
+}).catch(()=>{$('#auth-message').textContent='Login kunne ikke startes. Kontrollér internetforbindelsen.';});

@@ -1,96 +1,63 @@
-# Pejlo 0.3 – start her
+# Pejlo 0.4 – start her
 
-Denne pakke er til dit eget GitHub-repository og din egen Cloudflare-udgivelse.
-Der kræves ikke ChatGPT-login til appen, når du selv udgiver den.
+Denne version tilføjer personligt login og privat profillagring til dit eksisterende Pejlo-repository. Cloudflare er fortsat vært for appen; Firebase håndterer login og profiler.
 
-## 1. Upload til GitHub
+## 1. Firebase Authentication
 
-1. Pak ZIP-filen ud.
-2. Opret et nyt repository, fx `pejlo` (gerne privat).
-3. Upload indholdet, så `package.json`, `wrangler.jsonc`, `apps`, `packages`, `scripts` og `dist` ligger i repositoryets rod.
-4. Upload filerne og mapperne – ikke ZIP-filen. Undgå at lægge en ekstra `Find_dit dyr...`-mappe udenom hele projektet.
+Åbn projektet **Pejlo (pejlo-a1fed)** i Firebase Console.
 
-## 2. Cloudflare Workers (GitHub-forbindelse)
+1. Åbn Authentication, og vælg Get started, hvis den vises.
+2. Under Sign-in method: aktivér **Email/Password**. Gem.
+3. Under Settings → Authorized domains: tilføj **pejlo.driftportal-platform.workers.dev** uden https eller skråstreg.
 
-- Forbind dit repository under Workers & Pages.
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: repositoryets rod (tomt felt eller `/`).
-- Worker-navn: `pejlo`, som i `wrangler.jsonc`. Hvis du vælger et andet navn, skal konfigurationen bruge samme navn.
-- `dist` er allerede angivet som mappen med webfiler i `wrangler.jsonc`.
+Brugeren skal bekræfte sin e-mail, før appen giver adgang til profillagring. En knap i appen kontrollerer bekræftelsen. Firebase sender selve mailen. Appens webkonfiguration er allerede indsat i `apps/web/src/config/firebase.js`; det er almindelig offentlig klientkonfiguration, ikke en administratornøgle.
 
-Der er ingen Hello World-worker, som skal indsættes. Hele appen ligger i pakken.
+## 2. Cloud Firestore og regler
 
-Alternativt kan Cloudflare Pages bruges:
-- Framework preset: None
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Root directory: repositoryets rod.
+1. Åbn Cloud Firestore under Databases & Storage.
+2. Opret en **Standard**-database med database-ID **(default)**. Vælg produktionsregler og en passende EU-placering. Kontrollér placeringen før oprettelse; den kan ikke ændres på den eksisterende database.
+3. Åbn fanen Rules.
+4. Erstat reglerne med **hele indholdet af firestore.rules** fra denne pakke, og tryk Publish.
 
-## 3. Prøv appen
+GitHub-upload og Cloudflare-build udgiver IKKE Firebase-reglerne. De skal udgives særskilt i Firebase Console. Brug ikke åbne testregler.
 
-- Åbn HTTPS-adressen fra Cloudflare.
-- Vælg `Tilføj profil`, og opret fx kat, hund, hest, bil eller cykel.
-- Skift mellem profiler i feltet øverst.
-- Redigér navn og type under Indstillinger; ikonet følger med.
-- Hver profil har eget fast udgangspunkt.
-- Tryk Find [navn], og vælg Start søgedemo. Tryk Gå tættere på for at se meter og zoom ændre sig.
-- Brug min placering starter mobilens placering efter browserens tilladelse. Kompas tillades særskilt.
-- Når du forlader søgesiden eller skjuler appen, stoppes mobilens placering og kompas. Start igen, når du kommer tilbage.
+Reglerne tillader kun en verificeret bruger at hente og ændre sit eget dokument: `users/{uid}/private/state`. Andre konti har ingen adgang. Der gives ikke tilladelse til at liste brugere. Familiedeling er endnu ikke implementeret.
 
-## 4. Rigtige kortlag
+## 3. Opdatér GitHub
 
-Standardvisningen er et lokalt, skematisk eksempel. Det er ikke et geografisk kort.
-Gadekort, satellit/luftfoto og terræn/stier er implementeret via MapTiler.
-Tilføj en offentlig MapTiler-kortnøgle under Indstillinger, og vælg derefter kortlaget.
-Nøglen skal have adgang til de valgte kort og være begrænset til dit Cloudflare-domæne.
-Kontrollér MapTilers aktuelle abonnement og kvoter, før du tager kortene i brug.
-Uden kortnøgle ændres der ikke til et kortlag, som appen ikke kan vise.
+Pak ZIP-filen ud, og upload hele indholdet til **driftportal-platform/Pejlo**. Erstat de gamle filer. `package.json`, `wrangler.jsonc`, `apps` og `dist` skal ligge i repositoryets rod; upload ikke ZIP-filen eller en ekstra omsluttende mappe.
 
-## Hvad denne udgave kan – og hvad der kommer senere
+Cloudflare-indstillingerne er fortsat:
 
-Denne udgave indeholder brugerflade, lokal profilopsætning, lokale indstillinger,
-afstand/retning fra mobilens GPS til et eksempelpunkt, kompasstøtte og automatisk zoom.
-Den kan have flere lokale trackerprofiler, men modtager endnu ingen fysiske trackerdata.
-Alle målpositioner, ruter og batteriprocenter er eksempeldata. Den bruger ikke din rigtige Q8.
-Forskellige profiler viser forskellige, men stadig opdigtede, eksempelruter.
-Appen starter uden profiler. Brugeren vælger selv navn og type.
+- Build: `npm run build`
+- Deploy: `npx wrangler deploy`
+- Worker-navn: `pejlo`
+- Root: repositoryets rod
 
-Kortlag med din egen nøgle og mobilkompas er ikke afprøvet på din iPhone endnu.
-Retning er fugleflugtsretning, ikke gangnavigation. Ved lav GPS-præcision dæmpes pilen
-og zoom begrænses. En gammel position kan være et sted, enheden har forladt.
+## 4. Afprøv login og profiler
 
-Næste udviklingstrin er login, kundekonti, serverkontrollerede rettigheder og
-Traccar-tilknytning pr. profil. Så kommer synkronisering mellem dine og dit dyrses telefoner.
-Firebase er ikke oprettet og er ikke nødvendigt for at prøve denne udgave.
-Der ligger ingen adgangskoder, tracker-ID'er, hemmelige nøgler eller rigtig hjemmeposition i pakken.
+1. Vent på en vellykket Cloudflare-udgivelse, og åbn https://pejlo.driftportal-platform.workers.dev.
+2. Genindlæs med Ctrl+F5, hvis den gamle udgave vises.
+3. Vælg Opret konto med din egen e-mail og mindst 10 tegn i adgangskoden.
+4. Åbn bekræftelsesmailen; se også i spam. Vend tilbage til appen, og tryk Jeg har bekræftet min e-mail.
+5. Opret selv den første profil. Der er ingen Loui-profil fra start.
+6. Log ud og ind igen: profilen skal komme tilbage. Samme konto på en anden enhed skal vise samme profiler. En anden konto skal starte tomt.
+7. Gamle profiler fra denne browser kan importeres aktivt fra velkomstsiden eller Indstillinger. De importeres aldrig automatisk til en konto.
 
-## Mapper
+Profiler og kortnøgle gemmes på kontoen. Husk mig bruger vedvarende login på enheden; ellers gælder login for browsersessionen. Ved kontoskift ryddes den viste profiltilstand. Ingen profil åbnes fra lokal cache, før serveren har svaret. Ved mistet forbindelse sættes redigering på pause. Gemning bruger revisionstjek; en samtidig ændring vises i stedet for at blive overskrevet i stilhed. Ved en gemmefejl vises en besked, og seneste servertilstand gendannes.
 
-- `apps/web/src/features`: profiler, lokal lagring, kort, mobilplacering og eksempeldata.
-- `apps/web/src/components`: fælles faste SVG-ikoner.
-- `apps/web/src/assets/icons` og `images`: ikoner og faste billeder.
-- `apps/web/src/styles`: fælles farver og layout.
-- `packages/shared`: afstand, retning, koordinatkontrol og zoomregler.
-- `apps/api`: næste trins serverarkitektur (ingen aktiv backend endnu).
-- `docs`: arkitektur og kendte begrænsninger.
-- `dist`: færdigbyggede webfiler. Genopbygges ved hver Cloudflare-build.
+Hvis profillagring ikke åbner: kontrollér Firestore, publicerede regler og e-mailbekræftelsen, og tryk Prøv forbindelsen igen. Hvis login fejler: kontrollér Email/Password og Authorized domains.
 
-Lokalt: Node.js 20 eller nyere. Kør `npm test` for bygning og test.
-Åbn appen via en lokal webserver, ikke ved at dobbeltklikke på HTML-filen.
+## Kort og trackerstatus
 
-## Kilder
+Alle trackerpositioner, ruter og batterital er EKSEMPLER. Denne udgave modtager ingen data fra Q8 eller andre fysiske trackere. Familieroller og invitationer kommer senere.
 
-- https://developers.cloudflare.com/workers/static-assets/binding/
-- https://developers.cloudflare.com/pages/configuration/build-configuration/
-- https://docs.maptiler.com/cloud/api/maps/
-- https://docs.maptiler.com/guides/developer/credentials/api-key/
-- https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/watchPosition
-- https://developer.mozilla.org/en-US/docs/Web/API/DeviceOrientationEvent/requestPermission_static
+Uden MapTiler-nøgle vises et lokalt skematisk eksempel, ikke et geografisk kort. En offentlig MapTiler-nøgle kan gemmes under Indstillinger og bør begrænses til dit domæne. Kontrollér udbyderens abonnement og kvoter.
 
-## Opdatering fra 0.2 til Pejlo 0.3
-Upload hele pakkens indhold til det eksisterende GitHub-repository Pejlo, og erstat de gamle filer. Cloudflare bygger automatisk, når GitHub-forbindelsen er aktiv. Worker-navnet er `pejlo`.
+Find-skærmen bruger efter tilladelse mobilens GPS og eventuelt kompas. Afstanden er i fugleflugtslinje til et eksempelpunkt, ikke en gangrute. Automatisk zoom tager højde for GPS-usikkerhed. Mobilplacering og kompas stoppes, når søgesiden forlades eller appen skjules.
 
-Den urørte, automatisk oprettede Loui-eksempelprofil fjernes ved første start af 0.3. Egne profiler og ændrede gamle profiler bevares. Profiler, som brugeren selv kalder Loui, fjernes ikke. Kortnøgle bevares. Browseren gemmer herefter under en ny Pejlo-nøgle, så slettede profiler ikke kommer tilbage ved genindlæsning.
+## Verifikation og begrænsninger
 
-Hvis den gamle visning fortsætter efter en vellykket Cloudflare-udgivelse: genindlæs siden med Ctrl+F5 på Windows, eller luk og genåbn siden på mobilen.
+14 automatiske tests består for geoberegninger, profilvalidering, migrering, kontoskift og revisionskonflikter. Loginvisningen kontrolleres i browseren. Der er ikke oprettet testkonti eller sendt mails fra udviklingsarbejdet. Firebase-regler og det samlede login-/lagringsforløb er endnu ikke valideret mod dit aktive Firebase-projekt eller en emulator; gennemfør derfor trin 4 før brug med vigtige data.
+
+Kildekode: apps/web/src. Fælles geoberegninger: packages/shared. `npm test` bygger dist og kører tests. Firebase-regler: firestore.rules. Firebase CLI-konfiguration: firebase.json og .firebaserc.

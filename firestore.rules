@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid) { return request.auth != null && request.auth.uid == uid && request.auth.token.email_verified == true; }
+  match /users/{uid}/private/state {
+   allow get: if owner(uid);
+   allow create: if owner(uid) && validState() && request.resource.data.revision == 1;
+   allow update: if owner(uid) && validState() && request.resource.data.revision == resource.data.revision + 1;
+   allow delete: if owner(uid);
+   function validState() {
+    return request.resource.data.keys().hasAll(['profiles','activeId','mapKey','revision','updatedAt'])
+     && request.resource.data.keys().hasOnly(['profiles','activeId','mapKey','revision','updatedAt'])
+     && request.resource.data.profiles is list && request.resource.data.profiles.size() <= 50
+     && (request.resource.data.activeId == null || request.resource.data.activeId is string)
+     && request.resource.data.mapKey is string && request.resource.data.mapKey.size() <= 200
+     && request.resource.data.revision is int
+     && request.resource.data.updatedAt == request.time;
+   }
+  }
+  // All other paths, including other users, are denied by default.
+ }
+}

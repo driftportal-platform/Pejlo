@@ -1,17 +1,7 @@
-# Kontrol af 0.3
+# Kontrol af 0.4
 
-Bestået:
-- Bygning til dist og syntakskontrol af JavaScript.
-- Ni tests, herunder: afstand/format, verdensretninger og datolinje, kompasvinkel, zoom med GPS-usikkerhed og profilvalidering/lokal lagring.
-- Browserkontrol: opret cykelprofil, skift navn og type til hund, genindlæs og vælg den oprindelige katteprofil.
-- Browserkontrol: søgedemo viser 600 m og derefter 300 m med nordretning.
-- Browserkontrol: valg af satellit uden nøgle giver en tydelig besked og bevarer eksempelkortet.
-- Lokale modulreferencer i dist er verificeret.
+14 tests består ved npm test: geoberegninger, profilvalidering, lokal migrering, tom start, verificeringskrav, kontoskift, serverkrav før åbning og revisionskonflikter.
 
-Ikke afprøvet:
-- MapTiler-kort med brugerens gyldige kortnøgle.
-- GPS/kompas og responsivt layout på brugerens fysiske iPhone.
-- Cloudflare-udgivelse fra brugerens GitHub-konto.
-- Live-data, login, deling og rettigheder (ikke implementeret i denne version).
+Ingen live Firebase-konti oprettet. Ingen mail afsendt i udviklingskontrollen. Firestore-reglerne er ikke afprøvet i emulator eller mod det aktive projekt. Mobilkompas, fysisk tracker og geografiske kort med en kundes MapTiler-nøgle er ikke afprøvet.
 
-0.3: Tom første start og migrering er testet. Urørt automatisk profil fjernes; egne profiler og kortnøgle bevares. Tom tilstand forbliver tom efter genindlæsning. Browserkontrol viser Pejlo-titel og oprettelse af egen cykelprofil fra velkomstsiden.
+Se START_HER.md for nødvendige Firebase-indstillinger og manuel afprøvning.

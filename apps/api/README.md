@@ -1,4 +1,3 @@
-# Backend – næste trin
+# Serveradapter
 
-Ingen aktiv backend i 0.3. Se docs/next-step.md.
-Denne mappe er reserveret til login-validering, kundekonti, rettigheder og Traccar-adapter.
+Firebase håndterer login og privat profillagring i 0.4. Denne mappe er reserveret til fremtidig servervalidering af tracker-ejerskab og Traccar-tilknytning.
