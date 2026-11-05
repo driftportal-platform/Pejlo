@@ -1,7 +1,9 @@
 /*
   X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self)
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://www.gstatic.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://api.maptiler.com; img-src 'self' data: blob: https://api.maptiler.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; frame-src https://pejlo-a1fed.firebaseapp.com; base-uri 'none'; object-src 'none'; form-action 'self'
 /index.html
   Cache-Control: no-cache
 /src/*.js

@@ -9,7 +9,7 @@ function database(owner='owner-uid'){
  const row=rows.get(sql.startsWith('UPDATE')?args[1]:args[0]);
  if(sql.startsWith('UPDATE')){if(!row||row.code_hash!==args[2]||(row.owner_uid!==null&&row.owner_uid!==args[3]))return null;row.owner_uid=args[0];return {identifier:row.identifier,name:row.name};}
  return row&&(!sql.includes('AND owner_uid')||row.owner_uid===args[1])?{identifier:row.identifier}:null;
- },async run(){if(sql.startsWith('CREATE'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
+ },async run(){if(sql.startsWith('CREATE')||sql.startsWith('ALTER'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
 }
 const env={DB:database(),TRACCAR_ADMIN_UID:'owner-uid',TRACCAR_TOKEN:'server-secret'};
 const position={id:42,deviceId:7,valid:true,latitude:56.55,longitude:8.31,fixTime:new Date().toISOString(),attributes:{batteryLevel:55,secret:'never expose'}};
@@ -19,7 +19,7 @@ function fixture({uid='owner-uid',verified=true,lookupStatus=200,positionValue=p
   calls.push({url,options});
   if(url.includes('accounts:lookup'))return Response.json({users:[{localId:uid,emailVerified:verified}]},{status:lookupStatus});
   assert.equal(options.headers.Authorization,'Bearer server-secret');
-  if(url.includes('/api/devices?'))return Response.json([{id:99,uniqueId:'other'},{id:7,uniqueId:identifier,positionId:42,name:'Pejlo',status:'offline',phone:'private'}]);
+  if(url.includes('/api/devices?'))return Response.json([{id:99,uniqueId:'other'},{id:7,uniqueId:identifier,positionId:42,name:'Pejlo',status:'offline',lastUpdate:new Date(Date.parse(position.fixTime)+1000).toISOString(),phone:'private'}]);
   if(url.includes('/api/positions?'))return Response.json([positionValue]);
   if(url.includes('/api/reports/route?'))return Response.json(history?[position,{...position,deviceId:99}]:{}, {status:history?200:500});
   throw new Error('Unexpected request');
@@ -40,7 +40,7 @@ test('missing registry setup fails closed and never contacts Traccar',async()=>{
  const f=fixture();const r=await handleAPI(req(),{...env,DB:null},f.fetcher);assert.equal(r.status,503);assert.equal(f.calls.length,1);
 });
 test('only configured device and sanitized valid points are returned; offline is preserved',async()=>{
- const f=fixture(),r=await handleAPI(req(),env,f.fetcher),d=await r.json();assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(d.device.status,'offline');assert.equal(d.position.battery,55);assert.equal(d.route.length,1);assert.equal(d.device.identifier,'080608317309');assert.equal(JSON.stringify(d).includes('private'),false);assert.equal(JSON.stringify(d).includes('server-secret'),false);assert.equal(JSON.stringify(d).includes('never expose'),false);
+ const f=fixture(),r=await handleAPI(req(),env,f.fetcher),d=await r.json();assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(d.device.status,'offline');assert.equal(d.position.battery,55);assert.equal(d.device.lastContact,Date.parse(position.fixTime)+1000);assert.equal(d.position.timestamp,Date.parse(position.fixTime));assert.equal(d.route.length,1);assert.equal(d.device.identifier,'080608317309');assert.equal(JSON.stringify(d).includes('private'),false);assert.equal(JSON.stringify(d).includes('server-secret'),false);assert.equal(JSON.stringify(d).includes('never expose'),false);
 });
 test('invalid GPS stays absent and report failure does not fabricate a route',async()=>{
  const f=fixture({positionValue:{...position,valid:false},history:false});const d=await(await handleAPI(req(),env,f.fetcher)).json();assert.equal(d.position,null);assert.deepEqual(d.route,[]);assert.equal(d.historyAvailable,false);

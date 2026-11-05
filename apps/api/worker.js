@@ -1,3 +1,4 @@
+import {listAlarms} from './archive.js';
 import {mailReady,reserveInvitationMail,sendInvitationMail} from './mail.js';
 import {ensureFamily,trackerAccess,familyAPI} from './family.js';
 import {cleanAlerts} from '../../packages/shared/alerts.js';
@@ -11,7 +12,7 @@ export function point(raw){
  const timestamp=Date.parse(raw?.fixTime);
  if(raw?.valid!==true||typeof raw.latitude!=='number'||typeof raw.longitude!=='number'||!Number.isFinite(raw.latitude)||!Number.isFinite(raw.longitude)||Math.abs(raw.latitude)>90||Math.abs(raw.longitude)>180||!Number.isFinite(timestamp)||timestamp>Date.now()+60000)return null;
  const battery=raw.attributes?.batteryLevel;
- return {lat:raw.latitude,lon:raw.longitude,timestamp,battery:typeof battery==='number'&&battery>=0&&battery<=100?battery:null,valid:true};
+ return {lat:raw.latitude,lon:raw.longitude,timestamp,accuracy:typeof raw.accuracy==='number'&&raw.accuracy>0&&raw.accuracy<=10000?raw.accuracy:null,battery:typeof battery==='number'&&battery>=0&&battery<=100?battery:null,valid:true};
 }
 const identifierOK=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{4,100}$/.test(value);
 export async function codeHash(code){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code.trim().toUpperCase()))),x=>x.toString(16).padStart(2,'0')).join('');}
@@ -19,7 +20,7 @@ async function body(request,limit=12000){if(Number(request.headers.get('content-
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  const routes={'/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -32,17 +33,24 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
   const uid=account.localId,isAdmin=!!env.TRACCAR_ADMIN_UID&&uid===env.TRACCAR_ADMIN_UID;
+  if(path==='/api/alarms'){
+   const identifier=url.searchParams.get('identifier');
+   if(!identifierOK(identifier)||!await trackerAccess(env.DB,identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');
+   const before=url.searchParams.has('before')?Number(url.searchParams.get('before')):Date.now()+1,beforeId=url.searchParams.get('beforeId')||'~';
+   if(!Number.isSafeInteger(before)||before<0||beforeId.length>400)throw new Failure(400,'Ugyldig side i alarmarkivet.');
+   return json(await listAlarms(env.DB,identifier,uid,before,beforeId));
+  }
   if(path==='/api/family'){
    await ensureNotifications(env.DB);const input=request.method==='GET'?null:await body(request,120000);
    if(input?.action==='invite'){
     if(!mailReady(env))throw new Failure(503,'Invitationsmail mangler opsætning. Tilføj RESEND_API_KEY og MAIL_FROM i Cloudflare.');
     const access=await trackerAccess(env.DB,input.identifier,uid);if(!access?.owner)throw new Failure(403,'Kun ejeren kan invitere.');
-    await reserveInvitationMail(env.DB,uid);
+    await reserveInvitationMail(env.DB,uid,Date.now(),typeof input.email==='string'?input.email.trim().toLowerCase():'');
    }
    const result=await familyAPI(env.DB,account,input,codeHash);
    if(input?.action==='invite'){
     const row=await env.DB.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=?').bind(input.identifier).first();
-    try{await sendInvitationMail({email:input.email.trim().toLowerCase(),code:result.code,name:JSON.parse(row.profile).name},env,fetcher);return json({...result,mailSent:true});}
+    try{await sendInvitationMail({email:input.email.trim().toLowerCase(),code:result.code,name:JSON.parse(row.profile).name,inviter:account.displayName||account.email,role:result.role},env,fetcher);return json({...result,mailSent:true});}
     catch{return json({...result,mailSent:false,message:'Invitationen er oprettet, men mailen kunne ikke bekræftes sendt. Du kan give koden til modtageren eller prøve igen om et minut.'});}
    }
    return json(result);
@@ -64,6 +72,7 @@ export async function handleAPI(request,env,fetcher=fetch){
     if(!identifierOK(input.identifier)||!validHome(input.home)||typeof input.name!=='string'||input.name.length>40||typeof input.enabled!=='boolean')throw new Failure(400,'Kontrollér hjemmeområdet.');
     const access=await trackerAccess(env.DB,input.identifier,uid);
     if(!access)throw new Failure(403,'Trackeren er ikke tilknyttet din konto.');
+    if(!access.owner&&access.role==='viewer')throw new Failure(403,'Du har kun læseadgang til denne profil.');
     const trackerOwner=await env.DB.prepare('SELECT owner_uid FROM trackers WHERE identifier=?').bind(input.identifier).first();
     await ensureFamily(env.DB);if(await env.DB.prepare('SELECT identifier FROM pejlo_profiles WHERE identifier=?').bind(input.identifier).first())throw new Failure(409,'Gem området gennem den fælles profil.');
     const home={lat:input.home.lat,lon:input.home.lon,radius:input.home.radius,buffer:input.home.buffer??5,shape:input.home.shape,...(input.home.shape==='polygon'?{points:input.home.points.map(p=>({lat:p.lat,lon:p.lon}))}:{})};
@@ -133,7 +142,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(!Array.isArray(points))throw new Error();
    route=points.filter(p=>p.deviceId===device.id).map(point).filter(p=>p&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime()).sort((a,b)=>a.timestamp-b.timestamp);historyTruncated=route.length>10000;route=route.slice(-10000);
   }catch{historyAvailable=false;}
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown'},position,route,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},position,route,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

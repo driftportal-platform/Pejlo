@@ -28,12 +28,12 @@ Beskeder, der opstår under stilleperioden, springes over og genudsendes ikke ba
 
 1. Ejeren åbner appen, vælger fx Loui og går til **Familiedeling**.
 2. Indtast Louises e-mail og tryk **Opret invitationskode**.
-3. Giv selv koden til Louise. Appen sender ikke en invitationsmail.
+3. Appen sender invitationsmailen med link og kode (se `docs/invitationsmail.md`). Koden vises også, så du kan give den videre selv.
 4. Louise opretter sin egen Pejlo-konto med netop den e-mail og bekræfter mailen.
 5. Hun indtaster koden under **Modtaget en invitation?**. Dette felt er også tilgængeligt før hendes første profil er oprettet.
 6. Vælg den delte profil øverst. Louise vælger selv sine alarmindstillinger og aktiverer push på sin telefon.
 
-Koden er engangsbrug, bundet til den bekræftede e-mail og gyldig i 7 dage. Ubrugte invitationer kan annulleres. Kun ejeren kan invitere og fjerne medlemmer. Alle medlemmer kan redigere profilnavn, type, hjemmeområde, gemte områder og fælles overvågning. Der er én fælles aktiv geofence per tracker. Adgang til både seneste position og historik kontrolleres på serveren ved hvert kald.
+Koden er engangsbrug, bundet til den bekræftede e-mail og gyldig i 7 dage. Ubrugte invitationer kan annulleres. Kun ejeren kan invitere og fjerne medlemmer. Fra 0.7.5 vælger ejeren pr. bruger, om medlemmet kun må se eller også må redigere profilnavn, type, hjemmeområde, gemte områder og fælles overvågning (før 0.7.5 kunne alle medlemmer redigere). Der er én fælles aktiv geofence per tracker. Adgang til både seneste position og historik kontrolleres på serveren ved hvert kald.
 
 Delte ændringer hentes ved åbning og derefter ca. hvert minut, når appen er synlig. Mens man redigerer en formular, sættes denne opdatering på pause. Samtidige gemninger beskyttes med versionskontrol; ved konflikt hentes den nyeste profil, og brugeren må prøve igen. Fjernet adgang gælder efterfølgende serverkald; oplysninger, der allerede er vist, kan ikke trækkes tilbage fra en bruger.
 

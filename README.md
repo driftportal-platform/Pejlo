@@ -1,3 +1,43 @@
+# Pejlo 0.8.0 – foto, søgehjælp og alarmarkiv
+
+Komplet GitHub-pakke med alle otte ønskede tilføjelser. Se [brug og opdatering](docs/version-0.8.md). Ingen nye Cloudflare-nøgler kræves; arkivtabellen oprettes automatisk. Behold eksisterende Cron Trigger, database og nøgler.
+
+Foto deles på profilen og vises på kortet. Find kan holde skærmen vågen og viser afstand hjemmefra samt forsigtigt vurderet bevægelsesretning. Seneste trackerkontakt er adskilt fra GPS-alder, og gamle positioner får en tydelig hjemmestatus. Kortet har valgfrie afstandscirkler og hjemmelinje. Alarmarkivet under Ture bevarer den daværende geofence i 90 dage. Mailafsenderen hedder Pejlo.
+
+Upload hele pakkens indhold til det eksisterende repository. Telefonens faktiske skærmlås, push, foto og mail testes efter deployment.
+
+---
+
+# Pejlo 0.7.6 – rettet invitationsmail
+
+Komplet udgave baseret på 0.7.5. Roller, ejerbeskeder, CSP i testtilstand og PNG-ikoner er bevaret.
+
+- Mailafsenderen vises som **Pejlo** med den eksisterende adresse fra `MAIL_FROM`.
+- Mailgrænserne kontrolleres og reserveres i ét databasekald, også ved samtidige invitationer fra forskellige brugere.
+- Versionsnumre er ens i app, package.json og package-lock.json.
+- Behold `MAIL_FROM` som en ren e-mailadresse, fx `pejlo@send.driftportalen.dk`. Koden tilføjer selv afsendernavnet. Ingen nye nøgler eller manuelle databasetrin kræves for denne rettelse.
+- Begrænsningerne gælder invitationsforsøg, som er reserveret til afsendelse. En fejl hos mailtjenesten frigiver ikke forsøget. Døgn betyder et rullende vindue på 24 timer.
+
+Upload hele indholdet til GitHub som hidtil. Rigtig maillevering og push på telefonen skal stadig afprøves efter deployment.
+
+---
+
+# Pejlo 0.7.5 – roller, sikkerhedspolitik og rigtige ikoner
+
+- **Roller på delte profiler:** ejeren vælger ved invitation, om modtageren *kun må se* (position, historik, egne beskeder) eller også *må redigere* profil og områder. Standard i invitationsformularen er «Kun se». Ejeren kan senere skifte rolle («Gør til læser» / «Giv redigeringsret») eller fjerne adgangen. Rollen håndhæves på serveren; en læser kan ikke gemme profil, ændre områder, invitere eller slette. Eksisterende delte brugere beholder redigeringsret.
+- **Ejeren får besked**, når en redaktør ændrer eller pauser områdeovervågningen («… har slået områdeovervågningen fra for Loui.»). Almindelig omdøbning giver ingen besked.
+- **Content-Security-Policy i afprøvningstilstand** (Report-Only) samt `X-Frame-Options: DENY`. Se [docs/csp.md](docs/csp.md). Afvigelser vises som en kort besked i appen.
+- **PNG-ikoner** (192, 512, maskable 512), `apple-touch-icon` og PNG-favicon, så installation på iPhone og Android får et rigtigt ikon.
+- Databasen: tabellen over medlemmer og invitationer får en kolonne `role`. Workeren tilføjer den automatisk første gang (eksisterende medlemmer bliver «kan redigere»). Ingen manuel handling, og ingen nye nøgler.
+
+# Pejlo 0.7.4 – tydeligere beskeder og strammere invitationsmail
+
+- **Beskeder nævner nu profilen**, fx «Loui har forladt hjemmeområdet.» og «Batteriet på Cyklen er lavt (17 %).». Hver tracker har sit eget notifikations-tag, så beskeder fra flere trackere ikke længere erstatter hinanden. Tryk på en besked åbner appen på netop den profil (uden at genindlæse en allerede åben app).
+- **Databasen:** nye migrationen `apps/api/migrations/0002_family_notifications_mail.sql` samler alle tabeller. Kør den én gang: `npx wrangler d1 migrations apply pejlo-trackers --remote` (eller indsæt filen i D1-konsollen). Workeren opretter stadig manglende tabeller som sikkerhedsnet, men nu kun én gang pr. Worker-instans i stedet for ved hvert kald.
+- **Invitationsmail:** mailen oplyser, hvem der har inviteret. Grænser: 1 mail pr. minut og 10 pr. døgn pr. afsender, højst 3 pr. døgn pr. modtager. Modtagere gemmes kun som hash og slettes efter 24 timer.
+- **Valgfri variabel `APP_URL`** (fx `https://pejlo.dit-domæne.dk`) bruges i invitationslinket. Uden den bruges den nuværende workers.dev-adresse.
+- Ingen nye nøgler er nødvendige. Testserveren (demo3) er uændret.
+
 # Pejlo 0.7.3 – automatisk invitationsmail
 
 Komplet pakke med alle tidligere rettelser. Ny knap Send invitation sender mail med link og kode. Før første rigtige afsendelse skal RESEND_API_KEY og MAIL_FROM sættes op. Følg [mailvejledningen](docs/invitationsmail.md).

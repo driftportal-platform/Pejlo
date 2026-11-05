@@ -37,3 +37,13 @@ Afsendelsesbekræftelsen betyder, at mailtjenesten har modtaget mailen, ikke at 
 ## Test efter opsætning
 
 Send en invitation til en anden mail, kontrollér indbakke/spam, åbn linket, og acceptér på den korrekte konto. Kontrollér derefter delt adgang og tilbagekaldelse. De automatiske tests bruger simuleret mailtjeneste; ingen rigtig mail er sendt fra udviklingsmiljøet.
+
+## Grænser og valgfri adresse (0.7.4)
+
+- Højst 1 invitation pr. minut og 10 pr. døgn pr. afsender, og højst 3 pr. døgn til den samme modtager. Ved grænsen vises en forklarende fejl; koden kan stadig gives videre manuelt, hvis den allerede er oprettet.
+- Mailen starter med afsenderens navn eller e-mail, så modtageren kan se, hvem invitationen kommer fra.
+- Sæt eventuelt `APP_URL` (Variable, fx `https://pejlo.dit-domæne.dk`) i Cloudflare, hvis Pejlo får sit eget domæne. Kun en ren https-adresse uden sti accepteres.
+
+## Rettelse i 0.7.6
+
+MAIL_FROM skal fortsat være den rene adresse; appen tilføjer Pejlo som afsendernavn. Begrænsninger håndhæves samlet i én databaseoperation og gælder reserverede afsendelsesforsøg, også hvis mailtjenesten fejler. Ingen ny opsætning nødvendig.

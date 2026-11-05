@@ -1,3 +1,22 @@
+# Kontrol af Pejlo 0.8.0
+
+- `npm test`: 78 tests bestået. Produktionsfilerne bygges som del af testen.
+- Nye kontroller: gammel/frisk hjemmestatus, bevægelsesretning og afvisning af drift/dårlig præcision/huller, fotovalidering, skærmlåsens synlighed og sene svar efter stop, adskilte GPS-/kontakt-tider samt valgfrie kortlag.
+- Alarmarkiv afprøvet med rigtig lokal SQLite: uændret område efter geofenceændring, personafgrænsning, stabil paginering ved identiske tidspunkter og 90-dagesgrænse. Cron registrerer områdehændelser uden VAPID-nøgler; API afviser uvedkommende.
+- Samtidige mailreservationer kan ikke overskride kvoterne. Afsendernavnet Pejlo kontrolleres i mailtesten.
+- Simulerede DOM-forløb for ejer og delt redaktør: login, profil, alarmvalg, historik, arkiv, invitation/join og delt redigering. Ingen rigtige invitationer afsendt; HTTP-svar og konti er syntetiske.
+- Tidligere tests af roller, kontoadskillelse, API-adgang, sletning af geofence, navigation, kort og PWA-ikoner består.
+
+## Praktisk kontrol efter upload
+
+Ikke deployet til brugerens Cloudflare herfra. Der er ikke kørt Wrangler dry-run eller fuld visuel mobilbrowserkontrol i denne omgang. Fysisk tracker, live Firebase, push/mail-levering, telefonens skærmlås og canvasbehandling af et rigtigt foto skal afprøves efter upload. De lokale tests bekræfter ikke disse telefon- og tjenesteafhængige forhold.
+
+Se [opdateringsvejledningen](version-0.8.md) for den korte accepttest og funktionernes grænser.
+
+---
+
+## Tidligere kontrolnoter
+
 # Kontrol af Pejlo 0.5.1
 
 ## Udført

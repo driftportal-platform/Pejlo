@@ -15,6 +15,7 @@ export function cleanHome(h){
  if(h.shape==='polygon'&&!validPolygon(h.points))return null;
  return {lat:h.lat,lon:h.lon,radius:h.radius,buffer:Number.isFinite(h.buffer)&&h.buffer>=0&&h.buffer<=30?h.buffer:5,shape:h.shape==='polygon'?'polygon':'circle',...(h.shape==='polygon'?{points:h.points.map(v=>({lat:v.lat,lon:v.lon}))}:{})};
 }
+export const validPhoto=value=>typeof value==='string'&&value.length<=12000&&(value===''||/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value));
 export function cleanProfile(p) {
  if(!p||typeof p.id!=='string'||!p.id||typeof p.name!=='string'||!p.name.trim()||p.name.length>40||!Object.hasOwn(types,p.type))return null;
  const home=cleanHome(p.home);if(!home)return null;
@@ -23,7 +24,7 @@ export function cleanProfile(p) {
  }):p.homeConfirmed?[{id:'original',name:'Hjemme',home:structuredClone(home)}]:[];
  const unique=presets.filter((f,i)=>presets.findIndex(x=>x.id===f.id)===i);
  const active=unique.find(f=>f.id===p.activeFenceId)||(!Array.isArray(p.fencePresets)?unique[0]:null);
- return {id:p.id.slice(0,100),name:p.name.trim(),type:p.type,deviceLabel:typeof p.deviceLabel==='string'?p.deviceLabel.slice(0,60):'',trackerId:typeof p.trackerId==='string'?p.trackerId.slice(0,100):'',geofenceEnabled:p.geofenceEnabled===true,homeConfirmed:p.homeConfirmed===true,home,fencePresets:unique,activeFenceId:active?.id||null};
+ return {id:p.id.slice(0,100),name:p.name.trim(),photo:validPhoto(p.photo)?p.photo:'',type:p.type,deviceLabel:typeof p.deviceLabel==='string'?p.deviceLabel.slice(0,60):'',trackerId:typeof p.trackerId==='string'?p.trackerId.slice(0,100):'',geofenceEnabled:p.geofenceEnabled===true,homeConfirmed:p.homeConfirmed===true,home,fencePresets:unique,activeFenceId:active?.id||null};
 }
 export const createId=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
 export function newProfile(name,type,deviceLabel=''){

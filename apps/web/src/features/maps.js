@@ -1,6 +1,6 @@
 import {routeAnalysis} from '../shared/history.js';
 import {icon} from '../components/icons.js';
-import {distance,searchZoom} from '../shared/geo.js';
+import {distance,searchZoom,formatDistance} from '../shared/geo.js';
 import {types} from './profiles.js';
 export const layers = {demo:'Skematisk eksempel',streets:'Gadekort',satellite:'Satellit / luftfoto',outdoor:'Terræn og stier'};
 const mapIds = {streets:'streets-v4',satellite:'satellite',outdoor:'outdoor-v2'};
@@ -12,6 +12,7 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
   let base, generation=0, errors=0;
   const markers=L.layerGroup().addTo(map), path=L.layerGroup().addTo(map), homeLayer=L.layerGroup().addTo(map), phone=L.layerGroup().addTo(map), draft=L.layerGroup().addTo(map);
   const markerIcon=(type,cls='')=>L.divIcon({html:`<div class="map-marker ${cls}">${icon(type,24)}</div>`,className:'',iconSize:[42,42],iconAnchor:[21,21]});
+  function photoIcon(src){const el=document.createElement('div'),img=document.createElement('img');el.className='map-marker photo-marker';img.src=src;img.alt='Profilfoto';el.append(img);return L.divIcon({html:el,className:'',iconSize:[48,48],iconAnchor:[24,24]});}
   function demo() {if(base)map.removeLayer(base);base=L.imageOverlay('./src/assets/images/demo-map.svg',[[56.544,8.300],[56.557,8.329]]).addTo(map);}
   demo();
   map.on('click',e=>onHome?.({lat:e.latlng.lat,lon:e.latlng.lng}));map.on('dragstart',()=>onManual?.());
@@ -31,10 +32,12 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
         return true;
       } catch {if(current===generation)notice?.('Kortlaget kunne ikke indlæses. Prøv igen senere. Det tidligere lag beholdes.');return false;}
     },
-    profile(p,data,{showRoute=true,showHome=true,history=false}={}) {
+    profile(p,data,{showRoute=true,showHome=true,history=false,showDistanceLine=false,showRings=false}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();
-      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:markerIcon(types[p.type].icon),title:p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
+      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:p.photo?photoIcon(p.photo):markerIcon(types[p.type].icon),title:p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
       if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
+      if(p.homeConfirmed&&showDistanceLine&&data.position)L.polyline([[p.home.lat,p.home.lon],[data.position.lat,data.position.lon]],{color:'#477fc1',weight:2,dashArray:'3 7'}).addTo(homeLayer).bindTooltip('Afstand til seneste position: '+formatDistance(distance(p.home,data.position)));
+      if(p.homeConfirmed&&showRings)for(const radius of [100,250,500])L.circle([p.home.lat,p.home.lon],{radius,color:'#7c8792',weight:1,fill:false,dashArray:'2 6'}).addTo(homeLayer).bindTooltip(radius+' m fra hjem');
       if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
     },
     fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.homeConfirmed&&p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},

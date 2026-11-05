@@ -1,3 +1,7 @@
+import {profilePhoto} from './features/photo.js';
+import {createWakeLock} from './features/wake-lock.js';
+import {createAlarmArchive} from './features/alarm-archive.js';
+import {homeStatus,recentMovement,ageText} from './shared/status.js';
 import {createHistoryView} from './features/history-view.js';
 import {danishDate,routeAnalysis} from './shared/history.js';
 import {cleanAlerts,isQuiet} from './shared/alerts.js';
@@ -19,6 +23,11 @@ const $=s=>document.querySelector(s);
 const state=emptyState();
 let invitationPresented=false;
 const invitationMatch=window.location.hash.match(/^#invitation=([a-fA-F0-9]{32})$/);
+let pendingTracker=new URLSearchParams(window.location.search).get('profil');
+// Shows the first few Content-Security-Policy reports on screen, so they can be seen on a phone without a console.
+$('#auth-retry').addEventListener('click',()=>window.location.reload());
+const cspSeen=new Set();
+document.addEventListener('securitypolicyviolation',event=>{try{const key=event.violatedDirective+'|'+event.blockedURI;if(cspSeen.has(key)||cspSeen.size>=5)return;cspSeen.add(key);console.warn('CSP',event.disposition,event.violatedDirective,event.blockedURI);toast('Sikkerhedspolitik ('+(event.disposition==='report'?'test':'blokeret')+'): '+event.violatedDirective+' '+String(event.blockedURI).slice(0,60));}catch{}});
 if(invitationMatch){sessionStorage.setItem('pejlo-invitation',invitationMatch[1]);window.history.replaceState(null,'','#indstillinger');}
 
 let saveCloud=null,cloud=null,sessionGeneration=0;
@@ -29,6 +38,8 @@ const trackerClient=createTrackerClient();
 const geofenceMonitor=createGeofenceMonitor();
 let polygonDraft=null;
 let family=new Map(),settingsDirty=false,familyReady=false,lastInviteProfile=null,lastInviteText='',familyLoading=false,familySaving=false,alertsId=null,alertsConfig=cleanAlerts(),alertsGeneration=0,historyProfile=null;
+const alarms=createAlarmArchive({request:trackerRequest,selected});
+const wake=createWakeLock({onState:text=>$('#wake-status').textContent=text});
 const history=createHistoryView({request:trackerRequest,selected,layer:()=>chosenLayer,key:()=>mapConfig.apiKey,notice:toast});
 const isLinked=()=>!!selected()?.trackerId;
 const data=()=>!selected()?null:!isLinked()?demoFor(selected()):trackerData?.device.identifier===selected().trackerId?trackerData:{source:'traccar',position:null,route:[],historyAvailable:false};
@@ -73,7 +84,7 @@ async function persist(){
  }catch(e){if(gen===sessionGeneration){toast(e.message||'Ændringen blev ikke gemt. Prøv igen.');settingsDirty=false;await loadFamily(true);}return false;}
 }
 function options(select,items,value){select.replaceChildren();for(const [id,label] of items){const o=document.createElement('option');o.value=id;o.textContent=label;select.append(o);}select.value=value;}
-function renderMap(m){if(!selected())return;m?.profile(selected(),data(),{showRoute:$('#show-route').checked,showHome:$('#show-home').checked});}
+function renderMap(m){if(!selected())return;m?.profile(selected(),data(),{showRoute:$('#show-route').checked,showHome:$('#show-home').checked,showDistanceLine:$('#show-distance-line').checked,showRings:$('#show-distance-rings').checked});}
 function showPage(name){
   if(!selected()){name='velkommen';}
   else if(!['kort','ture','indstillinger','soeg'].includes(name))name='kort';
@@ -81,33 +92,37 @@ function showPage(name){
   if(currentPage==='ture'&&name!=='ture')history.stop();
   const openingHistory=currentPage!=='ture'&&name==='ture';
   currentPage=name;
+  if(name==='soeg')wake.page(true);else{wake.stop();$('#keep-awake').checked=false;}
   $('#family-join-panel').hidden=!['indstillinger','velkommen'].includes(name);
   document.querySelectorAll('.page').forEach(e=>e.hidden=e.id!==name);
   document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('active',e.dataset.page===name||(name==='soeg'&&e.dataset.page==='kort')));
   $('#page-title').textContent={kort:'Dit overblik',ture:'Ture og bevægelser',indstillinger:'Dine profiler og indstillinger',soeg:'Find '+(selected()?.name??''),velkommen:'Velkommen til Pejlo'}[name];
-  if(openingHistory)history.load();
+  if(openingHistory){history.load();alarms.load();}
   if(name==='kort'&&!polygonDraft)requestAnimationFrame(()=>overviewMap?.fit(selected(),data()));
   if(name==='soeg')requestAnimationFrame(()=>{if(!searchMap){searchMap=createMap('search-map',{notice:toast,onManual:()=>{$('#autozoom').checked=false;}});searchMap?.layer(chosenLayer,mapConfig.apiKey);}renderMap(searchMap);searchMap?.fit(selected(),data());updateSearch();});
 }
 function go(name){window.location.hash=name;showPage(name);}
 function refresh(){
+  if(pendingTracker){const found=state.profiles.find(p=>p.trackerId===pendingTracker);if(found){state.activeId=found.id;pendingTracker=null;if(window.location.search)window.history.replaceState(null,'',window.location.pathname+window.location.hash);}}
   const empty=!selected();
   if(trackerUser&&(selected()?.trackerId||null)!==pollingId)connectTracker();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
-  if(empty){history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
+  if(empty){alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
-  if(historyProfile!==p.id){historyProfile=p.id;history.clear();if(currentPage==='ture')history.load();}
+  if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
   renderFamily();loadAlerts();
   options($('#saved-fences'),[['','Intet gemt område valgt'],...(p.fencePresets||[]).map(f=>[f.id,f.name])],p.activeFenceId||'');
   $('#fence-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#delete-fence').disabled=!p.activeFenceId;$('#fence-buffer').value=p.home.buffer??5;
   options($('#profile-select'),state.profiles.map(p=>[p.id,p.name+' · '+types[p.type].label]),p.id);
   $('#side-name').textContent=p.name;$('#side-type').textContent=meta.label;
   $('#side-icon').innerHTML=icon(meta.icon,30);$('#select-icon').innerHTML=icon(meta.icon,22);
+  for(const id of ['side-icon','select-icon'])if(p.photo){const img=document.createElement('img');img.src=p.photo;img.alt=p.name;img.className='profile-photo-small';$('#'+id).replaceChildren(img);}
+  $('#profile-photo-preview').hidden=!p.photo;if(p.photo)$('#profile-photo-preview').src=p.photo;else $('#profile-photo-preview').removeAttribute('src');$('#remove-photo').hidden=!p.photo;
   $('#status-title').textContent=p.name+(isLinked()?' · seneste position':' · eksempelposition');
   $('#find').replaceChildren();$('#find').insertAdjacentHTML('beforeend',icon('find'));$('#find').append(document.createTextNode('Find '+p.name));
-  $('#home-distance').textContent=d.position?formatDistance(distance(p.home,d.position)):'—';
+  $('#home-distance').textContent=d.position&&p.homeConfirmed?formatDistance(distance(p.home,d.position)):'—';
   $('#home-title').textContent=meta.noun;
   $('#profile-name').value=p.name;$('#profile-type').value=p.type;$('#profile-device').value=p.deviceLabel;updateTrackerStatus();
   $('#lat').value=p.home.lat;$('#lon').value=p.home.lon;$('#radius').value=p.home.radius;$('#geofence-enabled').checked=p.geofenceEnabled;$('#fence-shape').value=p.home.shape||'circle';$('#polygon-count').textContent=p.home.points?.length?p.home.points.length+' punkter i området':'';fenceShapeUI();
@@ -136,6 +151,8 @@ function updateAge(){
  updateGeofence();
  if(!selected())return;
  const d=data(),p=d.position,live=isLinked();
+ $('#home-observation').textContent=live?homeStatus(selected(),p):'Eksempeldata · ikke en rigtig hjemmestatus';
+ const contact=d.device?.lastContact;$('#last-contact').textContent=live?ageText(contact):'Eksempeldata';$('#last-contact').title=Number.isFinite(contact)?new Date(contact).toLocaleString('da-DK',{timeZone:'Europe/Copenhagen'}):'Kontaktoplysningen kommer fra Traccar, særskilt fra GPS-positionen.';
  if(!p){$('#age').textContent='Ingen position';$('#freshness').textContent='Afventer GPS';$('#search-age').textContent='Der er endnu ingen gyldig position fra trackeren.';return;}
  const seconds=Math.max(0,Math.floor((Date.now()-p.timestamp)/1000));
  const text=seconds<60?seconds+' sek. siden':seconds<3600?Math.floor(seconds/60)+' min. siden':Math.floor(seconds/3600)+' timer siden';
@@ -146,6 +163,8 @@ function updateAge(){
 function updateSearch(){
   if(!selected())return;
   const target=data().position;
+  $('#search-home-distance').textContent=target&&selected().homeConfirmed?'Afstand fra hjem til seneste position: '+formatDistance(distance(selected().home,target)):'Vælg et fast hjemmepunkt for at vise afstand hjemmefra.';
+  const movement=isLinked()?recentMovement(data().route,target):null;$('#movement-text').textContent=movement?'Seneste målte bevægelse mod '+movement.direction+' ('+Math.round(movement.degrees)+'°). Viser bevægelsen frem til seneste GPS-punkt.':'Bevægelsesretning er usikker eller ikke tilgængelig. Kompaspilen viser retningen fra dig til seneste position.';
   if(!target){$('#search-distance').textContent='— m';$('#direction-text').textContent='Afventer en gyldig GPS-position fra trackeren.';$('#compass-arrow').style.opacity='.25';searchMap?.clearPhone();return;}
   if(!user){$('#search-distance').textContent='— m';$('#direction-text').textContent='Start placering for at se afstand og retning.';$('#compass-arrow').style.opacity='.25';searchMap?.clearPhone();return;}
   const meters=distance(user,target),b=bearing(user,target),phoneStale=Date.now()-user.timestamp>20000;
@@ -184,7 +203,7 @@ overviewMap=createMap('map',{notice:toast,onHome:p=>{if(polygonDraft){if(polygon
 $('#profile-select').onchange=e=>{settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
 $('#fit').onclick=()=>{if(selected())overviewMap?.fit(selected(),data());};
 $('#find').onclick=()=>go('soeg');
-$('#show-route').onchange=()=>{renderMap(overviewMap);renderMap(searchMap);};$('#show-home').onchange=$('#show-route').onchange;
+$('#show-route').onchange=()=>{renderMap(overviewMap);renderMap(searchMap);};$('#show-home').onchange=$('#show-route').onchange;$('#show-distance-line').onchange=$('#show-route').onchange;$('#show-distance-rings').onchange=$('#show-route').onchange;
 $('#set-map-home').onclick=()=>{choosingHome=!choosingHome;$('#set-map-home').textContent=choosingHome?'Annuller valg':'Sæt fast udgangspunkt';if(choosingHome)toast(chosenLayer==='demo'?'Vælg først et geografisk kortlag til dit rigtige hjem.':'Tryk på dit hjem på kortet for at vælge midtpunkt.');};
 $('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();if(!name)return toast('Skriv et navn.');if(family.has(selected().trackerId)&&selected().trackerId!==$('#profile-tracker').value)return toast('Fjern først profilen for at skifte tracker.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});if(await persist()){refresh();toast('Profil gemt. Navn og ikon er opdateret.');}};
 $('#home-form').onsubmit=async e=>{
@@ -211,6 +230,7 @@ $('#stop-location').onclick=()=>stopLocation();$('#autozoom').onchange=updateSea
 function simulate(){location.stop();watching=false;simulation=true;heading=null;const meters=[600,300,150,70,25,8][Math.min(demoStep,5)],target=data().position;user={lat:target.lat-meters/111195,lon:target.lon,accuracy:8,timestamp:Date.now()};$('#closer').hidden=false;$('#closer').disabled=demoStep>=5;$('#phone-state').classList.add('simulated');updateSearch();}
 $('#simulate').onclick=()=>{demoStep=0;simulate();};$('#closer').onclick=()=>{demoStep++;simulate();};
 window.addEventListener('hashchange',()=>showPage(window.location.hash.slice(1)));
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type!=='pejlo-open')return;pendingTracker=typeof event.data.tracker==='string'?event.data.tracker:null;refresh();go('kort');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(watching||simulation||heading!==null))stopLocation(false);});
 window.addEventListener('pagehide',()=>{location.stop();trackerClient.stop();});
 window.addEventListener('pageshow',event=>{if(event.persisted&&trackerUser)connectTracker();});
@@ -237,7 +257,7 @@ $('#provision-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- family=new Map();invitationPresented=false;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ family=new Map();invitationPresented=false;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
  trackerUser=user;loadTrackers();connectTracker();
@@ -307,6 +327,7 @@ async function saveFamilyProfile(profile){
  if(!familyReady)throw Error('Vent på at familiedelingen er hentet, og gem igen.');
  const entry=family.get(profile.trackerId);
  if(entry&&JSON.stringify(entry.profile)===JSON.stringify(profile))return;
+ if(entry?.role==='viewer')throw Error('Du har kun læseadgang til denne profil.');
  if(!entry&&!ownedTrackers.some(t=>t.identifier===profile.trackerId&&t.is_owner!==0))throw Error('Du har ikke længere adgang til profilen.');
  if(state.profiles.filter(p=>p.trackerId===profile.trackerId).length>1)throw Error('Brug én fælles profil per tracker. Fjern den ekstra profil først.');
  if(familySaving)throw Error('En ændring er ved at blive gemt. Prøv igen om et øjeblik.');
@@ -337,8 +358,12 @@ function renderFamily(){
  const p=selected(),entry=family.get(p?.trackerId),linked=!!p?.trackerId;
  $('#family-invite').hidden=!linked||entry?.owner===false;$('#family-leave').hidden=!linked||entry?.owner!==false;
  $('#family-members').replaceChildren();
- if(entry?.owner===false)$('#family-members').textContent='Delt med dig. Navn og områder er fælles med ejeren.';
- for(const member of [...(entry?.members||[]),...(entry?.invites||[]).map(i=>({...i,pending:true}))]){const line=document.createElement('p'),button=document.createElement('button');line.textContent=member.email+(member.pending?' · afventer':'');button.textContent=member.pending?'Annuller invitation':'Fjern adgang';button.className='text-button';button.type='button';button.onclick=async()=>{if(!confirm('Fjern adgang for '+member.email+'?'))return;try{await trackerRequest('family',{action:'revoke',identifier:p.trackerId,uid:member.uid,email:member.email});await loadFamily(true);toast('Adgangen er fjernet.');}catch(e){toast(e.message);}};line.append(button);$('#family-members').append(line);}
+ if(entry?.owner===false)$('#family-members').textContent=entry.role==='viewer'?'Delt med dig som læser. Du kan se position og historik og vælge dine egne beskeder, men ikke ændre profil eller områder.':'Delt med dig. Navn og områder er fælles med ejeren, som får besked, hvis du ændrer området.';
+ for(const member of [...(entry?.members||[]),...(entry?.invites||[]).map(i=>({...i,pending:true}))]){const line=document.createElement('p'),button=document.createElement('button');line.textContent=member.email+(member.pending?' · afventer':'')+' · '+(member.role==='viewer'?'kun se':'kan redigere');button.textContent=member.pending?'Annuller invitation':'Fjern adgang';button.className='text-button';button.type='button';button.onclick=async()=>{if(!confirm('Fjern adgang for '+member.email+'?'))return;try{await trackerRequest('family',{action:'revoke',identifier:p.trackerId,uid:member.uid,email:member.email});await loadFamily(true);toast('Adgangen er fjernet.');}catch(e){toast(e.message);}};if(!member.pending){const roleButton=document.createElement('button'),next=member.role==='viewer'?'editor':'viewer';roleButton.type='button';roleButton.className='text-button';roleButton.textContent=next==='viewer'?'Gør til læser':'Giv redigeringsret';roleButton.onclick=async()=>{try{await trackerRequest('family',{action:'setrole',identifier:p.trackerId,uid:member.uid,role:next});await loadFamily(true);toast('Adgangen er ændret.');}catch(e){toast(e.message);}};line.append(roleButton);}
+  line.append(button);$('#family-members').append(line);}
+ const viewer=entry?.role==='viewer';
+ for(const el of document.querySelectorAll('#profile-form :is(input,select,button):not(#delete-profile),#home-form :is(input,select,button),#edit-geofence,#set-map-home'))el.inert=viewer;
+ $('.app').classList.toggle('viewer-mode',viewer);
  $('#profile-tracker').disabled=!!entry;$('#family-result').textContent=lastInviteProfile===p?.id?lastInviteText:'';
 }
 async function loadAlerts(force=false){
@@ -358,9 +383,19 @@ $('#alerts-form').onsubmit=async e=>{
  catch(e){if(gen===sessionGeneration)$('#alerts-status').textContent=e.message;}
  finally{if(gen===sessionGeneration)$('#alerts-form').inert=false;}
 };
-$('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
+$('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value,role:$('#family-role').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
 $('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';sessionStorage.removeItem('pejlo-invitation');await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
 $('#family-leave').onclick=()=>$('#delete-profile').click();
 setInterval(()=>{if(trackerUser&&!document.hidden)loadFamily();},60000);
 
 for(const form of ['profile-form','home-form'])for(const event of ['input','change'])$('#'+form).addEventListener(event,()=>{settingsDirty=true;});
+
+$('#keep-awake').onchange=()=>wake.set($('#keep-awake').checked);
+document.addEventListener('visibilitychange',()=>wake.visibility());window.addEventListener('pagehide',()=>{wake.stop();$('#keep-awake').checked=false;});
+$('#profile-photo').onchange=async event=>{
+ const file=event.target.files?.[0],p=selected(),gen=sessionGeneration;if(!file||!p)return;
+ if(family.get(p.trackerId)?.role==='viewer'){event.target.value='';return toast('Du har kun læseadgang til profilen.');}
+ try{const photo=await profilePhoto(file);if(gen!==sessionGeneration||selected()?.id!==p.id)return;p.photo=photo;if(await persist()){refresh();toast('Profilfotoet er gemt.');}}
+ catch(e){toast(e.message);}finally{event.target.value='';}
+};
+$('#remove-photo').onclick=async()=>{const p=selected();if(!p||family.get(p.trackerId)?.role==='viewer')return;p.photo='';if(await persist()){refresh();toast('Profilfotoet er fjernet.');}};

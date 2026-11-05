@@ -5,7 +5,7 @@ import {sendInvitationMail,reserveInvitationMail,mailReady} from '../apps/api/ma
 const env={RESEND_API_KEY:'server-only-key',MAIL_FROM:'pejlo@example.com'},invitation={email:'member@example.com',code:'a'.repeat(32),name:'Loui'};
 test('mail uses fixed provider, server credentials, single recipient and fragment invitation link',async()=>{
  let captured;await sendInvitationMail(invitation,env,async(url,options)=>{captured={url,options};return Response.json({id:'email-id'});});
- assert.equal(captured.url,'https://api.resend.com/emails');assert.equal(captured.options.redirect,'manual');assert.equal(captured.options.headers.Authorization,'Bearer server-only-key');const body=JSON.parse(captured.options.body);assert.deepEqual(body.to,['member@example.com']);assert.match(body.text,/#invitation=aaaaaaaa/);assert.match(body.text,/Tilføj delt profil/);assert.ok(!captured.options.body.includes('server-only-key'));
+ assert.equal(captured.url,'https://api.resend.com/emails');assert.equal(captured.options.redirect,'manual');assert.equal(captured.options.headers.Authorization,'Bearer server-only-key');const body=JSON.parse(captured.options.body);assert.equal(body.from,'Pejlo <pejlo@example.com>');assert.deepEqual(body.to,['member@example.com']);assert.match(body.text,/#invitation=aaaaaaaa/);assert.match(body.text,/Tilføj delt profil/);assert.ok(!captured.options.body.includes('server-only-key'));
 });
 test('missing mail setup and failed delivery never report success',async()=>{
  assert.equal(mailReady({}),false);assert.equal(mailReady({...env,MAIL_FROM:'x\r\nbcc:other@example.com'}),false);
