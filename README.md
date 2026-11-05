@@ -1,3 +1,13 @@
+# Pejlo 0.7.3 – automatisk invitationsmail
+
+Komplet pakke med alle tidligere rettelser. Ny knap Send invitation sender mail med link og kode. Før første rigtige afsendelse skal RESEND_API_KEY og MAIL_FROM sættes op. Følg [mailvejledningen](docs/invitationsmail.md).
+
+Denne vejledning erstatter tidligere beskrivelser af manuel invitationsafsendelse.
+
+# Pejlo 0.7.2 – placering af invitationsfelt
+
+Invitationskoden kan nu kun indtastes under Indstillinger eller på velkomstsiden for nye konti. Feltet vises ikke længere under Kort, Ture eller Find. Invitationer sendes fortsat manuelt. Dagens kortrute følger dansk midnat; tidligere dage findes under Ture, afhængigt af Traccars opbevaring. Komplet pakke, ingen nye indstillinger.
+
 # Pejlo 0.7.1 – rettet sletning af geofence
 
 Slettede områder vises ikke længere på kortet. Ny tegning starter uden det tidligere omrids. Tegneknappen kræver mindst tre gyldige punkter. Alle funktioner fra 0.7.0 er med. Upload hele pakken som hidtil; ingen nye indstillinger kræves.

@@ -1,3 +1,4 @@
+import {mailReady,reserveInvitationMail,sendInvitationMail} from './mail.js';
 import {ensureFamily,trackerAccess,familyAPI} from './family.js';
 import {cleanAlerts} from '../../packages/shared/alerts.js';
 import {historyRange,danishDate} from '../../packages/shared/history.js';
@@ -31,7 +32,21 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
   const uid=account.localId,isAdmin=!!env.TRACCAR_ADMIN_UID&&uid===env.TRACCAR_ADMIN_UID;
-  if(path==='/api/family'){await ensureNotifications(env.DB);return json(await familyAPI(env.DB,account,request.method==='GET'?null:await body(request,120000),codeHash));}
+  if(path==='/api/family'){
+   await ensureNotifications(env.DB);const input=request.method==='GET'?null:await body(request,120000);
+   if(input?.action==='invite'){
+    if(!mailReady(env))throw new Failure(503,'Invitationsmail mangler opsætning. Tilføj RESEND_API_KEY og MAIL_FROM i Cloudflare.');
+    const access=await trackerAccess(env.DB,input.identifier,uid);if(!access?.owner)throw new Failure(403,'Kun ejeren kan invitere.');
+    await reserveInvitationMail(env.DB,uid);
+   }
+   const result=await familyAPI(env.DB,account,input,codeHash);
+   if(input?.action==='invite'){
+    const row=await env.DB.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=?').bind(input.identifier).first();
+    try{await sendInvitationMail({email:input.email.trim().toLowerCase(),code:result.code,name:JSON.parse(row.profile).name},env,fetcher);return json({...result,mailSent:true});}
+    catch{return json({...result,mailSent:false,message:'Invitationen er oprettet, men mailen kunne ikke bekræftes sendt. Du kan give koden til modtageren eller prøve igen om et minut.'});}
+   }
+   return json(result);
+  }
   if(path==='/api/alerts'){
    await ensureNotifications(env.DB);const input=request.method==='GET'?{identifier:url.searchParams.get('identifier')}:await body(request);
    if(!identifierOK(input.identifier)||!await trackerAccess(env.DB,input.identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');

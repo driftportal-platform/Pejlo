@@ -17,6 +17,10 @@ import {createLocation} from './features/location.js';
 import {distance,formatDistance,bearing,relativeBearing,directionName} from './shared/geo.js';
 const $=s=>document.querySelector(s);
 const state=emptyState();
+let invitationPresented=false;
+const invitationMatch=window.location.hash.match(/^#invitation=([a-fA-F0-9]{32})$/);
+if(invitationMatch){sessionStorage.setItem('pejlo-invitation',invitationMatch[1]);window.history.replaceState(null,'','#indstillinger');}
+
 let saveCloud=null,cloud=null,sessionGeneration=0;
 let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome=false, user=null, heading=null, headingTime=0, watching=false, simulation=false, demoStep=0, toastTimer;
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
@@ -77,6 +81,7 @@ function showPage(name){
   if(currentPage==='ture'&&name!=='ture')history.stop();
   const openingHistory=currentPage!=='ture'&&name==='ture';
   currentPage=name;
+  $('#family-join-panel').hidden=!['indstillinger','velkommen'].includes(name);
   document.querySelectorAll('.page').forEach(e=>e.hidden=e.id!==name);
   document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('active',e.dataset.page===name||(name==='soeg'&&e.dataset.page==='kort')));
   $('#page-title').textContent={kort:'Dit overblik',ture:'Ture og bevægelser',indstillinger:'Dine profiler og indstillinger',soeg:'Find '+(selected()?.name??''),velkommen:'Velkommen til Pejlo'}[name];
@@ -232,7 +237,7 @@ $('#provision-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- family=new Map();familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ family=new Map();invitationPresented=false;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
  trackerUser=user;loadTrackers();connectTracker();
@@ -245,7 +250,7 @@ startAuthentication(async(user,{db,dbSDK,auth})=>{
   transaction:(ref,update)=>dbSDK.runTransaction(db,async transaction=>{if(auth.currentUser?.uid!==user.uid)throw new Error('Konto skiftet');const snapshot=await transaction.get(ref);const value=update(snapshot.exists()?snapshot.data():null);transaction.set(ref,{...value,updatedAt:dbSDK.serverTimestamp()});})
  });
  saveCloud=cloud.open(user,{
-  state:value=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);Object.assign(state,normalizeAccountState(value));mergeFamily();refresh();if(!familyReady)loadFamily();$('#auth-shell').hidden=true;$('.app').hidden=false;$('.app').inert=false;$('#sync-state').textContent='Profiler synkroniseret';},
+  state:value=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);Object.assign(state,normalizeAccountState(value));mergeFamily();refresh();if(!familyReady)loadFamily();const invitation=sessionStorage.getItem('pejlo-invitation');if(invitation&&!invitationPresented){invitationPresented=true;$('#family-code').value=invitation;$('#join-result').textContent='Invitationen er klar. Tryk Tilføj delt profil, når du er logget ind med den inviterede e-mail.';go('indstillinger');}$('#auth-shell').hidden=true;$('.app').hidden=false;$('.app').inert=false;$('#sync-state').textContent='Profiler synkroniseret';},
   connection:online=>{if(gen!==sessionGeneration)return;$('.app').inert=!online;$('#sync-state').textContent=online?'Forbundet':'Offline · redigering sat på pause';},
   error:fail,
   busy:busy=>{if(gen!==sessionGeneration)return;$('.app').inert=busy;$('#sync-state').textContent=busy?'Gemmer…':'Forbundet';},
@@ -353,8 +358,8 @@ $('#alerts-form').onsubmit=async e=>{
  catch(e){if(gen===sessionGeneration)$('#alerts-status').textContent=e.message;}
  finally{if(gen===sessionGeneration)$('#alerts-form').inert=false;}
 };
-$('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value});lastInviteProfile=p.id;lastInviteText='Invitationskode: '+result.code+' · Giv koden til den inviterede. Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
-$('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
+$('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
+$('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';sessionStorage.removeItem('pejlo-invitation');await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
 $('#family-leave').onclick=()=>$('#delete-profile').click();
 setInterval(()=>{if(trackerUser&&!document.hidden)loadFamily();},60000);
 
