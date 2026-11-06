@@ -18,3 +18,11 @@ test('polygon needs at least three points and viewers cannot open the editor',as
  const f=fixture();await f.editor.open();f.el('#editor-shape').value='polygon';f.el('#editor-shape').onchange();assert.equal(f.el('#editor-save').disabled,true);assert.equal(f.el('#editor-radius-row').hidden,true);
  const viewer=fixture(false);await viewer.editor.open();assert.equal(viewer.el('#fence-editor').open,false);assert.equal(viewer.notices.length,1);
 });
+test('circle editor from settings uses the selected shape and unsaved form values without changing the stored polygon',async()=>{
+ const f=fixture();f.p.home={lat:56,lon:8,radius:100,shape:'polygon',points:[{lat:56,lon:8},{lat:56.001,lon:8},{lat:56,lon:8.001}]};
+ await f.editor.open({shape:'circle',name:'Sommerhus',radius:75,buffer:3,lat:57,lon:9,enabled:false});
+ assert.equal(f.el('#editor-shape').value,'circle');assert.equal(f.el('#editor-radius-row').hidden,false);assert.equal(f.el('#editor-name').value,'Sommerhus');assert.equal(f.el('#editor-radius').value,75);assert.equal(f.el('#editor-enabled').checked,false);
+ assert.equal(f.p.home.shape,'polygon');assert.equal(f.p.home.lat,56);
+ await f.el('#editor-form').onsubmit({preventDefault(){}});
+ assert.equal(f.saved[0][0].shape,'circle');assert.equal(f.saved[0][0].radius,75);assert.equal(f.saved[0][0].buffer,3);assert.equal(f.saved[0][0].lat,57);assert.equal(f.saved[0][1],'Sommerhus');assert.equal(f.saved[0][2],false);
+});

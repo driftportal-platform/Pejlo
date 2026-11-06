@@ -1,3 +1,15 @@
+# Pejlo 0.8.10 – vælg cirkel på kortet
+
+Områdeindstillingerne har nu også en kortknap ved cirkel. Vælg centrum med et tryk, justér radius, og gem i editoren. Polygonens punkttæller skjules ved cirkel. Komplet pakke oven på 0.8.9. Ingen nye Cloudflare-indstillinger.
+
+---
+
+# Pejlo 0.8.9 – mere kort og fri zoom
+
+Zoomknapperne er fri af knappen til fast udgangspunkt, som har sin egen række under kortet. Mobilkortet er højere, og et fast, dækkende topfelt beskytter området bag iPhones ur og signal. Komplet opdatering oven på 0.8.8; ingen nye nøgler kræves. Se [brug og afprøvning](docs/version-0.8.9.md).
+
+---
+
 # Pejlo 0.8.8 – mobilbredde og nemmere rulning
 
 Retter overlap, datoernes bredde og pladsen over bundmenuen. Tilføjer rulleskyder og »Til toppen«. Komplet pakke oven på 0.8.7; ingen nye nøgler kræves. Se [opdatering og afprøvning](docs/version-0.8.8.md).
