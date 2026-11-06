@@ -96,3 +96,23 @@ body:has(#kort:not([hidden])) .status-strip{display:none}
  #ture .playbar label{margin:6px 0}
  #ture .playbar button{flex:0 0 auto;width:auto;padding:10px 18px;margin:0}
 }
+/* 0.8.7 – kortet som hovedvisning */
+.sheet-handle{display:block;margin:0 auto 8px;padding:8px 20px;font-size:12px;font-weight:700;color:var(--muted)}.map-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.map-actions button{flex:1;white-space:nowrap}.map-options{margin:12px 0}.map-options summary{cursor:pointer;font-size:13px;font-weight:700;padding:10px}.fence-editor{max-width:760px;width:calc(100% - 20px);max-height:94dvh;overflow:auto;padding:18px}.fence-editor label{display:block;margin:12px 0}.fence-editor input:not([type=checkbox]),.fence-editor select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:white}.fence-editor input[type=range]{accent-color:var(--green);padding:0}.editor-map{height:45dvh;min-height:240px;border-radius:18px;overflow:hidden}.fence-editor input[type=checkbox]{width:20px;height:20px}.fence-editor .primary{position:sticky;bottom:0}.map-card .map-bottom button{max-width:50%;}
+@media(max-width:700px){
+ body:has(#kort:not([hidden])) main>header,body:has(#kort:not([hidden])) .demo-banner{display:none}
+ body:has(#kort:not([hidden])) main{padding-top:10px}
+ #kort{display:flex;padding-bottom:12px;gap:10px;position:relative}
+ #kort .map-card{order:1;height:58dvh;min-height:340px;border-radius:22px;margin:0 -6px}
+ #kort>.overview{display:contents}
+ #kort .status-card{order:2;padding:12px 16px;margin:-55px 4px 0;z-index:2;position:relative;box-shadow:0 5px 22px #183e3520;border-radius:24px}
+ #kort .status-heading h2{font-size:18px}#kort .distance{margin:8px 0;gap:10px}#kort .distance strong{font-size:30px}#kort #home-observation{font-size:12px;margin:6px 0}
+ #kort .metrics{padding-top:9px;margin-bottom:10px;justify-content:space-between;gap:12px}
+ #kort #find{position:static;width:100%;box-shadow:none;margin:6px 0}
+ #kort .status-card:not(.expanded) .distance,#kort .status-card:not(.expanded)>p.hint{display:none}
+ #kort .status-card.expanded>p.hint{display:block}
+ #kort .map-actions{order:3;margin:0;display:grid;grid-template-columns:1fr 1fr}#kort .map-actions button{padding:10px;font-size:12px;margin:0}
+ #kort .geofence-summary{order:4;margin:0;padding:12px 16px}#kort .map-options{order:5;margin:0}#kort .today-card{order:6;padding:16px}#kort #polygon-tools{order:0}
+ #kort:has(#polygon-tools:not([hidden])) .status-card,#kort:has(#polygon-tools:not([hidden])) .map-actions{display:none}
+ #kort:has(#polygon-tools:not([hidden])) .map-card{height:60dvh}
+ .fence-editor{margin:auto 5px;max-height:96dvh}.fence-editor .dialog-header h2{font-size:20px}.fence-editor #editor-form{font-size:13px}
+}

@@ -1,3 +1,9 @@
+# Pejlo 0.8.7 – kort som hovedvisning
+
+Større mobilkort, kompakt informationskort med udfoldning, genveje samt områdeeditor med radius-skyder og polygontegning. Komplet opdatering oven på 0.8.6. Se [brug og afprøvning](docs/version-0.8.7.md). Ingen nye nøgler kræves.
+
+---
+
 # Pejlo 0.8.6 – login uden ubrugt Google-kode
 
 Komplet opdatering af 0.8.5: Firebase Auth oprettes uden popup/redirect-koden, så `apis.google.com` og iframe-tilladelsen kan udgå af CSP-testpolitikken. Se [opdatering og afprøvning](docs/version-0.8.6.md). Ingen nye nøgler kræves. Login skal afprøves på telefonen efter upload.

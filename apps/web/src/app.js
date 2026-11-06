@@ -1,3 +1,4 @@
+import {createFenceEditor} from './features/fence-editor.js';
 import {installCspDiagnostics} from './features/csp-diagnostics.js';
 import {initSettingsTabs} from './features/settings-tabs.js';
 import {createProfileSheet} from './features/profile-sheet.js';
@@ -57,6 +58,11 @@ const admin=createAdmin({request:trackerRequest});
 const alarms=createAlarmArchive({request:trackerRequest,selected});
 const wake=createWakeLock({onState:text=>$('#wake-status').textContent=text});
 const history=createHistoryView({request:trackerRequest,selected,layer:()=>chosenLayer,key:()=>mapConfig.apiKey,notice:toast});
+const fenceEditor=createFenceEditor({selected,layer:()=>chosenLayer,key:()=>mapConfig.apiKey,notice:toast,canEdit:()=>family.get(selected()?.trackerId)?.role!=='viewer',save:async(home,name,enabled,id)=>{
+ const p=selected(),gen=sessionGeneration;if(!p||p.id!==id)throw Error('Profilen er skiftet. Åbn området igen.');const candidate=structuredClone(p);candidate.home=home;candidate.homeConfirmed=true;candidate.geofenceEnabled=enabled;
+ if(!candidate.activeFenceId){if(candidate.fencePresets.length>=20)throw Error('Der er plads til 20 områder per profil.');candidate.activeFenceId=createId();candidate.fencePresets.push({id:candidate.activeFenceId,name,home:structuredClone(home)});}else Object.assign(candidate.fencePresets.find(f=>f.id===candidate.activeFenceId),{name,home:structuredClone(home)});
+ await saveFence(candidate);if(gen!==sessionGeneration||selected()?.id!==id)throw Error('Konto eller profil er skiftet.');Object.assign(p,candidate);geofenceMonitor.clear();if(!await persist())throw Error('Gemningen kunne ikke bekræftes. Prøv igen.');refresh();
+}});
 const isLinked=()=>!!selected()?.trackerId;
 const data=()=>!selected()?null:!isLinked()?demoFor(selected()):trackerData?.device.identifier===selected().trackerId?trackerData:{source:'traccar',position:null,route:[],historyAvailable:false};
 async function trackerRequest(path,body){
@@ -279,7 +285,7 @@ $('#provision-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
  trackerUser=user;loadTrackers();connectTracker();
@@ -428,3 +434,7 @@ function presentPairing(){
 }
 $('#read-pairing').onclick=()=>{const value=parsePairing($('#pairing-input').value.trim(),window.location.origin);if(!value)return toast('Linket er ikke et gyldigt parringslink til denne Pejlo-app.');pendingPairing=value;sessionStorage.setItem('pejlo-pairing',pairingLink(value.identifier,value.code,window.location.origin));presentPairing();$('#pairing-input').value='';$('#pairing-pending').hidden=false;};
 $('#copy-pairing').onclick=async()=>{try{await navigator.clipboard.writeText($('#pairing-link').value);toast('Parringslinket er kopieret.');}catch{$('#pairing-link').select();toast('Markér og kopiér linket manuelt.');}};
+
+$('#toggle-map-info').onclick=()=>{const card=$('.status-card'),expanded=card.classList.toggle('expanded');$('#toggle-map-info').setAttribute('aria-expanded',String(expanded));$('#toggle-map-info').textContent=expanded?'Færre oplysninger ⌄':'Flere oplysninger ⌃';};
+$('#center-loui').onclick=()=>{const point=data()?.position;if(!point)return toast('Der er ingen gyldig GPS-position endnu.');overviewMap?.center(point);};
+$('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('ture');$('#map-pause').onclick=()=>go('indstillinger','beskeder');

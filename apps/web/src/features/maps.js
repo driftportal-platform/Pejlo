@@ -50,6 +50,8 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
     },
     clear(){draft.clearLayers();markers.clearLayers();path.clearLayers();homeLayer.clearLayers();phone.clearLayers();},
     draft(points){draft.clearLayers();if(points.length){L.polyline(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',weight:3}).addTo(draft);points.forEach((v,i)=>L.circleMarker([v.lat,v.lon],{radius:7,color:'#a4564b'}).addTo(draft).bindTooltip(String(i+1)));if(points.length>=3)L.polygon(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',fillOpacity:.1}).addTo(draft);}},
+    draftHome(home){draft.clearLayers();if(home.shape==='polygon'){this.draft(home.points||[]);}else L.circle([home.lat,home.lon],{radius:home.radius,color:'#183e35',weight:2,fillOpacity:.14}).addTo(draft);},
+    center(point){if(point){map.invalidateSize();map.setView([point.lat,point.lon],17);}},
     clearPhone(){phone.clearLayers();},
     invalidate(){map.invalidateSize();}
   };
