@@ -1,3 +1,4 @@
+import {installCspDiagnostics} from './features/csp-diagnostics.js';
 import {initSettingsTabs} from './features/settings-tabs.js';
 import {createProfileSheet} from './features/profile-sheet.js';
 import {initStatusStrip} from './features/status-strip.js';
@@ -38,10 +39,9 @@ let pendingPause=new URLSearchParams(window.location.search).get('handling')==='
 
 const invitationMatch=window.location.hash.match(/^#invitation=([a-fA-F0-9]{32})$/);
 let pendingTracker=new URLSearchParams(window.location.search).get('profil');
-// Shows the first few Content-Security-Policy reports on screen, so they can be seen on a phone without a console.
+// Technical policy diagnostics are kept in the developer console.
 $('#auth-retry').addEventListener('click',()=>window.location.reload());
-const cspSeen=new Set();
-document.addEventListener('securitypolicyviolation',event=>{try{const key=event.violatedDirective+'|'+event.blockedURI;if(cspSeen.has(key)||cspSeen.size>=5)return;cspSeen.add(key);console.warn('CSP',event.disposition,event.violatedDirective,event.blockedURI);toast('Sikkerhedspolitik ('+(event.disposition==='report'?'test':'blokeret')+'): '+event.violatedDirective+' '+String(event.blockedURI).slice(0,60));}catch{}});
+installCspDiagnostics();
 if(invitationMatch){sessionStorage.setItem('pejlo-invitation',invitationMatch[1]);window.history.replaceState(null,'','#indstillinger');}
 
 let saveCloud=null,cloud=null,sessionGeneration=0;
@@ -401,7 +401,7 @@ $('#alerts-form').onsubmit=async e=>{
  e.preventDefault();const identifier=selected()?.trackerId;if(!identifier)return;
  const config=cleanAlerts(Object.fromEntries(Object.entries(cleanAlerts()).map(([k,v])=>[k,typeof v==='boolean'?$('#alert-'+k).checked:typeof v==='number'?Number($('#alert-'+k).value):$('#alert-'+k).value])));
  const gen=sessionGeneration;$('#alerts-form').inert=true;
- try{await trackerRequest('alerts',{identifier,config});alertsConfig=config;if(gen===sessionGeneration&&selected()?.trackerId===identifier)$('#alerts-status').textContent='Dine alarmvalg er gemt. Husk at aktivere push på hver enhed.';}
+ try{await trackerRequest('alerts',{identifier,config});alertsConfig=config;if(gen===sessionGeneration&&selected()?.trackerId===identifier)$('#alerts-status').textContent='Dine alarmindstillinger er gemt. Husk at aktivere push på hver enhed.';}
  catch(e){if(gen===sessionGeneration)$('#alerts-status').textContent=e.message;}
  finally{if(gen===sessionGeneration)$('#alerts-form').inert=false;}
 };

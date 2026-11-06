@@ -1,3 +1,15 @@
+# Pejlo 0.8.6 – login uden ubrugt Google-kode
+
+Komplet opdatering af 0.8.5: Firebase Auth oprettes uden popup/redirect-koden, så `apis.google.com` og iframe-tilladelsen kan udgå af CSP-testpolitikken. Se [opdatering og afprøvning](docs/version-0.8.6.md). Ingen nye nøgler kræves. Login skal afprøves på telefonen efter upload.
+
+---
+
+# Pejlo 0.8.5 – tydeligere alarmindstillinger
+
+Komplet opdatering af 0.8.4: knappen hedder nu “Gem alarmindstillinger”, og tekniske CSP-rapporter vises kun i udviklerkonsollen. Testpolitikken er tilpasset den observerede Google-scriptsti. Se [opdatering](docs/version-0.8.5.md). Ingen nye nøgler kræves.
+
+---
+
 # Pejlo 0.8.4 – samlet pakke
 
 Layoutforbedringerne fra den uploadede 0.8.3 er flettet ind i vores komplette 0.8.1. Alle funktioner og mailrettelser er bevaret. Se [opdateringsvejledningen](docs/version-0.8.4.md).

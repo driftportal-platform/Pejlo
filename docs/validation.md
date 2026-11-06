@@ -1,3 +1,9 @@
+# Kontrol af Pejlo 0.8.5
+
+89 automatiske tests består inklusive build. Nye tests kontrollerer den tydelige knaptekst og at CSP-rapporter kun logges i konsollen, uden URL-parametre og med deduplikering. Sikkerhedspolitikken er fortsat i testtilstand. Ingen live Firebase-/iPhone-test eller deployment udført.
+
+---
+
 # Kontrol af Pejlo 0.8.4
 
 87 tests består inklusive build. Derudover er det flettede appforløb kørt med simuleret login og syntetiske HTTP-svar: Område-genvej, gammel hjemmestatus, foto i profilvælger, kompakt historik sammen med alarmarkiv samt lukning/tømning af profilvælger ved logout. Serverkoden og alle tidligere funktioner fra 0.8.1 er bevaret.
@@ -73,3 +79,8 @@ Testserver, ikke en produktionsklar tjeneste med SLA. Positionshistorik er indev
 ## Rettelse i 0.5.1
 
 Begge udgående kald bruger nu Cloudflare-understøttet redirect manual. Tests efterligner runtime-begrænsningen og afviser redirect error. Yderligere tests bekræfter, at en HTTP-viderestilling fra Google/Traccar ikke følges, og at credentials derfor ikke sendes videre. Database-ID fra brugerens screenshot er indsat; eksisterende tabel og indeks skal ikke genoprettes. 31 tests består. Livekontrol efter brugerens nye deploy afventes fortsat.
+
+
+## 0.8.6
+
+Tilføjet: `tests/auth-init.test.mjs` (login oprettes uden popup/redirect-resolver) og skærpede CSP-kontroller (ingen `apis.google.com`, `frame-src 'none'`). Login med rigtig Firebase-session kan ikke afprøves automatisk og skal tjekkes på telefonen.

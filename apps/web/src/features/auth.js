@@ -15,13 +15,19 @@ const messages={
  'auth/configuration-not-found':'Firebase Authentication er endnu ikke sat op i projektet.',
  'auth/unauthorized-domain':'Webadressen er ikke godkendt under Firebase Authentication → Settings → Authorized domains.'
 };
+// Pejlo only uses e-mail and password, so the popup/redirect resolver (which loads Google's apis.google.com script
+// and an iframe) is left out. getAuth() would add it automatically.
+export function createAuth(authSDK,app){
+ try{return authSDK.initializeAuth(app,{persistence:[authSDK.indexedDBLocalPersistence,authSDK.browserLocalPersistence,authSDK.browserSessionPersistence]});}
+ catch(error){if(error?.code==='auth/already-initialized')return authSDK.getAuth(app);throw error;}
+}
 export const authError=e=>messages[e?.code]??'Handlingen kunne ikke gennemføres. Prøv igen.';
 export async function startAuthentication(onSession){
  let appSDK,authSDK,dbSDK;
  const message=t=>{$('#auth-message').textContent=t;};
  try{[appSDK,authSDK,dbSDK]=await Promise.all(['app','auth','firestore'].map(name=>import(`https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}.js`)));}
  catch{message('Login kunne ikke indlæses. Kontrollér internetforbindelsen, og genindlæs siden.');$('#auth-retry').hidden=false;return;}
- const app=appSDK.initializeApp(firebaseConfig),auth=authSDK.getAuth(app),db=dbSDK.getFirestore(app);
+ const app=appSDK.initializeApp(firebaseConfig),auth=createAuth(authSDK,app),db=dbSDK.getFirestore(app);
  auth.languageCode='da';let mode='login';
  const actionSettings={url:window.location.origin+'/',handleCodeInApp:false};
  function setMode(m){mode=m;$('#auth-password-wrap').hidden=m==='reset';$('#auth-confirm-wrap').hidden=m!=='signup';$('#auth-remember-wrap').hidden=m==='reset';$('#auth-password').required=m!=='reset';$('#auth-confirm').required=m==='signup';$('#auth-password').minLength=m==='signup'?10:1;$('#auth-password').autocomplete=m==='signup'?'new-password':'current-password';$('#auth-title').textContent={login:'Velkommen til Pejlo',signup:'Opret din konto',reset:'Glemt adgangskode?'}[m];$('#auth-submit').textContent={login:'Log ind',signup:'Opret konto',reset:'Send nulstillingsmail'}[m];$('#auth-password').value='';$('#auth-confirm').value='';message('');document.querySelectorAll('[data-auth-mode]').forEach(b=>b.classList.toggle('active',b.dataset.authMode===m));}
