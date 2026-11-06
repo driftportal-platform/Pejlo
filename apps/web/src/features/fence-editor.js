@@ -8,10 +8,10 @@ export function createFenceEditor({selected,layer,key,notice,save,canEdit}){
   map?.draftHome(draft);$('#editor-save').disabled=saving||(polygon&&!validPolygon(draft.points));
  }
  function close(){if(saving)return;$('#fence-editor').close();map?.clear();}
- async function open(){
-  const p=selected();if(!p||!canEdit())return notice('Du har kun læseadgang til profilen.');const gen=++generation;profileId=p.id;draft=structuredClone(p.home);draft.points??=[];$('#editor-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#editor-shape').value=draft.shape||'circle';$('#editor-radius').value=draft.radius;$('#editor-status').textContent='';$('#editor-enabled').checked=p.geofenceEnabled;$('#fence-editor').showModal();
+ async function open(options={}){
+  const p=selected();if(!p||!canEdit())return notice('Du har kun læseadgang til profilen.');const gen=++generation;profileId=p.id;draft=structuredClone(p.home);draft.points??=[];if(options.shape==='circle'){draft.shape='circle';if(Number.isFinite(options.radius)&&options.radius>=20&&options.radius<=5000)draft.radius=options.radius;if(Number.isFinite(options.buffer)&&options.buffer>=0&&options.buffer<=30)draft.buffer=options.buffer;if(Number.isFinite(options.lat)&&Math.abs(options.lat)<=90&&Number.isFinite(options.lon)&&Math.abs(options.lon)<=180){draft.lat=options.lat;draft.lon=options.lon;}}$('#editor-name').value=options.name??(p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'');$('#editor-shape').value=draft.shape||'circle';$('#editor-radius').value=draft.radius;$('#editor-status').textContent='';$('#editor-enabled').checked=options.enabled??p.geofenceEnabled;$('#fence-editor').showModal();
   if(!map)map=createMap('editor-map',{notice,onHome:point=>{if(saving)return;if(draft.shape==='polygon'){if(draft.points.length>=50)return notice('Højst 50 punkter.');draft.points.push(point);}else Object.assign(draft,point);render();}});
-  await map?.layer(layer(),key());if(gen!==generation||!$('#fence-editor').open)return;map?.profile({...p,homeConfirmed:false},{position:null,route:[]},{showRoute:false,showHome:false});render();map?.fit(p,{position:null,route:[]});
+  await map?.layer(layer(),key());if(gen!==generation||!$('#fence-editor').open)return;map?.profile({...p,homeConfirmed:false},{position:null,route:[]},{showRoute:false,showHome:false});render();map?.fit({...p,home:draft},{position:null,route:[]});
  }
  $('#editor-shape').onchange=render;$('#editor-radius').oninput=()=>{draft.radius=Number($('#editor-radius').value);render();};$('#editor-undo').onclick=()=>{draft.points.pop();render();};$('#editor-close').onclick=close;
  $('#fence-editor').addEventListener('cancel',e=>{e.preventDefault();close();});

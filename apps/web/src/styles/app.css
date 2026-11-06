@@ -142,3 +142,21 @@ input::-webkit-date-and-time-value{min-width:0;text-align:center}
  .map-card,.history-map,.search-map{max-width:100%;box-sizing:border-box}
 }
 @media(max-width:359px){#ture .history-dates{grid-template-columns:minmax(0,1fr)}}
+
+/* 0.8.9: a dedicated row for the home action, taller map and opaque status area. */
+:root{--status-area:env(safe-area-inset-top,0px)}
+body{padding-top:var(--status-area)}
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:var(--status-area);background:#f5f6f1;z-index:10000;pointer-events:none}
+html{scroll-padding-top:calc(var(--status-area) + 12px)}
+#kort>.map-bottom{position:static;inset:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;pointer-events:auto;margin:10px 0 0;z-index:auto}
+#kort>.map-bottom button{max-width:100%;white-space:normal;border:1px solid var(--line);box-shadow:none}
+#kort>.map-bottom .map-caption{max-width:100%;overflow-wrap:anywhere}
+@media(max-width:700px){
+ #kort .map-card{height:62dvh;min-height:320px;max-height:720px}
+ #kort:has(#polygon-tools:not([hidden])) .map-card{height:62dvh}
+ #kort>.map-bottom{order:1;margin:0;justify-content:flex-end}
+ #kort>.map-bottom button{font-size:12px;padding:12px 15px}
+ #kort .status-card{margin:8px 0 0}
+ .fence-editor{max-height:calc(94dvh - var(--status-area));margin-top:calc(var(--status-area) + 8px)}
+}
+@media(max-width:700px) and (orientation:landscape){#kort .map-card{min-height:240px;height:70dvh}}
