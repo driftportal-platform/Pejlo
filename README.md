@@ -1,3 +1,9 @@
+# Pejlo 0.8.11 – jævnere rulleskyder
+
+Rulleskyderen bevarer grebspunktet og samler hurtige fingerbevægelser til højst én rulning pr. animationsbillede. Alle tidligere funktioner er bevaret. Se [ændringer og afprøvning](docs/version-0.8.11.md).
+
+---
+
 # Pejlo 0.8.10 – vælg cirkel på kortet
 
 Områdeindstillingerne har nu også en kortknap ved cirkel. Vælg centrum med et tryk, justér radius, og gem i editoren. Polygonens punkttæller skjules ved cirkel. Komplet pakke oven på 0.8.9. Ingen nye Cloudflare-indstillinger.

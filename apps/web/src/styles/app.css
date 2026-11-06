@@ -160,3 +160,7 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
  .fence-editor{max-height:calc(94dvh - var(--status-area));margin-top:calc(var(--status-area) + 8px)}
 }
 @media(max-width:700px) and (orientation:landscape){#kort .map-card{min-height:240px;height:70dvh}}
+
+/* 0.8.11: move the scroll thumb without changing its layout. */
+.page-scroll-thumb{top:0;will-change:transform;pointer-events:none}
+.page-scroll-rail{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
