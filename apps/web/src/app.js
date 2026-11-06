@@ -1,3 +1,4 @@
+import {initPageScroll} from './features/page-scroll.js';
 import {createFenceEditor} from './features/fence-editor.js';
 import {installCspDiagnostics} from './features/csp-diagnostics.js';
 import {initSettingsTabs} from './features/settings-tabs.js';
@@ -438,3 +439,5 @@ $('#copy-pairing').onclick=async()=>{try{await navigator.clipboard.writeText($('
 $('#toggle-map-info').onclick=()=>{const card=$('.status-card'),expanded=card.classList.toggle('expanded');$('#toggle-map-info').setAttribute('aria-expanded',String(expanded));$('#toggle-map-info').textContent=expanded?'Færre oplysninger ⌄':'Flere oplysninger ⌃';};
 $('#center-loui').onclick=()=>{const point=data()?.position;if(!point)return toast('Der er ingen gyldig GPS-position endnu.');overviewMap?.center(point);};
 $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('ture');$('#map-pause').onclick=()=>go('indstillinger','beskeder');
+
+initPageScroll();

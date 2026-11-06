@@ -1,3 +1,9 @@
+# Pejlo 0.8.8 – mobilbredde og nemmere rulning
+
+Retter overlap, datoernes bredde og pladsen over bundmenuen. Tilføjer rulleskyder og »Til toppen«. Komplet pakke oven på 0.8.7; ingen nye nøgler kræves. Se [opdatering og afprøvning](docs/version-0.8.8.md).
+
+---
+
 # Pejlo 0.8.7 – kort som hovedvisning
 
 Større mobilkort, kompakt informationskort med udfoldning, genveje samt områdeeditor med radius-skyder og polygontegning. Komplet opdatering oven på 0.8.6. Se [brug og afprøvning](docs/version-0.8.7.md). Ingen nye nøgler kræves.

@@ -116,3 +116,29 @@ body:has(#kort:not([hidden])) .status-strip{display:none}
  #kort:has(#polygon-tools:not([hidden])) .map-card{height:60dvh}
  .fence-editor{margin:auto 5px;max-height:96dvh}.fence-editor .dialog-header h2{font-size:20px}.fence-editor #editor-form{font-size:13px}
 }
+
+/* 0.8.8: page scrolling, safe navigation space and Safari form sizing. */
+html{scroll-padding-bottom:140px}
+main,main .page,main .panel{min-width:0}
+.history-dates{min-width:0}
+.history-dates label{min-width:0;max-width:100%}
+input[type="date"],input[type="time"]{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+input::-webkit-date-and-time-value{min-width:0;text-align:center}
+.page-scroll-rail{position:fixed;right:3px;top:30vh;height:32vh;width:24px;z-index:510;touch-action:none;cursor:ns-resize;border-radius:14px;background:linear-gradient(to right,transparent 9px,#ccd6cd 9px,#ccd6cd 15px,transparent 15px)}
+.page-scroll-thumb{position:absolute;left:6px;width:12px;height:28px;border-radius:8px;background:#183e35;box-shadow:0 0 0 2px #fafbf7}
+.page-scroll-rail:focus-visible{outline:2px solid #183e35;outline-offset:1px}
+.page-scroll-top{position:fixed;right:30px;bottom:24px;z-index:510;border:1px solid #cbd7c3;border-radius:24px;padding:10px 14px;background:#fafbf7;color:#183e35;box-shadow:0 3px 14px #183e3520;font-size:14px}
+@media(max-width:700px){
+ main,body:has(#kort:not([hidden])) main{padding-right:34px;padding-bottom:calc(130px + env(safe-area-inset-bottom))}
+ #kort{padding-bottom:16px}
+ #kort .map-card{height:46dvh;min-height:260px;margin:0;border-radius:22px}
+ #kort .status-card{margin:0;z-index:auto}
+ #kort:has(#polygon-tools:not([hidden])) .map-card{height:48dvh}
+ #ture .history-dates{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #ture #history-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr)}
+ #ture .history-dates label{min-width:0;width:100%}
+ #ture input[type="date"]{padding:12px 4px;font-size:16px}
+ .page-scroll-top{bottom:calc(100px + env(safe-area-inset-bottom))}
+ .map-card,.history-map,.search-map{max-width:100%;box-sizing:border-box}
+}
+@media(max-width:359px){#ture .history-dates{grid-template-columns:minmax(0,1fr)}}
