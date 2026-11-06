@@ -21,6 +21,8 @@ test('headers: report-only CSP allows exactly the known origins; framing is deni
  const csp=headers.match(/Content-Security-Policy-Report-Only: (.+)/)?.[1];assert.ok(csp);
  assert.match(csp,/script-src 'self' https:\/\/www\.gstatic\.com(;|$)/);
  assert.ok(!/unsafe-eval|script-src[^;]*unsafe-inline|\*/.test(csp));
+ assert.ok(!/apis\.google\.com|firebaseapp\.com/.test(csp),'Google popup/redirect code is no longer needed');
+ assert.match(csp,/frame-src 'none'/);
  assert.match(csp,/object-src 'none'/);assert.match(csp,/base-uri 'none'/);
  assert.match(headers,/X-Frame-Options: DENY/);
  assert.ok(!/^\s*Content-Security-Policy:/m.test(headers),'enforcing header is a deliberate later step');
