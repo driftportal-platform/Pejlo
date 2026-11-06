@@ -1,3 +1,5 @@
+import {ensureOperations} from './operations.js';
+import {snoozeUntil} from './snooze.js';
 import {ensureArchive,archiveEvent,archiveStatus} from './archive.js';
 import {once} from './schema.js';
 import {notificationPayload,label} from './messages.js';
@@ -26,17 +28,30 @@ export async function sendPush(subscription,payload,env,fetcher=fetch){
 }
 export {notificationPayload,messages} from './messages.js';
 export async function runNotifications(env,fetcher=fetch){
+ if(!env.DB)return;
+ await ensureOperations(env.DB);const id=crypto.randomUUID(),started=Date.now(),stats={checked:0,errors:0,requests:0,upstreamErrors:0};
+ await env.DB.prepare("INSERT INTO pejlo_runs(id,started_at,status) VALUES(?,?,'running')").bind(id,started).run();
+ let status=env.TRACCAR_TOKEN?'completed':'missing-token';
+ const tracked=async(url,options)=>{const upstream=url.startsWith('https://demo3.traccar.org/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
+ try{await processNotifications(env,tracked,stats);if(stats.errors||stats.upstreamErrors)status='partial';}
+ catch{status='failed';stats.errors++;}
+ finally{
+  await env.DB.prepare('UPDATE pejlo_runs SET finished_at=?,status=?,checked=?,errors=?,upstream_requests=?,upstream_errors=? WHERE id=?').bind(Date.now(),status,stats.checked,stats.errors,stats.requests,stats.upstreamErrors,id).run();
+  await env.DB.prepare('DELETE FROM pejlo_runs WHERE id NOT IN(SELECT id FROM pejlo_runs ORDER BY started_at DESC LIMIT 20)').run();
+ }
+}
+async function processNotifications(env,fetcher,stats){
  if(!env.DB||!env.TRACCAR_TOKEN)return;
  await ensureNotifications(env.DB);await ensureFamily(env.DB);await ensureArchive(env.DB);
  const rows=await env.DB.prepare(`SELECT t.identifier,t.owner_uid,t.name AS tracker_name,f.name AS fence_name,f.config,f.state,f.enabled FROM trackers t LEFT JOIN pejlo_fences f ON f.identifier=t.identifier AND f.owner_uid=t.owner_uid WHERE f.enabled=1 OR EXISTS(SELECT 1 FROM pejlo_alerts a WHERE a.identifier=t.identifier) ORDER BY COALESCE((SELECT MIN(a.checked_at) FROM pejlo_alerts a WHERE a.identifier=t.identifier),f.checked_at,0) LIMIT 8`).all();
  const get=async path=>{const r=await fetcher('https://demo3.traccar.org'+path,{headers:{Authorization:'Bearer '+env.TRACCAR_TOKEN},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('upstream');return r.json();};
  for(const row of rows.results){
   try{
-   const now=Date.now();
+   stats.checked++;const now=Date.now();
    await env.DB.prepare('UPDATE pejlo_fences SET checked_at=? WHERE identifier=?').bind(now,row.identifier).run();
    await env.DB.prepare('UPDATE pejlo_alerts SET checked_at=? WHERE identifier=?').bind(now,row.identifier).run();
    const devices=await get('/api/devices?uniqueId='+encodeURIComponent(row.identifier)),device=devices.find(d=>d.uniqueId===row.identifier);
-   if(!device)continue;
+   if(!device){stats.errors++;continue;}
    const positions=device.positionId?await get('/api/positions?id='+device.positionId):[],raw=positions.find(p=>p.deviceId===device.id&&p.id===device.positionId);
    let transition;
    if(row.enabled){
@@ -56,15 +71,16 @@ export async function runNotifications(env,fetcher=fetch){
      const changed=await env.DB.prepare('UPDATE pejlo_alerts SET state=? WHERE identifier=? AND uid=? AND state=? AND config=? RETURNING identifier').bind(JSON.stringify(result.state),row.identifier,uid,prefs.state,prefs.config).first();
      if(!changed)continue;
     }
+    const paused=await snoozeUntil(env.DB,row.identifier,uid)>now;
     const kinds=[...(transition?[transition]:[]),...result.events];
     for(const kind of kinds){
      const id=[row.identifier,uid,kind,kind==='missing'?result.state.lastFix||result.state.started:Date.parse(raw?.fixTime)||now].join(':');
      const enabled=config[kind==='battery'?'lowBattery':kind],quiet=isQuiet(config,now),ready=pushReady(env),payload=notificationPayload(kind,row.identifier,context);
-     await archiveEvent(env.DB,{id,identifier:row.identifier,uid,kind,payload,createdAt:now,fixTime:Date.parse(raw?.fixTime),area:row.config?{name:row.fence_name,home:JSON.parse(row.config)}:null,status:!enabled?'disabled':quiet?'quiet':!ready?'unconfigured':'pending'});
-     if(enabled&&!quiet&&ready)await env.DB.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(id,row.identifier,uid,kind,JSON.stringify(payload),now).run();
+     await archiveEvent(env.DB,{id,identifier:row.identifier,uid,kind,payload,createdAt:now,fixTime:Date.parse(raw?.fixTime),area:row.config?{name:row.fence_name,home:JSON.parse(row.config)}:null,status:paused?'snoozed':!enabled?'disabled':quiet?'quiet':!ready?'unconfigured':'pending'});
+     if(enabled&&!quiet&&ready&&!paused)await env.DB.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(id,row.identifier,uid,kind,JSON.stringify(payload),now).run();
     }
    }
-  }catch{ /* Upstream failures cannot create geofence or battery events. */ }
+  }catch{stats.errors++; /* Upstream failures cannot create geofence or battery events. */ }
  }
  await env.DB.prepare('DELETE FROM pejlo_alarm_history WHERE created_at<?').bind(Date.now()-90*86400000).run();
  if(!pushReady(env))return;
@@ -72,8 +88,9 @@ export async function runNotifications(env,fetcher=fetch){
  for(const item of queue.results){
   const prefs=await env.DB.prepare('SELECT config FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(item.identifier,item.uid).first(),config=cleanAlerts(prefs?JSON.parse(prefs.config):null);
   const enabled=item.kind==='fencechange'||config[item.kind==='battery'?'lowBattery':item.kind];
-  if(Date.now()-item.created_at>300000||!enabled||isQuiet(config)||!await trackerAccess(env.DB,item.identifier,item.uid)){
-   await archiveStatus(env.DB,item.id,Date.now()-item.created_at>300000?'expired':'suppressed');await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();continue;
+  const paused=await snoozeUntil(env.DB,item.identifier,item.uid)>Date.now();
+  if(paused||Date.now()-item.created_at>300000||!enabled||isQuiet(config)||!await trackerAccess(env.DB,item.identifier,item.uid)){
+   await archiveStatus(env.DB,item.id,paused?'snoozed':Date.now()-item.created_at>300000?'expired':'suppressed');await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();continue;
   }
   const subs=await env.DB.prepare('SELECT * FROM pejlo_push WHERE owner_uid=? LIMIT 5').bind(item.uid).all();let failed=false;
   for(const sub of subs.results){try{const r=await sendPush(JSON.parse(sub.subscription),JSON.parse(item.payload),env,fetcher);if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=?').bind(sub.endpoint).run();else if(!r.ok)failed=true;}catch{failed=true;}}

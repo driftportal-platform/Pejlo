@@ -1,3 +1,5 @@
+import {adminStatus} from './operations.js';
+import {snoozeUntil,setSnooze} from './snooze.js';
 import {listAlarms} from './archive.js';
 import {mailReady,reserveInvitationMail,sendInvitationMail} from './mail.js';
 import {ensureFamily,trackerAccess,familyAPI} from './family.js';
@@ -20,7 +22,7 @@ async function body(request,limit=12000){if(Number(request.headers.get('content-
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  const routes={'/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/admin/status':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -33,6 +35,16 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
   const uid=account.localId,isAdmin=!!env.TRACCAR_ADMIN_UID&&uid===env.TRACCAR_ADMIN_UID;
+  if(path==='/api/admin/status'){
+   if(!isAdmin)throw new Failure(403,'Kun administratoren kan se driftsstatus.');
+   await ensureNotifications(env.DB);return json(await adminStatus(env));
+  }
+  if(path==='/api/snooze'){
+   const input=request.method==='GET'?{identifier:url.searchParams.get('identifier')}:await body(request);
+   if(!identifierOK(input.identifier)||!await trackerAccess(env.DB,input.identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');
+   const until=request.method==='POST'?await setSnooze(env.DB,input.identifier,uid,input.hours):await snoozeUntil(env.DB,input.identifier,uid);
+   return json({until,serverTime:Date.now()});
+  }
   if(path==='/api/alarms'){
    const identifier=url.searchParams.get('identifier');
    if(!identifierOK(identifier)||!await trackerAccess(env.DB,identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');

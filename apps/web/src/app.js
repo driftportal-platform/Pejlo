@@ -1,3 +1,10 @@
+import {initSettingsTabs} from './features/settings-tabs.js';
+import {createProfileSheet} from './features/profile-sheet.js';
+import {initStatusStrip} from './features/status-strip.js';
+import {collapseHints} from './features/hints.js';
+import {createSnooze} from './features/snooze.js';
+import {createAdmin} from './features/admin.js';
+import {parsePairing,pairingLink,drawPairingQR} from './features/pairing.js';
 import {profilePhoto} from './features/photo.js';
 import {createWakeLock} from './features/wake-lock.js';
 import {createAlarmArchive} from './features/alarm-archive.js';
@@ -21,7 +28,14 @@ import {createLocation} from './features/location.js';
 import {distance,formatDistance,bearing,relativeBearing,directionName} from './shared/geo.js';
 const $=s=>document.querySelector(s);
 const state=emptyState();
-let invitationPresented=false;
+const settingsTabs=initSettingsTabs();collapseHints();
+for(const d of document.querySelectorAll('details.history-more'))d.open=window.matchMedia('(min-width:701px)').matches;
+const profileSheet=createProfileSheet({select:$('#profile-select'),add:$('#add-profile')});initStatusStrip();
+let invitationPresented=false,pairingPresented=false;
+let pendingPairing=parsePairing(window.location.href,window.location.origin)||parsePairing(sessionStorage.getItem('pejlo-pairing'),window.location.origin);
+if(pendingPairing){sessionStorage.setItem('pejlo-pairing',pairingLink(pendingPairing.identifier,pendingPairing.code,window.location.origin));if(window.location.hash.startsWith('#parring='))window.history.replaceState(null,'',window.location.pathname+window.location.search+'#indstillinger');}
+let pendingPause=new URLSearchParams(window.location.search).get('handling')==='pause';
+
 const invitationMatch=window.location.hash.match(/^#invitation=([a-fA-F0-9]{32})$/);
 let pendingTracker=new URLSearchParams(window.location.search).get('profil');
 // Shows the first few Content-Security-Policy reports on screen, so they can be seen on a phone without a console.
@@ -38,6 +52,8 @@ const trackerClient=createTrackerClient();
 const geofenceMonitor=createGeofenceMonitor();
 let polygonDraft=null;
 let family=new Map(),settingsDirty=false,familyReady=false,lastInviteProfile=null,lastInviteText='',familyLoading=false,familySaving=false,alertsId=null,alertsConfig=cleanAlerts(),alertsGeneration=0,historyProfile=null;
+const snooze=createSnooze({request:trackerRequest,selected,notice:toast});
+const admin=createAdmin({request:trackerRequest});
 const alarms=createAlarmArchive({request:trackerRequest,selected});
 const wake=createWakeLock({onState:text=>$('#wake-status').textContent=text});
 const history=createHistoryView({request:trackerRequest,selected,layer:()=>chosenLayer,key:()=>mapConfig.apiKey,notice:toast});
@@ -51,7 +67,7 @@ async function trackerRequest(path,body){
 async function loadTrackers(){
  const gen=sessionGeneration;
  try{const result=await trackerRequest('trackers');if(gen!==sessionGeneration)return;
- ownedTrackers=result.trackers;$('#tracker-admin').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;trackerError='';updateTrackerStatus();
+ ownedTrackers=result.trackers;$('#tracker-admin').hidden=!result.isAdmin;admin.enable(result.isAdmin);$('#my-uid').textContent=result.uid;trackerError='';updateTrackerStatus();
  }catch(error){if(gen===sessionGeneration){trackerError=error.message;updateTrackerStatus();}}
 }
 function connectTracker(){
@@ -101,21 +117,24 @@ function showPage(name){
   if(name==='kort'&&!polygonDraft)requestAnimationFrame(()=>overviewMap?.fit(selected(),data()));
   if(name==='soeg')requestAnimationFrame(()=>{if(!searchMap){searchMap=createMap('search-map',{notice:toast,onManual:()=>{$('#autozoom').checked=false;}});searchMap?.layer(chosenLayer,mapConfig.apiKey);}renderMap(searchMap);searchMap?.fit(selected(),data());updateSearch();});
 }
-function go(name){window.location.hash=name;showPage(name);}
+function go(name,tab){if(tab)settingsTabs?.select(tab);window.location.hash=name;showPage(name);}
 function refresh(){
-  if(pendingTracker){const found=state.profiles.find(p=>p.trackerId===pendingTracker);if(found){state.activeId=found.id;pendingTracker=null;if(window.location.search)window.history.replaceState(null,'',window.location.pathname+window.location.hash);}}
+  if(pendingTracker){const found=state.profiles.find(p=>p.trackerId===pendingTracker);if(found){state.activeId=found.id;pendingTracker=null;if(pendingPause){currentPage='indstillinger';settingsTabs?.select('beskeder');$('#pause-action').hidden=false;pendingPause=false;}if(window.location.search)window.history.replaceState(null,'',window.location.pathname+window.location.hash);}}
+  $('#pairing-pending').hidden=!pendingPairing;
   const empty=!selected();
   if(trackerUser&&(selected()?.trackerId||null)!==pollingId)connectTracker();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
-  if(empty){alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
+  if(empty){profileSheet.update([],null);snooze.clear();alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
-  renderFamily();loadAlerts();
+  renderFamily();loadAlerts();snooze.load();
+  if(pendingPairing&&!pairingPresented){presentPairing();currentPage='indstillinger';settingsTabs?.select('tracker');}
   options($('#saved-fences'),[['','Intet gemt område valgt'],...(p.fencePresets||[]).map(f=>[f.id,f.name])],p.activeFenceId||'');
   $('#fence-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#delete-fence').disabled=!p.activeFenceId;$('#fence-buffer').value=p.home.buffer??5;
   options($('#profile-select'),state.profiles.map(p=>[p.id,p.name+' · '+types[p.type].label]),p.id);
+  profileSheet.update(state.profiles.map(q=>({id:q.id,name:q.name,label:types[q.type].label,photo:q.photo,icon:icon(types[q.type].icon,26)})),p.id);
   $('#side-name').textContent=p.name;$('#side-type').textContent=meta.label;
   $('#side-icon').innerHTML=icon(meta.icon,30);$('#select-icon').innerHTML=icon(meta.icon,22);
   for(const id of ['side-icon','select-icon'])if(p.photo){const img=document.createElement('img');img.src=p.photo;img.alt=p.name;img.className='profile-photo-small';$('#'+id).replaceChildren(img);}
@@ -145,10 +164,11 @@ function updateGeofence(){
  if(!selected())return;
  const result=geofenceMonitor.evaluate(selected(),data(),{unavailable:!!trackerError});
  const area=selected().fencePresets?.find(f=>f.id===selected().activeFenceId);$('#geofence-status').textContent=(area?area.name+' · ':'')+result.text;$('#fence-margin-description').textContent='To nye positioner og '+(selected().home.buffer??5)+' meters ekstra margen.';$('.geofence-summary').dataset.state=result.kind;
- if(result.transition&&alertsConfig[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
+ if(result.transition&&!snooze.paused()&&alertsConfig[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
 }
 function updateAge(){
  updateGeofence();
+ snooze.tick();
  if(!selected())return;
  const d=data(),p=d.position,live=isLinked();
  $('#home-observation').textContent=live?homeStatus(selected(),p):'Eksempeldata · ikke en rigtig hjemmestatus';
@@ -218,7 +238,7 @@ $('#home-form').onsubmit=async e=>{
  try{await saveFence(candidate);}catch{return;}if(gen!==sessionGeneration||selected()?.id!==p.id)return;
  Object.assign(p,candidate);geofenceMonitor.clear();persist();refresh();
 };
-$('#edit-geofence').onclick=()=>{go('indstillinger');$('#home-form').scrollIntoView({behavior:'smooth',block:'center'});};
+$('#edit-geofence').onclick=()=>{go('indstillinger','omraade');$('#home-form').scrollIntoView({behavior:'smooth',block:'center'});};
 $('#use-location').onclick=()=>{if(!navigator.geolocation)return toast('Placering er ikke tilgængelig.');navigator.geolocation.getCurrentPosition(p=>{settingsDirty=true;$('#lat').value=p.coords.latitude.toFixed(6);$('#lon').value=p.coords.longitude.toFixed(6);toast('Kontrollér koordinaterne, og tryk Gem fast udgangspunkt.');},()=>toast('Placering kunne ikke hentes. Kontrollér browserens tilladelse.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});};
 function openNewProfile(){if(state.profiles.length>=50)return toast('Prototypen har plads til 50 profiler.');$('#new-profile-form').reset();$('#new-type').value='';$('#new-profile').showModal();}
 $('#add-profile').onclick=openNewProfile;$('#first-profile').onclick=openNewProfile;$('#close-new').onclick=()=>$('#new-profile').close();
@@ -230,7 +250,7 @@ $('#stop-location').onclick=()=>stopLocation();$('#autozoom').onchange=updateSea
 function simulate(){location.stop();watching=false;simulation=true;heading=null;const meters=[600,300,150,70,25,8][Math.min(demoStep,5)],target=data().position;user={lat:target.lat-meters/111195,lon:target.lon,accuracy:8,timestamp:Date.now()};$('#closer').hidden=false;$('#closer').disabled=demoStep>=5;$('#phone-state').classList.add('simulated');updateSearch();}
 $('#simulate').onclick=()=>{demoStep=0;simulate();};$('#closer').onclick=()=>{demoStep++;simulate();};
 window.addEventListener('hashchange',()=>showPage(window.location.hash.slice(1)));
-if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type!=='pejlo-open')return;pendingTracker=typeof event.data.tracker==='string'?event.data.tracker:null;refresh();go('kort');});
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type!=='pejlo-open')return;pendingTracker=typeof event.data.tracker==='string'&&/^[A-Za-z0-9_-]{4,100}$/.test(event.data.tracker)?event.data.tracker:null;pendingPause=!!pendingTracker&&event.data.action==='pause';refresh();go(event.data.action==='pause'?'indstillinger':'kort');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(watching||simulation||heading!==null))stopLocation(false);});
 window.addEventListener('pagehide',()=>{location.stop();trackerClient.stop();});
 window.addEventListener('pageshow',event=>{if(event.persisted&&trackerUser)connectTracker();});
@@ -244,20 +264,22 @@ const importLocal=()=>{
 $('#import-local').onclick=importLocal;$('#import-first').onclick=importLocal;
 $('#tracker-retry').onclick=()=>{loadTrackers();connectTracker();};
 $('#claim-tracker').onsubmit=async event=>{
- event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;const gen=sessionGeneration,profileId=state.activeId;$('#claim-result').textContent='';
+ event.preventDefault();if(selected()?.trackerId&&selected().trackerId!==$('#claim-id').value.trim())return toast('Vælg eller opret en tom profil til den nye tracker.');const button=event.target.querySelector('button');button.disabled=true;const gen=sessionGeneration,profileId=state.activeId;$('#claim-result').textContent='';
  try{const result=await trackerRequest('trackers/claim',{identifier:$('#claim-id').value.trim(),code:$('#claim-code').value.trim()});if(gen!==sessionGeneration)return;
- const profile=state.profiles.find(p=>p.id===profileId);if(!profile)return;profile.trackerId=result.tracker.identifier;$('#claim-code').value='';await loadTrackers();persist();refresh();toast('Trackeren er tilknyttet din konto og profilen '+profile.name+'.');
+ const profile=state.profiles.find(p=>p.id===profileId);if(!profile)return;profile.trackerId=result.tracker.identifier;pendingPairing=null;pairingPresented=false;sessionStorage.removeItem('pejlo-pairing');$('#pairing-input').value='';$('#pairing-status').textContent='';$('#claim-code').value='';await loadTrackers();persist();refresh();toast('Trackeren er tilknyttet din konto og profilen '+profile.name+'.');
  }catch(error){if(gen===sessionGeneration)$('#claim-result').textContent=error.message;}finally{button.disabled=false;}
 };
 $('#provision-tracker').onsubmit=async event=>{
  event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;const gen=sessionGeneration;
  try{const result=await trackerRequest('admin/trackers',{identifier:$('#provision-id').value.trim(),name:$('#provision-name').value.trim()});if(gen!==sessionGeneration)return;
+ $('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';
  $('#provision-result').textContent='Tracker-ID: '+result.identifier+' · Parringskode: '+result.code+' — Gem koden nu. Den vises kun denne gang.';
+ const link=pairingLink(result.identifier,result.code,window.location.origin);$('#pairing-link').value=link;$('#pairing-output').hidden=false;try{await drawPairingQR($('#pairing-qr'),link);if(gen!==sessionGeneration){$('#pairing-qr').replaceChildren();return;}}catch{if(gen===sessionGeneration)toast('QR-koden kunne ikke tegnes. Parringslinket kan stadig kopieres.');}
  }catch(error){if(gen===sessionGeneration)$('#provision-result').textContent=error.message;}finally{button.disabled=false;}
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- family=new Map();invitationPresented=false;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
  trackerUser=user;loadTrackers();connectTracker();
@@ -285,7 +307,7 @@ $('#fence-shape').onchange=fenceShapeUI;
 $('#draw-fence').onclick=()=>{if(chosenLayer==='demo')return toast('Vælg et geografisk kortlag før du tegner.');polygonDraft={profileId:state.activeId,points:[],name:$('#fence-name').value,buffer:$('#fence-buffer').value,enabled:$('#geofence-enabled').checked};choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';go('kort');$('#polygon-tools').hidden=false;updateDraft();$('#polygon-tools').scrollIntoView({behavior:'smooth'});};
 $('#undo-point').onclick=()=>{polygonDraft?.points.pop();updateDraft();};
 $('#cancel-fence').onclick=()=>{cancelDrawing();go('indstillinger');};
-$('#finish-fence').onclick=()=>{if(!polygonDraft||polygonDraft.profileId!==state.activeId)return cancelDrawing();if(!validPolygon(polygonDraft.points))return toast('Brug mindst 3 forskellige punkter uden krydsende kanter. Området må højst strække sig 20 km fra første punkt.');settingsDirty=true;const draft=polygonDraft,points=draft.points;selected().home={...selected().home,shape:'polygon',points,lat:points.reduce((s,p)=>s+p.lat,0)/points.length,lon:points.reduce((s,p)=>s+p.lon,0)/points.length};cancelDrawing();refresh();$('#fence-name').value=draft.name;$('#fence-buffer').value=draft.buffer;$('#geofence-enabled').checked=draft.enabled;go('indstillinger');$('#home-form').scrollIntoView({behavior:'smooth'});toast('Området er tegnet. Slå overvågning til, og tryk Gem hjemmeområde.');};
+$('#finish-fence').onclick=()=>{if(!polygonDraft||polygonDraft.profileId!==state.activeId)return cancelDrawing();if(!validPolygon(polygonDraft.points))return toast('Brug mindst 3 forskellige punkter uden krydsende kanter. Området må højst strække sig 20 km fra første punkt.');settingsDirty=true;const draft=polygonDraft,points=draft.points;selected().home={...selected().home,shape:'polygon',points,lat:points.reduce((s,p)=>s+p.lat,0)/points.length,lon:points.reduce((s,p)=>s+p.lon,0)/points.length};cancelDrawing();refresh();$('#fence-name').value=draft.name;$('#fence-buffer').value=draft.buffer;$('#geofence-enabled').checked=draft.enabled;go('indstillinger','omraade');$('#home-form').scrollIntoView({behavior:'smooth'});toast('Området er tegnet. Slå overvågning til, og tryk Gem hjemmeområde.');};
 
 async function saveFence(profile){
  if(!profile.trackerId){toast('Området gemmes på profilen. Tilknyt en tracker for overvågning.');return;}
@@ -386,7 +408,8 @@ $('#alerts-form').onsubmit=async e=>{
 $('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value,role:$('#family-role').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
 $('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';sessionStorage.removeItem('pejlo-invitation');await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
 $('#family-leave').onclick=()=>$('#delete-profile').click();
-setInterval(()=>{if(trackerUser&&!document.hidden)loadFamily();},60000);
+setInterval(()=>{if(trackerUser&&!document.hidden){loadFamily();snooze.load(true);}},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&trackerUser)snooze.load(true);});
 
 for(const form of ['profile-form','home-form'])for(const event of ['input','change'])$('#'+form).addEventListener(event,()=>{settingsDirty=true;});
 
@@ -399,3 +422,9 @@ $('#profile-photo').onchange=async event=>{
  catch(e){toast(e.message);}finally{event.target.value='';}
 };
 $('#remove-photo').onclick=async()=>{const p=selected();if(!p||family.get(p.trackerId)?.role==='viewer')return;p.photo='';if(await persist()){refresh();toast('Profilfotoet er fjernet.');}};
+
+function presentPairing(){
+ if(!pendingPairing)return;settingsTabs?.select('tracker');pairingPresented=true;$('#claim-id').value=pendingPairing.identifier;$('#claim-code').value=pendingPairing.code;$('#pairing-status').textContent='Parringslinket er læst. Kontrollér tracker-ID, vælg en tom profil, og tryk Tilføj tracker til denne profil.';
+}
+$('#read-pairing').onclick=()=>{const value=parsePairing($('#pairing-input').value.trim(),window.location.origin);if(!value)return toast('Linket er ikke et gyldigt parringslink til denne Pejlo-app.');pendingPairing=value;sessionStorage.setItem('pejlo-pairing',pairingLink(value.identifier,value.code,window.location.origin));presentPairing();$('#pairing-input').value='';$('#pairing-pending').hidden=false;};
+$('#copy-pairing').onclick=async()=>{try{await navigator.clipboard.writeText($('#pairing-link').value);toast('Parringslinket er kopieret.');}catch{$('#pairing-link').select();toast('Markér og kopiér linket manuelt.');}};

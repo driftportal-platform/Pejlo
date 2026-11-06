@@ -1,3 +1,24 @@
+# Pejlo 0.8.4 – samlet pakke
+
+Layoutforbedringerne fra den uploadede 0.8.3 er flettet ind i vores komplette 0.8.1. Alle funktioner og mailrettelser er bevaret. Se [opdateringsvejledningen](docs/version-0.8.4.md).
+
+Upload indholdet til GitHub som hidtil. Ingen nye Cloudflare-nøgler kræves.
+
+---
+
+# Pejlo 0.8.1 – personlige pauser, administratorpanel og QR-parring
+
+Komplet GitHub-pakke oven på 0.8.0. Se [opsætning og brug](docs/version-0.8.1.md).
+
+- Pause egne beskeder i 1, 4 eller 12 timer på tværs af egne enheder. Andre brugere og alarmarkivet fortsætter.
+- Driftsstatus for administratoren med seneste 20 baggrundskørsler, fejltællere og push-tilmeldinger.
+- Lokalt genereret QR-kode og parringslink, som modtageren bekræfter efter login.
+- Vis på kort / Pause 1 time… på notifikationer, hvor telefonen understøtter det. Pause kræver bekræftelse i appen.
+
+Upload indholdet til GitHub som hidtil. Ingen nye nøgler kræves; tabellerne oprettes automatisk. Behold Cron Trigger hvert minut. Funktionerne skal afprøves på telefonen efter upload.
+
+---
+
 # Pejlo 0.8.0 – foto, søgehjælp og alarmarkiv
 
 Komplet GitHub-pakke med alle otte ønskede tilføjelser. Se [brug og opdatering](docs/version-0.8.md). Ingen nye Cloudflare-nøgler kræves; arkivtabellen oprettes automatisk. Behold eksisterende Cron Trigger, database og nøgler.

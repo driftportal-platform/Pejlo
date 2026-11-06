@@ -1,3 +1,4 @@
+import {ensureSnooze} from './snooze.js';
 import {archiveEvent} from './archive.js';
 import {cleanProfile} from '../../packages/shared/profiles.js';
 import {once} from './schema.js';
@@ -79,11 +80,13 @@ export async function familyAPI(db,account,input,hashCode){
   if(!changed)fail(404,'Brugeren har ikke adgang til profilen.');return {role:input.role};
  }
  if(input.action==='revoke'){
+  await ensureSnooze(db);await db.prepare('DELETE FROM pejlo_snooze WHERE identifier=? AND uid=?').bind(input.identifier,String(input.uid||'')).run();
   await db.prepare('DELETE FROM pejlo_members WHERE identifier=? AND uid=?').bind(input.identifier,String(input.uid||'')).run();
   await db.prepare('DELETE FROM pejlo_invites WHERE identifier=? AND email=?').bind(input.identifier,String(input.email||'').toLowerCase()).run();
   await db.prepare('DELETE FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(input.identifier,String(input.uid||'')).run();return {revoked:true};
  }
  if(input.action==='delete'){
+  await ensureSnooze(db);await db.prepare('DELETE FROM pejlo_snooze WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('UPDATE pejlo_fences SET enabled=0 WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('DELETE FROM pejlo_alerts WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('DELETE FROM pejlo_events WHERE identifier=?').bind(input.identifier).run();

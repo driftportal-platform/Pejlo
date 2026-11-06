@@ -14,3 +14,85 @@
 .viewer-mode :is(input,select,button)[inert]{opacity:.55;cursor:not-allowed}
 
 .profile-photo{width:128px;height:128px;border-radius:24px;object-fit:cover}.profile-photo-small{width:100%;height:100%;max-width:64px;max-height:64px;border-radius:50%;object-fit:cover}.photo-marker{padding:0!important;overflow:hidden}.photo-marker img{width:100%;height:100%;object-fit:cover;border-radius:50%}.alarm-item{padding:12px 0;border-bottom:1px solid #dce1d7}#home-observation{font-weight:600}.overlay-options{flex-wrap:wrap}
+
+.button-row{display:flex;flex-wrap:wrap;gap:.6rem}.snooze-controls{border-top:1px solid #dde4d8;margin-top:1rem;padding-top:1rem}.admin-rows{max-height:20rem;overflow:auto;overflow-wrap:anywhere;font-size:.85rem}.admin-rows p{padding:.5rem 0;border-bottom:1px solid #dde4d8}.pairing-qr{width:288px;max-width:100%;aspect-ratio:1;background:white;padding:16px;margin:1rem auto;box-sizing:border-box}.pairing-qr svg{display:block;width:100%;height:100%}#admin-status{border-top:1px solid #dde4d8;margin-top:1rem;padding-top:1rem}
+
+/* Layout fra 0.8.3 */
+
+.settings-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;margin:0 0 6px;position:sticky;top:0;z-index:5;background:var(--bg);scroll-snap-type:x proximity;scrollbar-width:none}
+.settings-tabs::-webkit-scrollbar{display:none}
+.settings-tabs button{flex:0 0 auto;scroll-snap-align:start;padding:10px 16px;border:1px solid var(--line);border-radius:999px;background:white;color:#52635a;font-weight:600;font-size:13px;min-height:40px}
+.settings-tabs button[aria-selected=true]{background:#e9efdf;border-color:#c9d9b6;color:var(--green);font-weight:700}
+.settings-tabs button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.tab-hidden{display:none!important}
+@media(max-width:700px){
+ header .eyebrow{display:none}
+ #kort{display:flex;flex-direction:column}
+ #kort>.overview{display:contents}
+ #kort .status-card{order:1;padding:16px 18px;margin-bottom:12px}
+ #kort .status-card .hint{display:none}
+ #kort .geofence-summary{order:2;padding:12px 16px;margin-bottom:12px}
+ #kort .geofence-summary .eyebrow,#kort .geofence-summary .hint{display:none}
+ #kort .geofence-summary p[role=status]{font-size:1rem;margin:0 0 4px}
+ #kort #polygon-tools{order:2}
+ #kort .map-card{order:3}
+ #kort .overlay-options{order:4}
+ #kort .today-card{order:5}
+ .settings-grid{grid-template-columns:1fr}
+}
+
+/* 0.8.1 – profilvælger og statuslinje */
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.profile-switch{position:relative}
+.profile-open{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 4px;background:none;border:0;font-weight:700;font-size:14px;color:var(--green);text-align:left;flex:1;min-width:0}
+.profile-open-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-open-chevron{margin-left:auto;font-size:18px;line-height:1}
+.profile-bar>#add-profile{display:none}
+.status-strip{display:flex;align-items:center;gap:10px;margin:0 0 16px;padding:10px 14px;border-radius:12px;background:white;border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--green)}
+.status-strip[hidden]{display:none}
+.status-dot{flex:0 0 10px;height:10px;border-radius:50%;background:#aab5ad}
+.status-strip[data-state=inside] .status-dot{background:#6f9a4a}
+.status-strip[data-state=outside] .status-dot{background:#a4564b}
+.status-strip[data-state=outside]{border-color:#d9aaa3}
+dialog.sheet{border:0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));width:min(100%,480px);max-height:80vh;overflow:auto;border-radius:22px;background:var(--bg);color:var(--green)}
+dialog.sheet::backdrop{background:#10201a80}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sheet-head h2{margin:0;font-size:20px}
+.sheet-list{display:grid;gap:10px;margin-bottom:14px}
+.sheet-card{display:flex;align-items:center;gap:14px;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:white;text-align:left;min-height:56px}
+.sheet-card[aria-current=true]{border-color:#8da666;background:#f1f6e8}
+.sheet-card b{display:block;font-size:15px}.sheet-card small{color:var(--muted);font-size:12px}
+.sheet-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#e9efdf;flex:0 0 40px}
+.sheet-check{margin-left:auto;font-weight:800;color:#6f9a4a}
+.sheet-add{width:100%}
+@media(max-width:700px){dialog.sheet{margin:auto 0 0;max-width:100%;border-radius:22px 22px 0 0}}
+body:has(#kort:not([hidden])) .status-strip{display:none}
+
+/* 0.8.2 – Find-knap og foldbare hjælpetekster */
+.hint-toggle{display:inline-flex;align-items:center;gap:7px;margin:2px 0 10px;padding:5px 12px 5px 6px;min-height:32px;border:1px solid var(--line);border-radius:999px;background:white;color:#52635a;font-size:12px;font-weight:600}
+.hint-toggle .q{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--green);color:white;font-size:12px;font-weight:800;line-height:1}
+.hint-toggle[aria-expanded=true]{background:#e9efdf;border-color:#c9d9b6;color:var(--green)}
+.hint-toggle:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.map-card{isolation:isolate}
+@media(max-width:700px){
+ #kort{padding-bottom:70px}
+ #kort #find{position:fixed;left:17px;right:17px;bottom:calc(74px + env(safe-area-inset-bottom));width:auto;z-index:450;box-shadow:0 8px 22px #183e3555}
+ #kort:has(#polygon-tools:not([hidden])) #find{display:none}
+}
+
+/* 0.8.3 – kortere Ture-side */
+.playbar{display:flex;align-items:center;gap:12px}.playbar label{flex:1;margin:18px 0}
+.history-more>summary{cursor:pointer;padding:12px 0;font-weight:700;color:var(--green)}
+.history-more:not(:has(#timeline:not(:empty),#history-transitions:not(:empty))){display:none}
+@media(max-width:700px){
+ #ture .panel{padding:18px 16px}
+ #ture #history-description{display:none}
+ #ture #history-form{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;align-items:center;margin-top:10px}
+ #ture .history-dates{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ #ture .history-dates label{margin:0}
+ #ture #history-form>button{margin:0;padding:12px 8px;font-size:13px;min-height:44px;width:100%}
+ #ture #history-today{order:1}#ture #history-yesterday{order:2}#ture #history-form>.primary{order:3}
+ #ture .history-map{height:240px;margin:14px 0}
+ #ture .playbar label{margin:6px 0}
+ #ture .playbar button{flex:0 0 auto;width:auto;padding:10px 18px;margin:0}
+}

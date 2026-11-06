@@ -1,3 +1,24 @@
+# Kontrol af Pejlo 0.8.4
+
+87 tests består inklusive build. Derudover er det flettede appforløb kørt med simuleret login og syntetiske HTTP-svar: Område-genvej, gammel hjemmestatus, foto i profilvælger, kompakt historik sammen med alarmarkiv samt lukning/tømning af profilvælger ved logout. Serverkoden og alle tidligere funktioner fra 0.8.1 er bevaret.
+
+Ingen deployment eller live mail/push afsendt. Der er ikke udført fuld visuel mobilbrowserkontrol eller Wrangler dry-run. Den lokale DOM-kontrol erstatter ikke test på telefonen.
+
+---
+
+# Kontrol af Pejlo 0.8.1
+
+- 85 automatiske tests bestået, inklusive build. Nye tests dækker personlige pauser, varighed, genoptagelse, adgang for læsere, afvisning af uvedkommende, arkivering under pause og undertrykkelse af allerede kølagte beskeder samt sene svar efter profilskift/logout.
+- Administrator-API testes med både administrator og almindelig bruger. Baggrundskørslens succes, Traccar-fejl og opbevaring af højst 20 kørsler er kontrolleret. Svarene indeholder ingen abonnementsadresser, nøgler eller rå fejltekster.
+- Parringslinks testes for gyldighed, fremmede domæner og placering af koden i fragmentet. Service workeren testes med og uden handlingsknapper, åbning af rigtig profil og pausebekræftelse.
+- Simulerede DOM-forløb for ejer og delt bruger består, også pause/genoptagelse. Ejerforløbet omfatter administratorstatus, oprettelse af QR/link, åbning af link, afvisning af udskiftning af eksisterende tracker samt tilknytning til en ny tom profil.
+- QR-generatorens matrix er genereret og læst tilbage med en separat QR-dekoder, både med almindeligt og maksimalt langt tracker-ID. SVG-udgaven oprettes i DOM-kontrollen. Det erstatter ikke scanning med telefonens kamera.
+- Tidligere 0.8.0-funktioner og tests er bevaret.
+
+Ingen deployment, live mail eller rigtig push afsendt herfra. Konti, HTTP-svar og databasetests er lokale/syntetiske. Ingen fuld visuel mobilbrowserkontrol eller Wrangler dry-run i denne omgang. Telefonens konkrete notifikationsknapper og QR-scanning skal afprøves efter upload.
+
+---
+
 # Kontrol af Pejlo 0.8.0
 
 - `npm test`: 78 tests bestået. Produktionsfilerne bygges som del af testen.
