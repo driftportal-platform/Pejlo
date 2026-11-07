@@ -62,7 +62,7 @@ async function processNotifications(env,fetcher,stats){
     if(Array.isArray(report))samples=report.filter(p=>p.deviceId===device.id).map(gpsPoint).filter(p=>p&&p.timestamp>=now-300000&&p.timestamp<=now);
    }catch{/* Persistent state still filters the latest fix when reports are unavailable. */}
    const current=gpsPoint(raw);if(current)samples.push(current);
-   const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object');
+   const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object',profile.homeConfirmed===true?profile.home:null);
    const fenceRaw=current&&gps.trusted?.timestamp===current.timestamp&&!gps.uncertain?raw:null;
    let transition;
    if(row.enabled){

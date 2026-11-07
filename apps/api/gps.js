@@ -2,13 +2,13 @@ import {validPoint} from '../../packages/shared/geo.js';
 import {once} from './schema.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 export function ensureGps(db){return once(db,'gps-filter',()=>db.prepare('CREATE TABLE IF NOT EXISTS pejlo_gps_filter(identifier TEXT NOT NULL,owner_uid TEXT NOT NULL,state TEXT NOT NULL,PRIMARY KEY(identifier,owner_uid))').run());}
-export async function trustedGps(db,identifier,owner,points,type){
+export async function trustedGps(db,identifier,owner,points,type,home){
  await ensureGps(db);
  await db.prepare("INSERT OR IGNORE INTO pejlo_gps_filter(identifier,owner_uid,state) VALUES(?,?,'{}')").bind(identifier,owner).run();
  for(let n=0;n<4;n++){
   const row=await db.prepare('SELECT state FROM pejlo_gps_filter WHERE identifier=? AND owner_uid=?').bind(identifier,owner).first();
   if(!row)throw Error('GPS-filteret kunne ikke læses.');
-  const result=filterGps(points,type,JSON.parse(row.state));
+  const result=filterGps(points,type,JSON.parse(row.state),home);
   const changed=await db.prepare('UPDATE pejlo_gps_filter SET state=? WHERE identifier=? AND owner_uid=? AND state=? RETURNING identifier').bind(JSON.stringify(result.state),identifier,owner,row.state).first();
   if(changed)return result.state;
  }

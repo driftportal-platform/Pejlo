@@ -173,11 +173,12 @@ export async function handleAPI(request,env,fetcher=fetch){
   }catch{historyAvailable=false;}
   await ensureFamily(env.DB);
   const profileRow=await env.DB.prepare('SELECT profile,owner_uid FROM pejlo_profiles WHERE identifier=?').bind(identifier).first();
-  let type='object';try{type=JSON.parse(profileRow?.profile||'{}').type||'object';}catch{}
+  let profile;try{profile=JSON.parse(profileRow?.profile||'{}');}catch{}
+  const type=profile?.type||'object',home=profile?.homeConfirmed===true?profile.home:null;
   const ownerRow=await env.DB.prepare('SELECT owner_uid FROM trackers WHERE identifier=?').bind(identifier).first();
-  const filtered=filterGps(route,type),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(position?[position]:[])];
+  const filtered=filterGps(route,type,{},home),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(position?[position]:[])];
   // Historical queries must never rewind the shared live filter.
-  const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type);
+  const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home);
   position=point(raw)?gps.trusted||null:null;route=filtered.points;
   return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},position,route,gpsUncertain:!!gps.uncertain,gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
