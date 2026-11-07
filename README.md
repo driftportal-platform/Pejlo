@@ -1,4 +1,12 @@
-# Pejlo 0.8.14
+# Pejlo 0.8.16
+
+GPS-filteret afviser spejlede koordinater og hop, som er for lange i forhold til tiden siden sidste troværdige punkt. Et bekræftet hjemmeområde kan hjælpe, når den første eller en tidligere gemt måling er spejlet.
+
+## Pejlo 0.8.15
+
+Store positionshop på katteprofiler afventer et nyt GPS-punkt i nærheden, også når der er længere mellem målingerne.
+
+## Pejlo 0.8.14
 
 Tryk på profilens markør på kortet for at se trackeroplysninger. Ejeren kan bede om en enkelt GPS-position via Traccar.
 
