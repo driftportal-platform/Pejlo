@@ -124,9 +124,9 @@ main,main .page,main .panel{min-width:0}
 .history-dates label{min-width:0;max-width:100%}
 input[type="date"],input[type="time"]{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%}
 input::-webkit-date-and-time-value{min-width:0;text-align:center}
-.page-scroll-rail{position:fixed;right:3px;top:30vh;height:32vh;width:24px;z-index:510;touch-action:none;cursor:ns-resize;border-radius:14px;background:linear-gradient(to right,transparent 9px,#ccd6cd 9px,#ccd6cd 15px,transparent 15px)}
-.page-scroll-thumb{position:absolute;left:6px;width:12px;height:28px;border-radius:8px;background:#183e35;box-shadow:0 0 0 2px #fafbf7}
-.page-scroll-rail:focus-visible{outline:2px solid #183e35;outline-offset:1px}
+
+
+
 .page-scroll-top{position:fixed;right:30px;bottom:24px;z-index:510;border:1px solid #cbd7c3;border-radius:24px;padding:10px 14px;background:#fafbf7;color:#183e35;box-shadow:0 3px 14px #183e3520;font-size:14px}
 @media(max-width:700px){
  main,body:has(#kort:not([hidden])) main{padding-right:34px;padding-bottom:calc(130px + env(safe-area-inset-bottom))}
@@ -162,5 +162,10 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 @media(max-width:700px) and (orientation:landscape){#kort .map-card{min-height:240px;height:70dvh}}
 
 /* 0.8.11: move the scroll thumb without changing its layout. */
-.page-scroll-thumb{top:0;will-change:transform;pointer-events:none}
-.page-scroll-rail{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+
+
+
+.tracker-details-list{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px;margin:16px 0 20px}
+.tracker-details-list dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.position-request-status{width:100%;margin:4px 0 0}
+.position-request-status:empty{margin:0;height:0;position:absolute;overflow:hidden}

@@ -19,7 +19,7 @@ export function createHistoryView({request,selected,layer,key,notice}){
    if(!map)map=createMap('history-map',{notice});await map?.layer(layer(),key());if(gen!==generation)return;
    map?.profile(p,{...data,route:analysis.points,position:null},{showRoute:true,showHome:true,history:true});map?.fit(p,{...data,route:analysis.points,position:null});
    $('#history-status').textContent=analysis.points.length?'Perioden er hentet i dansk tid.':'Ingen GPS-punkter i perioden. Testserverens historik kan være begrænset.';
-   $('#history-summary').textContent=analysis.points.length+' punkter · '+formatDistance(analysis.meters)+' anslået · '+analysis.gaps.length+' huller over 10 minutter · '+analysis.rejected+' punkter frasorteret'+(data.historyTruncated?' · Kun de seneste 10.000 punkter vises.':'');
+   $('#history-summary').textContent=analysis.points.length+' punkter · '+formatDistance(analysis.meters)+' anslået · '+analysis.gaps.length+' huller over 10 minutter · '+(analysis.rejected+(data.gpsRejected||0))+' punkter frasorteret'+(data.historyTruncated?' · Kun de seneste 10.000 punkter vises.':'');
    $('#history-slider').max=Math.max(0,analysis.points.length-1);$('#history-slider').value=0;
    $('#timeline').replaceChildren();
    for(const gap of analysis.gaps){const el=document.createElement('p');el.className='history-gap';el.textContent='Manglende spor: '+time(gap.from)+' – '+time(gap.to);$('#timeline').append(el);}

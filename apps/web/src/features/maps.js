@@ -4,7 +4,7 @@ import {distance,searchZoom,formatDistance} from '../shared/geo.js';
 import {types} from './profiles.js';
 export const layers = {demo:'Skematisk eksempel',streets:'Gadekort',satellite:'Satellit / luftfoto',outdoor:'Terræn og stier'};
 const mapIds = {streets:'streets-v4',satellite:'satellite',outdoor:'outdoor-v2'};
-export function createMap(id, {notice, onHome, onManual} = {}) {
+export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
   const root = document.getElementById(id);
   if (!window.L) {root.textContent='Kortet kunne ikke indlæses.';return null;}
   const map=L.map(root,{zoomControl:false,maxZoom:20}).setView([56.55,8.314],16);
@@ -34,7 +34,20 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
     },
     profile(p,data,{showRoute=true,showHome=true,history=false,showDistanceLine=false,showRings=false}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();
-      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:p.photo?photoIcon(p.photo):markerIcon(types[p.type].icon),title:p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
+      if(data.position){
+        const title=p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition');
+        const marker=L.marker([data.position.lat,data.position.lon],{
+          icon:p.photo?photoIcon(p.photo):markerIcon(types[p.type].icon),
+          title:onTracker?'Vis oplysninger om '+p.name:title
+        }).addTo(markers);
+        if(onTracker)marker.on('click',e=>{
+          if(!onTracker())onHome?.({lat:e.latlng.lat,lon:e.latlng.lng});
+        });
+        else{
+          const label=document.createElement('span');label.textContent=p.name;
+          marker.bindTooltip(label,{direction:'top'});
+        }
+      }
       if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
       if(p.homeConfirmed&&showDistanceLine&&data.position)L.polyline([[p.home.lat,p.home.lon],[data.position.lat,data.position.lon]],{color:'#477fc1',weight:2,dashArray:'3 7'}).addTo(homeLayer).bindTooltip('Afstand til seneste position: '+formatDistance(distance(p.home,data.position)));
       if(p.homeConfirmed&&showRings)for(const radius of [100,250,500])L.circle([p.home.lat,p.home.lon],{radius,color:'#7c8792',weight:1,fill:false,dashArray:'2 6'}).addTo(homeLayer).bindTooltip(radius+' m fra hjem');

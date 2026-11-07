@@ -1,3 +1,4 @@
+import {trustedGps,gpsPoint} from './gps.js';
 import {ensureOperations} from './operations.js';
 import {snoozeUntil} from './snooze.js';
 import {ensureArchive,archiveEvent,archiveStatus} from './archive.js';
@@ -53,13 +54,22 @@ async function processNotifications(env,fetcher,stats){
    const devices=await get('/api/devices?uniqueId='+encodeURIComponent(row.identifier)),device=devices.find(d=>d.uniqueId===row.identifier);
    if(!device){stats.errors++;continue;}
    const positions=device.positionId?await get('/api/positions?id='+device.positionId):[],raw=positions.find(p=>p.deviceId===device.id&&p.id===device.positionId);
+   const profileRow=await env.DB.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=?').bind(row.identifier).first();
+   let profile={};try{profile=JSON.parse(profileRow?.profile||'{}')||{};}catch{}
+   // Include intermediate fixes: polling only the last one misses out-and-back spikes.
+   let samples=[];
+   try{const report=await get('/api/reports/route?'+new URLSearchParams({deviceId:String(device.id),from:new Date(now-300000).toISOString(),to:new Date(now).toISOString()}));
+    if(Array.isArray(report))samples=report.filter(p=>p.deviceId===device.id).map(gpsPoint).filter(p=>p&&p.timestamp>=now-300000&&p.timestamp<=now);
+   }catch{/* Persistent state still filters the latest fix when reports are unavailable. */}
+   const current=gpsPoint(raw);if(current)samples.push(current);
+   const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object');
+   const fenceRaw=current&&gps.trusted?.timestamp===current.timestamp&&!gps.uncertain?raw:null;
    let transition;
    if(row.enabled){
-    const result=advanceFence(JSON.parse(row.config),raw,JSON.parse(row.state),now);
+    const result=advanceFence(JSON.parse(row.config),fenceRaw,JSON.parse(row.state),now);
     const updated=await env.DB.prepare('UPDATE pejlo_fences SET state=? WHERE identifier=? AND owner_uid=? AND state=? AND config=? AND enabled=1 RETURNING identifier').bind(JSON.stringify(result.state),row.identifier,row.owner_uid,row.state,row.config).first();
     if(updated)transition=result.transition;
    }
-   const profileRow=await env.DB.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=?').bind(row.identifier).first();
    let profileName='';try{profileName=label(JSON.parse(profileRow?.profile??'null')?.name);}catch{}
    const name=profileName||label(row.tracker_name),fence=label(row.fence_name);
    const context={name,area:fence&&fence!==name?'«'+fence+'»':'hjemmeområdet',battery:raw?.attributes?.batteryLevel};

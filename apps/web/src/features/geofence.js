@@ -8,6 +8,7 @@ export function createGeofenceMonitor(){
   if(!profile.homeConfirmed)return {text:'Vælg og gem hjemmeområdet først',kind:'unknown'};
   const p=data?.position;
   if(!profile.trackerId||data?.source!=='traccar')return {text:'Tilknyt en tracker for at overvåge området',kind:'unknown'};
+  if(data?.gpsUncertain)return {text:'Usikkert GPS-signal · afventer bekræftet position',kind:'unknown'};
   if(unavailable||!p||!Number.isFinite(p.timestamp)||p.timestamp>now+60000||now-p.timestamp>300000)return {text:'Afventer en frisk position · området kan ikke vurderes',kind:'unknown'};
   const key=JSON.stringify([profile.id,profile.trackerId,profile.home]);
   let state=states.get(key);const meters=fenceDistance(profile.home,p),radius=0,buffer=profile.home.buffer??5;
