@@ -1,3 +1,19 @@
+# Pejlo 0.8.14
+
+Tryk på profilens markør på kortet for at se trackeroplysninger. Ejeren kan bede om en enkelt GPS-position via Traccar.
+
+## Pejlo 0.8.13 – almindelig rulning uden ekstra skyder
+
+Den ekstra rulleskyder og dens trækstyring er fjernet. Brug normal rulning i den frie kant ved kortet. »Til toppen« bevares. Alle funktioner fra 0.8.12, inklusive GPS-filteret, er med. Se [opdatering og afprøvning](docs/version-0.8.13.md).
+
+---
+
+# Pejlo 0.8.12 – filter mod GPS-hop
+
+Automatisk GPS-filter efter profiltype, fælles filtertilstand på serveren og tydelig markering af usikkert signal. Filtrerede punkter udelades af kort, rute, distance og geofence-kontrol. Komplet opdatering oven på 0.8.11. Se [funktion og afprøvning](docs/version-0.8.12.md).
+
+---
+
 # Pejlo 0.8.11 – jævnere rulleskyder
 
 Rulleskyderen bevarer grebspunktet og samler hurtige fingerbevægelser til højst én rulning pr. animationsbillede. Alle tidligere funktioner er bevaret. Se [ændringer og afprøvning](docs/version-0.8.11.md).

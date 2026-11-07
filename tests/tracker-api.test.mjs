@@ -3,23 +3,32 @@ import assert from 'node:assert/strict';
 import {handleAPI,point,codeHash} from '../apps/api/worker.js';
 const identifier='080608317309';
 function database(owner='owner-uid'){
- const rows=new Map([[identifier,{identifier,name:'Pejlo',code_hash:'test-hash',owner_uid:owner}]]);
+ const gps=new Map(),requests=new Map();const rows=new Map([[identifier,{identifier,name:'Pejlo',code_hash:'test-hash',owner_uid:owner}]]);
  return {rows,prepare(sql){let args=[];return {bind(...values){args=values;return this;},async all(){return {results:[...rows.values()].filter(r=>r.owner_uid===args[0]).map(({identifier,name})=>({identifier,name}))};},async first(){
- if(sql.startsWith('SELECT m.'))return null;
+ if(sql.includes('pejlo_gps_filter')){if(sql.startsWith('SELECT'))return {state:gps.get(args[0]+args[1])};if(sql.startsWith('UPDATE')){const k=args[1]+args[2];if(gps.get(k)!==args[3])return null;gps.set(k,args[0]);return {identifier:args[1]};}}
+ if(sql.startsWith('INSERT INTO pejlo_position_requests')){
+  if(requests.get(args[0])>args[2])return null;
+  requests.set(args[0],args[1]);return {identifier:args[0]};
+ }
+ if(sql.includes('SELECT profile'))return null;
+ if(sql.startsWith('SELECT owner_uid'))return {owner_uid:rows.get(args[0])?.owner_uid};
+ if(sql.startsWith('SELECT m.'))return args[1]==='viewer-uid'?{identifier:args[0],role:'viewer'}:null;
  const row=rows.get(sql.startsWith('UPDATE')?args[1]:args[0]);
  if(sql.startsWith('UPDATE')){if(!row||row.code_hash!==args[2]||(row.owner_uid!==null&&row.owner_uid!==args[3]))return null;row.owner_uid=args[0];return {identifier:row.identifier,name:row.name};}
  return row&&(!sql.includes('AND owner_uid')||row.owner_uid===args[1])?{identifier:row.identifier}:null;
- },async run(){if(sql.startsWith('CREATE')||sql.startsWith('ALTER'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
+ },async run(){if(sql.startsWith('INSERT OR IGNORE INTO pejlo_gps_filter')){const k=args[0]+args[1];if(!gps.has(k))gps.set(k,'{}');return {success:true};}if(sql.startsWith('CREATE')||sql.startsWith('ALTER'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
 }
 const env={DB:database(),TRACCAR_ADMIN_UID:'owner-uid',TRACCAR_TOKEN:'server-secret'};
 const position={id:42,deviceId:7,valid:true,latitude:56.55,longitude:8.31,fixTime:new Date().toISOString(),attributes:{batteryLevel:55,secret:'never expose'}};
-function fixture({uid='owner-uid',verified=true,lookupStatus=200,positionValue=position,history=true}={}){
+function fixture({uid='owner-uid',verified=true,lookupStatus=200,positionValue=position,history=true,status='offline',commandTypes=[{type:'positionSingle'}],commandStatus=200}={}){
  const calls=[];
  const fetcher=async(url,options)=>{
   calls.push({url,options});
   if(url.includes('accounts:lookup'))return Response.json({users:[{localId:uid,emailVerified:verified}]},{status:lookupStatus});
   assert.equal(options.headers.Authorization,'Bearer server-secret');
-  if(url.includes('/api/devices?'))return Response.json([{id:99,uniqueId:'other'},{id:7,uniqueId:identifier,positionId:42,name:'Pejlo',status:'offline',lastUpdate:new Date(Date.parse(position.fixTime)+1000).toISOString(),phone:'private'}]);
+  if(url.includes('/api/devices?'))return Response.json([{id:99,uniqueId:'other'},{id:7,uniqueId:identifier,positionId:42,name:'Pejlo',status,lastUpdate:new Date(Date.parse(position.fixTime)+1000).toISOString(),phone:'private'}]);
+  if(url.includes('/api/commands/types?'))return Response.json(commandTypes);
+  if(url.endsWith('/api/commands/send'))return Response.json({}, {status:commandStatus});
   if(url.includes('/api/positions?'))return Response.json([positionValue]);
   if(url.includes('/api/reports/route?'))return Response.json(history?[position,{...position,deviceId:99}]:{}, {status:history?200:500});
   throw new Error('Unexpected request');
@@ -54,6 +63,31 @@ test('method and route are constrained, external server override fails closed',a
 });
 
 const post=(path,value)=>new Request('https://pejlo.example/api/'+path,{method:'POST',headers:{Authorization:'Bearer firebase-token','Content-Type':'application/json'},body:JSON.stringify(value)});
+test('position request sends only one fixed data command despite concurrent clicks',async()=>{
+ const f=fixture({status:'online'}),localEnv={...env,DB:database()};
+ const send=()=>handleAPI(post('tracker/position',{identifier,deviceId:99,type:'rebootDevice',textChannel:true}),localEnv,f.fetcher);
+ const responses=await Promise.all([send(),send()]);
+ assert.deepEqual(responses.map(r=>r.status).sort(),[200,429]);
+ assert.equal((await responses.find(r=>r.ok).json()).status,'sent');
+ const sends=f.calls.filter(c=>c.url.endsWith('/api/commands/send'));
+ assert.equal(sends.length,1);
+ assert.deepEqual(JSON.parse(sends[0].options.body),{deviceId:7,type:'positionSingle',textChannel:false,attributes:{noQueue:true}});
+ assert.ok(f.calls.some(c=>c.url.endsWith('/api/commands/types?deviceId=7&textChannel=false')));
+});
+test('position request never sends for viewers, offline trackers or unsupported protocols',async()=>{
+ for(const [options,status] of [[{uid:'viewer-uid'},403],[{},409],[{status:'online',commandTypes:[]},409]]){
+  const f=fixture(options),response=await handleAPI(post('tracker/position',{identifier}),{...env,DB:database()},f.fetcher);
+  assert.equal(response.status,status);
+  assert.ok(f.calls.every(c=>!c.url.endsWith('/api/commands/send')));
+ }
+});
+test('queued and failed commands are distinguished from sent commands',async()=>{
+ for(const [commandStatus,status] of [[202,200],[500,502]]){
+  const f=fixture({status:'online',commandStatus}),response=await handleAPI(post('tracker/position',{identifier}),{...env,DB:database()},f.fetcher);
+  assert.equal(response.status,status);
+  if(response.ok)assert.equal((await response.json()).status,'queued');
+ }
+});
 test('claim requires correct code and atomically prevents another user taking the tracker',async()=>{
  const DB=database(null),code='0123456789ABCDEF0123456789ABCDEF';DB.rows.get(identifier).code_hash=await codeHash(code);
  const first=fixture(),other=fixture({uid:'another-user'});

@@ -31,11 +31,11 @@ test('queued event carries the shared profile name and tracker id',async()=>{
  const home={shape:'circle',lat:56,lon:8,radius:100,buffer:5};
  await db.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').bind('1234','owner','Hjem',JSON.stringify(home)).run();
  await db.prepare('INSERT INTO pejlo_alerts(identifier,uid,config) VALUES(?,?,?)').bind('1234','owner',JSON.stringify({exit:true,enter:true,lowBattery:false,missing:false,quiet:false})).run();
- let stamp=Date.now()-10000,lat=56;
+ let stamp=Date.now()-90000,lat=56;
  const env={DB:db,TRACCAR_TOKEN:'t',VAPID_PUBLIC_KEY:'a',VAPID_PRIVATE_KEY:'b',VAPID_SUBJECT:'mailto:t@example.com'};
  const get=async url=>Response.json(url.includes('/devices')?[{id:7,uniqueId:'1234',positionId:9}]:[{id:9,deviceId:7,valid:true,latitude:lat,longitude:8,fixTime:new Date(stamp).toISOString()}]);
  await runNotifications(env,get);
- lat=56.002;for(let i=0;i<2;i++){stamp+=1000;await runNotifications(env,async url=>{const r=await get(url);return r;});}
+ lat=56.002;for(let i=0;i<2;i++){stamp+=20000;await runNotifications(env,async url=>{const r=await get(url);return r;});}
  assert.equal(db.inserted.length,1);
  const p=JSON.parse(db.inserted[0][4]);assert.equal(db.inserted[0][3],'exit');
  assert.match(p.body,/^Loui har forladt «Hjem»\./);assert.equal(p.tracker,'1234');assert.equal(p.tag,'pejlo-exit-1234');
