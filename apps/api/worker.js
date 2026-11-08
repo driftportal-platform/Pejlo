@@ -180,7 +180,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   // Historical queries must never rewind the shared live filter.
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home);
   position=point(raw)?gps.trusted||null:null;route=filtered.points;
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},position,route,gpsUncertain:!!gps.uncertain,gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},position,route,gpsUncertain:!!gps.uncertain,gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

@@ -78,7 +78,7 @@ function updatePositionRequest(){
  const canRequest=!!trackerUser&&!!identifier&&ownedTrackers.some(t=>t.identifier===identifier&&t.is_owner!==0);
  const request=canRequest?positionRequests.get(identifier):null;
  if(request?.requestedAt){
-  if(position?.timestamp>request.previous&&position.timestamp>=Math.floor(request.requestedAt/1000)*1000){
+  if(!d.gpsProvisional&&position?.timestamp>request.previous&&position.timestamp>=Math.floor(request.requestedAt/1000)*1000){
    request.message='Ny GPS-position modtaget.';
    delete request.requestedAt;
   }else if(!request.queued&&Date.now()-request.requestedAt>=90000){
@@ -98,7 +98,7 @@ function updatePositionRequest(){
  $('#tracker-details-name').textContent=profile.name;
  $('#tracker-details-connection').textContent=identifier?({online:'Online',offline:'Offline'}[d.device?.status]||'Ukendt'):'Eksempeldata';
  $('#tracker-details-contact').textContent=identifier?ageText(d.device?.lastContact):'—';
- $('#tracker-details-gps').textContent=position?ageText(position.timestamp)+(d.gpsUncertain?' · usikkert GPS-signal':''):'Ingen gyldig position';
+ $('#tracker-details-gps').textContent=position?ageText(position.timestamp)+(d.gpsProvisional?' · afventer bekræftelse':d.gpsUncertain?' · usikkert GPS-signal':''):'Ingen gyldig position';
  $('#tracker-details-battery').textContent=position?.battery!=null?position.battery+' %':'Ikke oplyst';
  $('#tracker-details-home').textContent=identifier?homeStatus(profile,position):'Eksempelposition';
 }
@@ -226,14 +226,14 @@ function updateAge(){
  updatePositionRequest();
  if(!selected())return;
  const d=data(),p=d.position,live=isLinked();
- $('#home-observation').textContent=live?homeStatus(selected(),p):'Eksempeldata · ikke en rigtig hjemmestatus';
+ $('#home-observation').textContent=live?(d.gpsProvisional?'Afventer bekræftet position':homeStatus(selected(),p)):'Eksempeldata · ikke en rigtig hjemmestatus';
  const contact=d.device?.lastContact;$('#last-contact').textContent=live?ageText(contact):'Eksempeldata';$('#last-contact').title=Number.isFinite(contact)?new Date(contact).toLocaleString('da-DK',{timeZone:'Europe/Copenhagen'}):'Kontaktoplysningen kommer fra Traccar, særskilt fra GPS-positionen.';
  if(!p){$('#age').textContent='Ingen position';$('#freshness').textContent=d.gpsUncertain?'Usikkert GPS-signal':'Afventer GPS';$('#search-age').textContent='Der er endnu ingen gyldig position fra trackeren.';return;}
  const seconds=Math.max(0,Math.floor((Date.now()-p.timestamp)/1000));
  const text=seconds<60?seconds+' sek. siden':seconds<3600?Math.floor(seconds/60)+' min. siden':Math.floor(seconds/3600)+' timer siden';
  $('#age').textContent=text;
- $('#freshness').textContent=live&&d.gpsUncertain?'Usikkert GPS-signal':live?(seconds>300?'Gammel position':'Seneste registrering'):(seconds>300?'Gammel eksempelposition':'Eksempel');
- $('#search-age').textContent=(d.gpsUncertain?'Usikkert GPS-signal. Viser seneste troværdige position. ':'')+(seconds>300?'OBS: gammel position. ':'')+(live?'Seneste registrering fra ':'Målet er en eksempelposition fra ')+text+'.';
+ $('#freshness').textContent=live&&d.gpsProvisional?'Ubekræftet position':live&&d.gpsUncertain?'Usikkert GPS-signal':live?(seconds>300?'Gammel position':'Seneste registrering'):(seconds>300?'Gammel eksempelposition':'Eksempel');
+ $('#search-age').textContent=(d.gpsProvisional?'Afventer bekræftelse af første GPS-position. ':d.gpsUncertain?'Usikkert GPS-signal. Viser seneste troværdige position. ':'')+(seconds>300?'OBS: gammel position. ':'')+(live?'Seneste registrering fra ':'Målet er en eksempelposition fra ')+text+'.';
 }
 function updateSearch(){
   if(!selected())return;
