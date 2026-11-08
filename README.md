@@ -1,4 +1,12 @@
-# Pejlo 0.8.17
+# Pejlo 0.8.19
+
+Profilfoto kan flyttes og zoomes i en rund ramme før det gemmes. Nye fotos gemmes i op til 384 × 384 pixel.
+
+## Pejlo 0.8.18
+
+Den stiplede rute er orange, så den er lettere at se på satellitkortet.
+
+## Pejlo 0.8.17
 
 Det første GPS-punkt vises som ubekræftet. Hvis to efterfølgende punkter samler sig et andet sted, kan de erstatte det. Et startpunkt, som modsiges af næste måling, udelades fra historikken, indtil målingerne kan bekræftes.
 

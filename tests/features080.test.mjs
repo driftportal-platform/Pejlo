@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {homeStatus,recentMovement} from '../packages/shared/status.js';
-import {validPhoto,cleanProfile} from '../packages/shared/profiles.js';
+import {PROFILE_PHOTO_LIMIT,validPhoto,cleanProfile} from '../packages/shared/profiles.js';
+import {photoCrop} from '../dist/src/features/photo.js';
 import {createWakeLock} from '../apps/web/src/features/wake-lock.js';
 import {archiveEvent,archiveStatus,listAlarms} from '../apps/api/archive.js';
 const now=Date.now(),home={lat:56,lon:8,radius:100,shape:'circle'},profile={id:'loui',name:'Loui',type:'cat',home,homeConfirmed:true};
@@ -25,7 +26,14 @@ test('movement requires several recent consistent fixes and rejects drift, gaps 
 });
 test('profile photos survive cleaning; external URLs, SVG and oversized images are stripped',()=>{
  const photo='data:image/jpeg;base64,/9j/AAAA';assert.equal(cleanProfile({...profile,photo}).photo,photo);
- for(const photo of ['https://example.com/track.jpg','data:image/svg+xml;base64,AAAA','data:image/jpeg;base64,'+'A'.repeat(12000)]){assert.equal(validPhoto(photo),false);assert.equal(cleanProfile({...profile,photo}).photo,'');}
+ const largerPhoto='data:image/jpeg;base64,'+'A'.repeat(14000);assert.equal(cleanProfile({...profile,photo:largerPhoto}).photo,largerPhoto);
+ for(const photo of ['https://example.com/track.jpg','data:image/svg+xml;base64,AAAA','data:image/jpeg;base64,'+'A'.repeat(PROFILE_PHOTO_LIMIT)]){assert.equal(validPhoto(photo),false);assert.equal(cleanProfile({...profile,photo}).photo,'');}
+});
+test('photo cropping keeps portrait and landscape selections inside the source image',()=>{
+ assert.deepEqual(photoCrop(1200,800,1,600,400),{size:800,x:200,y:0});
+ assert.deepEqual(photoCrop(800,1200,1,400,600),{size:800,x:0,y:200});
+ assert.deepEqual(photoCrop(1200,800,2,0,800),{size:400,x:0,y:400});
+ assert.deepEqual(photoCrop(800,1200,4,800,0),{size:200,x:600,y:0});
 });
 function lock(){const listeners=[];return {released:false,addEventListener(_,fn){listeners.push(fn);},async release(){this.released=true;listeners.forEach(fn=>fn());}};}
 test('wake lock only runs in Find, reacquires on visibility and releases on leaving/logout',async()=>{
