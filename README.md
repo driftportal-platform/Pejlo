@@ -1,4 +1,8 @@
-# Pejlo 0.8.16
+# Pejlo 0.8.17
+
+Det første GPS-punkt vises som ubekræftet. Hvis to efterfølgende punkter samler sig et andet sted, kan de erstatte det. Et startpunkt, som modsiges af næste måling, udelades fra historikken, indtil målingerne kan bekræftes.
+
+## Pejlo 0.8.16
 
 GPS-filteret afviser spejlede koordinater og hop, som er for lange i forhold til tiden siden sidste troværdige punkt. Et bekræftet hjemmeområde kan hjælpe, når den første eller en tidligere gemt måling er spejlet.
 

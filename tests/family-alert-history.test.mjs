@@ -77,8 +77,8 @@ test('cron queues independent low battery and missing GPS alerts even with geofe
 test('cron archives fence transitions without push keys and preserves them after area changes',async()=>{
  const db=await setup();await call(db,owner,{action:'save',identifier:'1234',profile,revision:0});
  const base=Date.now()-90000;let n=0;
- const fetcher=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:n===0?56:56.002,longitude:8,fixTime:new Date(base+n*20000).toISOString(),attributes:{batteryLevel:98}}]);
- const env={DB:db,TRACCAR_TOKEN:'token'};for(n=0;n<3;n++)await runNotifications(env,fetcher);
+ const fetcher=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:n<2?56:56.002,longitude:8,fixTime:new Date(base+n*20000).toISOString(),attributes:{batteryLevel:98}}]);
+ const env={DB:db,TRACCAR_TOKEN:'token'};for(n=0;n<4;n++)await runNotifications(env,fetcher);
  assert.equal(await db.prepare("SELECT * FROM pejlo_alarm_history WHERE kind='exit'").first(),null);
  await runNotifications(env,fetcher);
  let row=await db.prepare("SELECT * FROM pejlo_alarm_history WHERE kind='exit'").first();assert.ok(row);assert.equal(row.push_status,'unconfigured');assert.equal(JSON.parse(row.area).home.radius,100);

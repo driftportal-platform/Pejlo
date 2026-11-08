@@ -24,23 +24,23 @@ test('sparse back-and-forth jumps of 100–200 m do not move the cat marker',()=
  assert.equal(result.state.uncertain,true);
 });
 test('two different distant clusters do not confirm each other, but a consistent follow-up does',()=>{
- const samples=[p(0,0),p(100,30),p(200,60),p(205,360)];
+ const samples=[p(0,-5),p(0,0),p(100,30),p(200,60),p(205,360)];
  const result=filterGps(samples,'cat');
- assert.deepEqual(result.points,[samples[0],samples[3]]);
+ assert.deepEqual(result.points,[samples[0],samples[1],samples[4]]);
  assert.equal(result.state.uncertain,false);
  assert.deepEqual(filterGps(samples,'car').points,samples);
 });
-test('a relocation is accepted after a distinct consistent fix at least five seconds later',()=>{const r=filterGps([p(0,0),p(500,2),p(502,3),p(503,7)],'cat');assert.deepEqual(r.points.map(p=>p.timestamp),[1000000,1007000]);assert.equal(r.state.uncertain,false)});
+test('a relocation is accepted after a distinct consistent fix at least five seconds later',()=>{const r=filterGps([p(0,-5),p(0,0),p(500,2),p(502,3),p(503,7)],'cat');assert.deepEqual(r.points.map(p=>p.timestamp),[995000,1000000,1007000]);assert.equal(r.state.uncertain,false)});
 test('a sustained mirrored cluster cannot move the marker, even after days of silence',()=>{
  const first=p(0,0),last=p(8,259260),mirrored=seconds=>p(0,seconds,{lat:-56,lon:-8});
- const result=filterGps([first,mirrored(259200),mirrored(259230),last],'cat');
- assert.deepEqual(result.points,[first,last]);
+ const result=filterGps([first,p(0,5),mirrored(259200),mirrored(259230),last],'cat');
+ assert.deepEqual(result.points,[first,p(0,5),last]);
  assert.equal(result.state.uncertain,false);
 });
 test('an implausible cluster outside the mirrored area also cannot confirm a jump',()=>{
  const first=p(0,0);
- const result=filterGps([first,p(50000,10),p(50010,40)],'cat');
- assert.deepEqual(result.points,[first]);
+ const result=filterGps([first,p(0,5),p(50000,10),p(50010,40)],'cat');
+ assert.deepEqual(result.points,[first,p(0,5)]);
  assert.equal(result.state.pending,null);
  assert.equal(result.state.uncertain,true);
 });
@@ -55,9 +55,37 @@ test('a confirmed home rejects a mirrored first point and recovers an old saved 
  const recovered=await trustedGps(db,'1234','a',[next],'cat',home);
  assert.deepEqual(recovered.trusted,next);
 });
+test('a mirrored first fix without a home cannot erase four hours of history',()=>{
+ const mirrored=p(0,0,{lat:-56,lon:-8});
+ const fixes=Array.from({length:240},(_,i)=>p(i%12,(i+1)*60));
+ const ambiguous=filterGps([mirrored,fixes[0]],'cat');
+ assert.deepEqual(ambiguous.points,[]);
+ assert.equal(ambiguous.state.provisional,true);
+ const result=filterGps([mirrored,...fixes],'cat');
+ assert.deepEqual(result.points,fixes);
+ assert.equal(result.rejected,1);
+ assert.equal(result.state.provisional,false);
+});
+test('a legacy mirrored anchor recovers across separate live polls without a home',async()=>{
+ const db=database(),mirrored=p(0,0,{lat:-56,lon:-8}),first=p(0,60),second=p(1,120);
+ await trustedGps(db,'1234','a',[],'cat');
+ db.raw.prepare('UPDATE pejlo_gps_filter SET state=? WHERE identifier=? AND owner_uid=?')
+  .run(JSON.stringify({trusted:mirrored,seen:mirrored.timestamp,uncertain:false}),'1234','a');
+ const waiting=await trustedGps(db,'1234','a',[first],'cat');
+ assert.equal(waiting.provisional,true);
+ assert.equal(waiting.uncertain,true);
+ assert.deepEqual(waiting.trusted,mirrored);
+ assert.equal((await trustedGps(db,'1234','a',[first],'cat')).provisional,true);
+ const recovered=await trustedGps(db,'1234','a',[second],'cat');
+ assert.deepEqual(recovered.trusted,second);
+ assert.equal(recovered.uncertain,false);
+ const later=await trustedGps(db,'1234','a',[p(0,180,{lat:-56,lon:-8}),p(0,240,{lat:-56,lon:-8})],'cat');
+ assert.deepEqual(later.trusted,second);
+ assert.equal(later.uncertain,true);
+});
 test('duplicate fixes and changing remote clusters do not confirm a jump',()=>{const r=filterGps([p(0,0),p(500,2),p(500,2),p(-500,8)],'cat');assert.equal(r.state.trusted.timestamp,1000000);assert.equal(r.state.uncertain,true)});
 test('normal cat movement and car-speed movement have different limits',()=>{assert.equal(filterGps([p(0,0),p(100,2)],'car').points.length,2);assert.equal(filterGps([p(0,0),p(10,2),p(25,4)],'cat').points.length,3)});
 test('reported poor accuracy is withheld and a later good fix recovers',()=>{const r=filterGps([p(0,0),p(1,2,{accuracy:150}),p(2,4,{accuracy:10})],'cat');assert.equal(r.points.length,2);assert.equal(r.state.uncertain,false);assert.equal(advanceGps({},p(0,0,{accuracy:150}),'cat').state.trusted,undefined)});
 test('persisted filter survives new calls, isolates owners and cannot rewind on a history request',async()=>{const db=database();await trustedGps(db,'1234','a',[p(0,0)],'cat');let state=await trustedGps(db,'1234','a',[p(100,2)],'cat');assert.equal(state.trusted.timestamp,1000000);state=await trustedGps(db,'1234','a',[p(0,-1)],'cat');assert.equal(state.seen,1002000);assert.equal(state.uncertain,true);const other=await trustedGps(db,'1234','b',[p(100,2)],'cat');assert.equal(other.trusted.lat,p(100,2).lat)});
-test('API removes hops from both live position and history with unchanged contact time',async()=>{const db=await setup(),now=Date.now(),start=now-20000;const raw=(m,s)=>({id:s+1,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(start+s*1000).toISOString()});const samples=[raw(0,0),raw(100,2)];const fetcher=async url=>url.includes('accounts:lookup')?Response.json({users:[{localId:'owner',emailVerified:true}]}):url.includes('/devices')?Response.json([{id:7,uniqueId:'1234',positionId:3,lastUpdate:new Date(now).toISOString()}]):Response.json(url.includes('/positions')?[samples[1]]:samples);const res=await handleAPI(new Request('https://pejlo.example/api/tracker?identifier=1234',{headers:{Authorization:'Bearer test'}}),{DB:db,TRACCAR_TOKEN:'test'},fetcher);const data=await res.json();assert.equal(res.status,200);assert.equal(data.position.timestamp,start);assert.equal(data.route.length,1);assert.equal(data.gpsUncertain,true);assert.equal(data.device.lastContact,now)});
-test('background geofence ignores a GPS jump and then detects a genuine sustained crossing',async()=>{const db=await setup(),home={lat:56,lon:8,radius:50,shape:'circle',buffer:5};db.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify(home));const base=Date.now()-90000;let m=0,s=0;const get=async url=>Response.json(url.includes('/devices')?[{id:7,uniqueId:'1234',positionId:9}]:[{id:9,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(base+s*1000).toISOString()}]);const env={DB:db,TRACCAR_TOKEN:'test'};await runNotifications(env,get);m=100;s=2;await runNotifications(env,get);assert.equal(JSON.parse(db.raw.prepare('SELECT state FROM pejlo_fences').get().state).pending,0);m=1;s=4;await runNotifications(env,get);assert.equal(db.raw.prepare('SELECT count(*) n FROM pejlo_alarm_history').get().n,0);m=80;s=24;await runNotifications(env,get);m=90;s=44;await runNotifications(env,get);assert.equal(db.raw.prepare("SELECT count(*) n FROM pejlo_alarm_history WHERE kind='exit'").get().n,1)});
+test('API removes hops from both live position and history with unchanged contact time',async()=>{const db=await setup(),now=Date.now(),start=now-20000;const raw=(m,s)=>({id:s+1,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(start+s*1000).toISOString()});const samples=[raw(0,0),raw(100,2)];const fetcher=async url=>url.includes('accounts:lookup')?Response.json({users:[{localId:'owner',emailVerified:true}]}):url.includes('/devices')?Response.json([{id:7,uniqueId:'1234',positionId:3,lastUpdate:new Date(now).toISOString()}]):Response.json(url.includes('/positions')?[samples[1]]:samples);const res=await handleAPI(new Request('https://pejlo.example/api/tracker?identifier=1234',{headers:{Authorization:'Bearer test'}}),{DB:db,TRACCAR_TOKEN:'test'},fetcher);const data=await res.json();assert.equal(res.status,200);assert.equal(data.position.timestamp,start);assert.equal(data.route.length,0);assert.equal(data.gpsUncertain,true);assert.equal(data.gpsProvisional,true);assert.equal(data.device.lastContact,now)});
+test('background geofence ignores a GPS jump and then detects a genuine sustained crossing',async()=>{const db=await setup(),home={lat:56,lon:8,radius:50,shape:'circle',buffer:5};db.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify(home));const base=Date.now()-90000;let m=0,s=0;const get=async url=>Response.json(url.includes('/devices')?[{id:7,uniqueId:'1234',positionId:9}]:[{id:9,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(base+s*1000).toISOString()}]);const env={DB:db,TRACCAR_TOKEN:'test'};await runNotifications(env,get);s=1;await runNotifications(env,get);m=100;s=2;await runNotifications(env,get);assert.equal(JSON.parse(db.raw.prepare('SELECT state FROM pejlo_fences').get().state).pending,0);m=1;s=4;await runNotifications(env,get);assert.equal(db.raw.prepare('SELECT count(*) n FROM pejlo_alarm_history').get().n,0);m=80;s=24;await runNotifications(env,get);m=90;s=44;await runNotifications(env,get);assert.equal(db.raw.prepare("SELECT count(*) n FROM pejlo_alarm_history WHERE kind='exit'").get().n,1)});
