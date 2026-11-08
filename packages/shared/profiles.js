@@ -15,7 +15,8 @@ export function cleanHome(h){
  if(h.shape==='polygon'&&!validPolygon(h.points))return null;
  return {lat:h.lat,lon:h.lon,radius:h.radius,buffer:Number.isFinite(h.buffer)&&h.buffer>=0&&h.buffer<=30?h.buffer:5,shape:h.shape==='polygon'?'polygon':'circle',...(h.shape==='polygon'?{points:h.points.map(v=>({lat:v.lat,lon:v.lon}))}:{})};
 }
-export const validPhoto=value=>typeof value==='string'&&value.length<=12000&&(value===''||/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value));
+export const PROFILE_PHOTO_LIMIT=16000;
+export const validPhoto=value=>typeof value==='string'&&value.length<=PROFILE_PHOTO_LIMIT&&(value===''||/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value));
 export function cleanProfile(p) {
  if(!p||typeof p.id!=='string'||!p.id||typeof p.name!=='string'||!p.name.trim()||p.name.length>40||!Object.hasOwn(types,p.type))return null;
  const home=cleanHome(p.home);if(!home)return null;

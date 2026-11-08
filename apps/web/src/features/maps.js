@@ -48,7 +48,7 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
           marker.bindTooltip(label,{direction:'top'});
         }
       }
-      if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
+      if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#ff8000',weight:4,dashArray:'6 7'}).addTo(path);
       if(p.homeConfirmed&&showDistanceLine&&data.position)L.polyline([[p.home.lat,p.home.lon],[data.position.lat,data.position.lon]],{color:'#477fc1',weight:2,dashArray:'3 7'}).addTo(homeLayer).bindTooltip('Afstand til seneste position: '+formatDistance(distance(p.home,data.position)));
       if(p.homeConfirmed&&showRings)for(const radius of [100,250,500])L.circle([p.home.lat,p.home.lon],{radius,color:'#7c8792',weight:1,fill:false,dashArray:'2 6'}).addTo(homeLayer).bindTooltip(radius+' m fra hjem');
       if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}

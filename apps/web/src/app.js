@@ -8,7 +8,7 @@ import {collapseHints} from './features/hints.js';
 import {createSnooze} from './features/snooze.js';
 import {createAdmin} from './features/admin.js';
 import {parsePairing,pairingLink,drawPairingQR} from './features/pairing.js';
-import {profilePhoto} from './features/photo.js';
+import {createPhotoEditor} from './features/photo.js';
 import {createWakeLock} from './features/wake-lock.js';
 import {createAlarmArchive} from './features/alarm-archive.js';
 import {homeStatus,recentMovement,ageText} from './shared/status.js';
@@ -30,6 +30,7 @@ import {createMap,layers} from './features/maps.js';
 import {createLocation} from './features/location.js';
 import {distance,formatDistance,bearing,relativeBearing,directionName} from './shared/geo.js';
 const $=s=>document.querySelector(s);
+const photoEditor=createPhotoEditor($('#photo-editor'));
 const state=emptyState();
 const settingsTabs=initSettingsTabs();collapseHints();
 for(const d of document.querySelectorAll('details.history-more'))d.open=window.matchMedia('(min-width:701px)').matches;
@@ -341,7 +342,7 @@ $('#provision-tracker').onsubmit=async event=>{
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
  fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
- positionRequests.clear();trackerDetails.close();
+ positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
  trackerUser=user;loadTrackers();connectTracker();
@@ -479,9 +480,23 @@ $('#keep-awake').onchange=()=>wake.set($('#keep-awake').checked);
 document.addEventListener('visibilitychange',()=>wake.visibility());window.addEventListener('pagehide',()=>{wake.stop();$('#keep-awake').checked=false;});
 $('#profile-photo').onchange=async event=>{
  const file=event.target.files?.[0],p=selected(),gen=sessionGeneration;if(!file||!p)return;
- if(family.get(p.trackerId)?.role==='viewer'){event.target.value='';return toast('Du har kun læseadgang til profilen.');}
- try{const photo=await profilePhoto(file);if(gen!==sessionGeneration||selected()?.id!==p.id)return;p.photo=photo;if(await persist()){refresh();toast('Profilfotoet er gemt.');}}
- catch(e){toast(e.message);}finally{event.target.value='';}
+ event.target.value='';
+ if(family.get(p.trackerId)?.role==='viewer')return toast('Du har kun læseadgang til profilen.');
+ const isCurrent=()=>gen===sessionGeneration&&selected()?.id===p.id&&selected()?.trackerId===p.trackerId;
+ try{
+  const photo=await photoEditor.open(file,isCurrent);
+  if(!photo||!isCurrent())return;
+  const profile=selected();
+  if(family.get(profile.trackerId)?.role==='viewer')return toast('Du har kun læseadgang til profilen.');
+  const previous=profile.photo;
+  profile.photo=photo;
+  if(await persist()){
+   if(gen===sessionGeneration){refresh();toast('Profilfotoet er gemt.');}
+  }else if(isCurrent()&&selected()===profile&&profile.photo===photo){
+   profile.photo=family.get(profile.trackerId)?.profile?.photo??previous;
+   refresh();
+  }
+ }catch(e){if(isCurrent())toast(e.message);}
 };
 $('#remove-photo').onclick=async()=>{const p=selected();if(!p||family.get(p.trackerId)?.role==='viewer')return;p.photo='';if(await persist()){refresh();toast('Profilfotoet er fjernet.');}};
 
