@@ -69,3 +69,50 @@ test('invitation mail names the sender, strips control characters and honours AP
  assert.equal(appURL({APP_URL:'http://evil.example'}),'https://pejlo.driftportal-platform.workers.dev');
  assert.equal(appURL({APP_URL:'https://x.dk/path'}),'https://pejlo.driftportal-platform.workers.dev');
 });
+
+test('a queued GPS alert retries only the failed device and prevents overlapping sends',async()=>{
+ const db=database();
+ const now=Date.now();
+ db.raw.exec('CREATE TABLE pejlo_events(id TEXT PRIMARY KEY,identifier TEXT,uid TEXT,kind TEXT,payload TEXT,created_at INTEGER,attempts INTEGER DEFAULT 0)');
+ db.raw.prepare('INSERT INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)')
+  .run('gps-alert','1234','owner','missing',JSON.stringify(notificationPayload('missing','1234',{name:'Loui'})),now);
+ await ensureNotifications(db);
+ db.raw.prepare('INSERT INTO trackers(identifier,name,owner_uid) VALUES(?,?,?)').run('1234','Loui','owner');
+ db.raw.prepare('INSERT INTO pejlo_alerts(identifier,uid,config) VALUES(?,?,?)').run('1234','owner','{"missing":true}');
+ const vapid=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const receiver=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+ const publicKey=async key=>Buffer.from(await crypto.subtle.exportKey('raw',key)).toString('base64url');
+ const env={
+  DB:db,TRACCAR_TOKEN:'test',VAPID_PUBLIC_KEY:await publicKey(vapid.publicKey),
+  VAPID_PRIVATE_KEY:(await crypto.subtle.exportKey('jwk',vapid.privateKey)).d,VAPID_SUBJECT:'mailto:test@example.com'
+ };
+ const phone='https://web.push.apple.com/Q/phone',other='https://web.push.apple.com/Q/other';
+ const keys={p256dh:await publicKey(receiver.publicKey),auth:Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url')};
+ for(const endpoint of [phone,other]){
+  db.raw.prepare('INSERT INTO pejlo_push VALUES(?,?,?)').run(endpoint,'owner',JSON.stringify({endpoint,keys}));
+ }
+ let notifyStarted,releaseFirst;
+ const started=new Promise(resolve=>{notifyStarted=resolve;});
+ const release=new Promise(resolve=>{releaseFirst=resolve;});
+ const sent=[];
+ let otherAttempts=0;
+ const fetcher=async url=>{
+  if(url.startsWith('https://demo3.traccar.org/'))return Response.json([]);
+  sent.push(url);
+  if(url===phone&&sent.length===1){notifyStarted();await release;}
+  const status=url===other&&++otherAttempts<3?503:201;
+  return new Response(null,{status});
+ };
+ const first=runNotifications(env,fetcher);
+ await started;
+ try{await runNotifications(env,fetcher);assert.deepEqual(sent,[phone]);}
+ finally{releaseFirst();await first;}
+ assert.deepEqual(sent,[phone,other]);
+ const queued=db.raw.prepare('SELECT accepted_endpoints,attempts FROM pejlo_events WHERE id=?').get('gps-alert');
+ assert.deepEqual(JSON.parse(queued.accepted_endpoints),[phone]);
+ assert.equal(queued.attempts,1);
+ await runNotifications(env,fetcher);
+ await runNotifications(env,fetcher);
+ assert.deepEqual(sent,[phone,other,other,other]);
+ assert.equal(db.raw.prepare('SELECT id FROM pejlo_events WHERE id=?').get('gps-alert'),undefined);
+});

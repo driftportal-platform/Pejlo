@@ -19,6 +19,11 @@ export function ensureNotifications(db){return once(db,'notifications',async()=>
  'CREATE TABLE IF NOT EXISTS pejlo_push (endpoint TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, subscription TEXT NOT NULL)',
  'CREATE TABLE IF NOT EXISTS pejlo_push_queue (id TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, payload TEXT NOT NULL, created_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)'
  ])await db.prepare(sql).run();
+ // Upgrade the existing queue in place so pending notifications can still be sent.
+ for(const sql of [
+  "ALTER TABLE pejlo_events ADD COLUMN accepted_endpoints TEXT NOT NULL DEFAULT '[]'",
+  'ALTER TABLE pejlo_events ADD COLUMN lease_until INTEGER NOT NULL DEFAULT 0'
+ ])try{await db.prepare(sql).run();}catch(error){if(!/duplicate column/i.test(String(error?.message)))throw error;}
 });}
 export const pushReady=env=>!!(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
 export function validSubscription(s){try{const u=new URL(s.endpoint);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&s.endpoint.length<2048&&(u.hostname==='fcm.googleapis.com'||u.hostname==='updates.push.services.mozilla.com'||u.hostname==='web.push.apple.com'||u.hostname.endsWith('.push.apple.com')||u.hostname.endsWith('.notify.windows.com'))&&/^[\w-]{87}$/.test(s.keys?.p256dh)&&/^[\w-]{22}$/.test(s.keys?.auth);}catch{return false;}}
@@ -95,8 +100,11 @@ async function processNotifications(env,fetcher,stats){
  }
  await env.DB.prepare('DELETE FROM pejlo_alarm_history WHERE created_at<?').bind(Date.now()-90*86400000).run();
  if(!pushReady(env))return;
- const queue=await env.DB.prepare('SELECT * FROM pejlo_events WHERE attempts<3 ORDER BY created_at LIMIT 4').all();
- for(const item of queue.results){
+ const queue=await env.DB.prepare('SELECT id,attempts FROM pejlo_events WHERE attempts<3 AND lease_until<=? ORDER BY created_at LIMIT 4').bind(Date.now()).all();
+ for(const queued of queue.results){
+  const now=Date.now();
+  const item=await env.DB.prepare('UPDATE pejlo_events SET lease_until=? WHERE id=? AND attempts=? AND lease_until<=? RETURNING *').bind(now+90000,queued.id,queued.attempts,now).first();
+  if(!item)continue;
   const prefs=await env.DB.prepare('SELECT config FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(item.identifier,item.uid).first(),config=cleanAlerts(prefs?JSON.parse(prefs.config):null);
   const {areaId,...payload}=JSON.parse(item.payload);
   const enabled=item.kind==='enter'||item.kind==='exit'
@@ -106,14 +114,28 @@ async function processNotifications(env,fetcher,stats){
   if(paused||Date.now()-item.created_at>300000||!enabled||isQuiet(config)||!await trackerAccess(env.DB,item.identifier,item.uid)){
    await archiveStatus(env.DB,item.id,paused?'snoozed':Date.now()-item.created_at>300000?'expired':'suppressed');await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();continue;
   }
-  const subs=await env.DB.prepare('SELECT * FROM pejlo_push WHERE owner_uid=? LIMIT 5').bind(item.uid).all();let failed=false;
-  for(const sub of subs.results){try{const r=await sendPush(JSON.parse(sub.subscription),payload,env,fetcher);if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=?').bind(sub.endpoint).run();else if(!r.ok)failed=true;}catch{failed=true;}}
-  await archiveStatus(env.DB,item.id,failed?'retrying':subs.results.length?'accepted':'no-device');
-  if(failed)await env.DB.prepare('UPDATE pejlo_events SET attempts=attempts+1 WHERE id=?').bind(item.id).run();else await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();
+  const subs=await env.DB.prepare('SELECT * FROM pejlo_push WHERE owner_uid=? LIMIT 5').bind(item.uid).all();
+  const accepted=new Set(JSON.parse(item.accepted_endpoints));
+  let failed=false;
+  for(const sub of subs.results){
+   if(accepted.has(sub.endpoint))continue;
+   let response;
+   try{response=await sendPush(JSON.parse(sub.subscription),payload,env,fetcher);}
+   catch{failed=true;continue;}
+   if(response.ok){
+    accepted.add(sub.endpoint);
+    await env.DB.prepare('UPDATE pejlo_events SET accepted_endpoints=? WHERE id=? AND lease_until=?').bind(JSON.stringify([...accepted]),item.id,item.lease_until).run();
+   }else if(response.status===404||response.status===410){
+    await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=? AND owner_uid=? AND subscription=?').bind(sub.endpoint,item.uid,sub.subscription).run();
+   }else failed=true;
+  }
+  await archiveStatus(env.DB,item.id,failed?'retrying':accepted.size?'accepted':'no-device');
+  if(failed)await env.DB.prepare('UPDATE pejlo_events SET attempts=attempts+1,lease_until=0 WHERE id=? AND lease_until=?').bind(item.id,item.lease_until).run();
+  else await env.DB.prepare('DELETE FROM pejlo_events WHERE id=? AND lease_until=?').bind(item.id,item.lease_until).run();
  }
  await env.DB.prepare("UPDATE pejlo_alarm_history SET push_status='failed' WHERE id IN(SELECT id FROM pejlo_events WHERE attempts>=3)").run();
- await env.DB.prepare("UPDATE pejlo_alarm_history SET push_status='expired' WHERE push_status IN ('pending','retrying') AND id IN(SELECT id FROM pejlo_events WHERE created_at<?)").bind(Date.now()-300000).run();
- await env.DB.prepare('DELETE FROM pejlo_events WHERE attempts>=3 OR created_at<?').bind(Date.now()-300000).run();
+ await env.DB.prepare("UPDATE pejlo_alarm_history SET push_status='expired' WHERE push_status IN ('pending','retrying') AND id IN(SELECT id FROM pejlo_events WHERE created_at<? AND lease_until<=?)").bind(Date.now()-300000,Date.now()).run();
+ await env.DB.prepare('DELETE FROM pejlo_events WHERE attempts>=3 OR (created_at<? AND lease_until<=?)').bind(Date.now()-300000,Date.now()).run();
  // Retire the earlier queue: its events have no revocable tracker access binding.
  await env.DB.prepare('DELETE FROM pejlo_push_queue').run();
 }
