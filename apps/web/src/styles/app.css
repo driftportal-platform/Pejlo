@@ -147,7 +147,7 @@ input::-webkit-date-and-time-value{min-width:0;text-align:center}
 /* Reserve space even if an iPhone home-screen app reports a zero top inset. */
 @supports (-webkit-touch-callout:none){
  @media (display-mode:standalone) and (orientation:portrait){
-  :root{--status-area:max(env(safe-area-inset-top,0px),60px)}
+  :root{--status-area:max(env(safe-area-inset-top,0px),24px)}
  }
 }
 .status-bar{position:sticky;top:0;height:var(--status-area);background:var(--bg);z-index:1000}
