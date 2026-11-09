@@ -12,7 +12,7 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
   let base, generation=0, errors=0;
   const markers=L.layerGroup().addTo(map), path=L.layerGroup().addTo(map), homeLayer=L.layerGroup().addTo(map), phone=L.layerGroup().addTo(map), draft=L.layerGroup().addTo(map);
   const markerIcon=(type,cls='')=>L.divIcon({html:`<div class="map-marker ${cls}">${icon(type,24)}</div>`,className:'',iconSize:[42,42],iconAnchor:[21,21]});
-  function photoIcon(src){const el=document.createElement('div'),img=document.createElement('img');el.className='map-marker photo-marker';img.src=src;img.alt='Profilfoto';el.append(img);return L.divIcon({html:el,className:'',iconSize:[48,48],iconAnchor:[24,24]});}
+  function photoIcon(src){const el=document.createElement('div'),img=document.createElement('img');el.className='map-marker photo-marker';img.src=src;img.alt='Profilfoto';el.append(img);return L.divIcon({html:el,className:'',iconSize:[42,42],iconAnchor:[21,21]});}
   function demo() {if(base)map.removeLayer(base);base=L.imageOverlay('./src/assets/images/demo-map.svg',[[56.544,8.300],[56.557,8.329]]).addTo(map);}
   demo();
   map.on('click',e=>onHome?.({lat:e.latlng.lat,lon:e.latlng.lng}));map.on('dragstart',()=>onManual?.());
