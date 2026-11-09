@@ -6,7 +6,7 @@ import {once} from './schema.js';
 import {notificationPayload,label} from './messages.js';
 import {advanceFence} from '../../packages/shared/fence-events.js';
 export {advanceFence} from '../../packages/shared/fence-events.js';
-import {cleanAlerts,advanceAlerts,isQuiet} from '../../packages/shared/alerts.js';
+import {cleanAlerts,advanceAlerts,isQuiet,areaAlerts} from '../../packages/shared/alerts.js';
 import {ensureFamily,trackerAccess} from './family.js';
 import {buildPushPayload} from '@block65/webcrypto-web-push';
 import {validPoint} from '../../packages/shared/geo.js';
@@ -64,9 +64,10 @@ async function processNotifications(env,fetcher,stats){
    const current=gpsPoint(raw);if(current)samples.push(current);
    const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object',profile.homeConfirmed===true?profile.home:null);
    const fenceRaw=current&&gps.trusted?.timestamp===current.timestamp&&!gps.uncertain?raw:null;
+   const home=row.config?JSON.parse(row.config):null,areaId=home?.areaId??profile.activeFenceId??null;
    let transition;
    if(row.enabled){
-    const result=advanceFence(JSON.parse(row.config),fenceRaw,JSON.parse(row.state),now);
+    const result=advanceFence(home,fenceRaw,JSON.parse(row.state),now);
     const updated=await env.DB.prepare('UPDATE pejlo_fences SET state=? WHERE identifier=? AND owner_uid=? AND state=? AND config=? AND enabled=1 RETURNING identifier').bind(JSON.stringify(result.state),row.identifier,row.owner_uid,row.state,row.config).first();
     if(updated)transition=result.transition;
    }
@@ -85,9 +86,9 @@ async function processNotifications(env,fetcher,stats){
     const kinds=[...(transition?[transition]:[]),...result.events];
     for(const kind of kinds){
      const id=[row.identifier,uid,kind,kind==='missing'?result.state.lastFix||result.state.started:Date.parse(raw?.fixTime)||now].join(':');
-     const enabled=config[kind==='battery'?'lowBattery':kind],quiet=isQuiet(config,now),ready=pushReady(env),payload=notificationPayload(kind,row.identifier,context);
-     await archiveEvent(env.DB,{id,identifier:row.identifier,uid,kind,payload,createdAt:now,fixTime:Date.parse(raw?.fixTime),area:row.config?{name:row.fence_name,home:JSON.parse(row.config)}:null,status:paused?'snoozed':!enabled?'disabled':quiet?'quiet':!ready?'unconfigured':'pending'});
-     if(enabled&&!quiet&&ready&&!paused)await env.DB.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(id,row.identifier,uid,kind,JSON.stringify(payload),now).run();
+     const enabled=kind===transition?areaAlerts(config,areaId)[kind]:config[kind==='battery'?'lowBattery':kind],quiet=isQuiet(config,now),ready=pushReady(env),payload=notificationPayload(kind,row.identifier,context);
+     await archiveEvent(env.DB,{id,identifier:row.identifier,uid,kind,payload,createdAt:now,fixTime:Date.parse(raw?.fixTime),area:home?{name:row.fence_name,home}:null,status:paused?'snoozed':!enabled?'disabled':quiet?'quiet':!ready?'unconfigured':'pending'});
+     if(enabled&&!quiet&&ready&&!paused)await env.DB.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(id,row.identifier,uid,kind,JSON.stringify(kind===transition?{...payload,areaId}:payload),now).run();
     }
    }
   }catch{stats.errors++; /* Upstream failures cannot create geofence or battery events. */ }
@@ -97,13 +98,16 @@ async function processNotifications(env,fetcher,stats){
  const queue=await env.DB.prepare('SELECT * FROM pejlo_events WHERE attempts<3 ORDER BY created_at LIMIT 4').all();
  for(const item of queue.results){
   const prefs=await env.DB.prepare('SELECT config FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(item.identifier,item.uid).first(),config=cleanAlerts(prefs?JSON.parse(prefs.config):null);
-  const enabled=item.kind==='fencechange'||config[item.kind==='battery'?'lowBattery':item.kind];
+  const {areaId,...payload}=JSON.parse(item.payload);
+  const enabled=item.kind==='enter'||item.kind==='exit'
+   ?areaAlerts(config,areaId)[item.kind]
+   :item.kind==='fencechange'||config[item.kind==='battery'?'lowBattery':item.kind];
   const paused=await snoozeUntil(env.DB,item.identifier,item.uid)>Date.now();
   if(paused||Date.now()-item.created_at>300000||!enabled||isQuiet(config)||!await trackerAccess(env.DB,item.identifier,item.uid)){
    await archiveStatus(env.DB,item.id,paused?'snoozed':Date.now()-item.created_at>300000?'expired':'suppressed');await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();continue;
   }
   const subs=await env.DB.prepare('SELECT * FROM pejlo_push WHERE owner_uid=? LIMIT 5').bind(item.uid).all();let failed=false;
-  for(const sub of subs.results){try{const r=await sendPush(JSON.parse(sub.subscription),JSON.parse(item.payload),env,fetcher);if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=?').bind(sub.endpoint).run();else if(!r.ok)failed=true;}catch{failed=true;}}
+  for(const sub of subs.results){try{const r=await sendPush(JSON.parse(sub.subscription),payload,env,fetcher);if(r.status===404||r.status===410)await env.DB.prepare('DELETE FROM pejlo_push WHERE endpoint=?').bind(sub.endpoint).run();else if(!r.ok)failed=true;}catch{failed=true;}}
   await archiveStatus(env.DB,item.id,failed?'retrying':subs.results.length?'accepted':'no-device');
   if(failed)await env.DB.prepare('UPDATE pejlo_events SET attempts=attempts+1 WHERE id=?').bind(item.id).run();else await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();
  }

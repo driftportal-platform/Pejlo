@@ -5,7 +5,14 @@ export function cleanAlerts(value){
  if(Number.isInteger(v.batteryThreshold)&&v.batteryThreshold>=5&&v.batteryThreshold<=50)d.batteryThreshold=v.batteryThreshold;
  if(Number.isInteger(v.missingMinutes)&&v.missingMinutes>=5&&v.missingMinutes<=1440)d.missingMinutes=v.missingMinutes;
  for(const key of ['quietStart','quietEnd'])if(typeof v[key]==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v[key]))d[key]=v[key];
+ if(v.areas&&typeof v.areas==='object'&&!Array.isArray(v.areas)){
+  const areas=Object.fromEntries(Object.entries(v.areas).filter(([id,choice])=>id.length>0&&id.length<=100&&typeof choice?.enter==='boolean'&&typeof choice?.exit==='boolean').slice(0,20).map(([id,{enter,exit}])=>[id,{enter,exit}]));
+  if(Object.keys(areas).length)d.areas=areas;
+ }
  return d;
+}
+export function areaAlerts(config,areaId){
+ return areaId&&config.areas&&Object.hasOwn(config.areas,areaId)?config.areas[areaId]:{enter:config.enter,exit:config.exit};
 }
 export function isQuiet(config,now=Date.now()){
  if(!config.quiet||config.quietStart===config.quietEnd)return false;

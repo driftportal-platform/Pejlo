@@ -68,8 +68,30 @@ export async function handleAPI(request,env,fetcher=fetch){
    await ensureNotifications(env.DB);const input=request.method==='GET'?{identifier:url.searchParams.get('identifier')}:await body(request);
    if(!identifierOK(input.identifier)||!await trackerAccess(env.DB,input.identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');
    if(request.method==='POST'){
-    const config=cleanAlerts(input.config);
-    await env.DB.prepare("INSERT INTO pejlo_alerts(identifier,uid,config,state) VALUES(?,?,?,?) ON CONFLICT(identifier,uid) DO UPDATE SET config=excluded.config,state=excluded.state").bind(input.identifier,uid,JSON.stringify(config),JSON.stringify({started:Date.now()})).run();return json({saved:true,config});
+    const requested=cleanAlerts(input.config);
+    const areaUpdate=Object.hasOwn(input,'areaId');
+    let savedIds=[];
+    if(areaUpdate){
+     await ensureFamily(env.DB);
+     const profileRow=await env.DB.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=?').bind(input.identifier).first();
+     savedIds=JSON.parse(profileRow?.profile||'{}').fencePresets?.map(area=>area.id)||[];
+     if(!savedIds.includes(input.areaId)||typeof input.config?.enter!=='boolean'||typeof input.config?.exit!=='boolean')throw new Failure(400,'Vælg et gemt område og prøv igen.');
+    }
+    for(let attempt=0;attempt<4;attempt++){
+     const row=await env.DB.prepare('SELECT config FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(input.identifier,uid).first();
+     const previous=cleanAlerts(row?JSON.parse(row.config):null);
+     const config=areaUpdate?{...previous}:requested;
+     delete config.areas;
+     const areas=areaUpdate?Object.fromEntries(savedIds.filter(id=>Object.hasOwn(previous.areas||{},id)).map(id=>[id,previous.areas[id]])):previous.areas;
+     if(areaUpdate)config.areas={...areas,[input.areaId]:{enter:requested.enter,exit:requested.exit}};
+     else if(areas)config.areas=areas;
+     const serialized=JSON.stringify(config),started=JSON.stringify({started:Date.now()});
+     const saved=row
+      ?await env.DB.prepare('UPDATE pejlo_alerts SET config=?,state=CASE WHEN ? THEN state ELSE ? END WHERE identifier=? AND uid=? AND config=? RETURNING identifier').bind(serialized,areaUpdate?1:0,started,input.identifier,uid,row.config).first()
+      :await env.DB.prepare('INSERT OR IGNORE INTO pejlo_alerts(identifier,uid,config,state) VALUES(?,?,?,?) RETURNING identifier').bind(input.identifier,uid,serialized,started).first();
+     if(saved)return json({saved:true,config});
+    }
+    throw new Failure(409,'Beskedindstillingerne blev ændret samtidigt. Prøv igen.');
    }
    const row=await env.DB.prepare('SELECT config FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(input.identifier,uid).first();return json({config:cleanAlerts(row?JSON.parse(row.config):null)});
   }

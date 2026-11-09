@@ -14,7 +14,7 @@ import {createAlarmArchive} from './features/alarm-archive.js';
 import {homeStatus,recentMovement,ageText} from './shared/status.js';
 import {createHistoryView} from './features/history-view.js';
 import {danishDate,routeAnalysis} from './shared/history.js';
-import {cleanAlerts,isQuiet} from './shared/alerts.js';
+import {defaultAlerts,cleanAlerts,isQuiet,areaAlerts} from './shared/alerts.js';
 import {validPolygon} from './shared/fence.js';
 import {createGeofenceMonitor} from './features/geofence.js';
 import {mapConfig} from './config/maps.js';
@@ -184,7 +184,7 @@ function refresh(){
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
-  renderFamily();loadAlerts();snooze.load();
+  renderFamily();loadAlerts();renderAreaAlerts();snooze.load();
   if(pendingPairing&&!pairingPresented){presentPairing();currentPage='indstillinger';settingsTabs?.select('tracker');}
   options($('#saved-fences'),[['','Intet gemt område valgt'],...(p.fencePresets||[]).map(f=>[f.id,f.name])],p.activeFenceId||'');
   $('#fence-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#delete-fence').disabled=!p.activeFenceId;$('#fence-buffer').value=p.home.buffer??5;
@@ -219,7 +219,7 @@ function updateGeofence(){
  if(!selected())return;
  const result=geofenceMonitor.evaluate(selected(),data(),{unavailable:!!trackerError});
  const area=selected().fencePresets?.find(f=>f.id===selected().activeFenceId);$('#geofence-status').textContent=(area?area.name+' · ':'')+result.text;$('#fence-margin-description').textContent='To nye positioner og '+(selected().home.buffer??5)+' meters ekstra margen.';$('.geofence-summary').dataset.state=result.kind;
- if(result.transition&&!snooze.paused()&&alertsConfig[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
+ if(result.transition&&!snooze.paused()&&areaAlerts(alertsConfig,area?.id)[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
 }
 function updateAge(){
  updateGeofence();
@@ -341,7 +341,7 @@ $('#provision-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
  positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
@@ -451,22 +451,59 @@ function renderFamily(){
  $('.app').classList.toggle('viewer-mode',viewer);
  $('#profile-tracker').disabled=!!entry;$('#family-result').textContent=lastInviteProfile===p?.id?lastInviteText:'';
 }
+function renderAreaAlerts(force=false){
+ const p=selected(),select=$('#alert-area'),areas=(p?.fencePresets||[]).map(area=>[area.id,area.name]);
+ const signature=JSON.stringify([p?.id,areas]);
+ if(!force&&select.dataset.areas===signature)return;
+ const current=select.dataset.profile===p?.id?select.value:'';
+ const areaId=areas.some(([id])=>id===current)?current:p?.activeFenceId||areas[0]?.[0];
+ select.dataset.profile=p?.id||'';select.dataset.areas=signature;
+ options(select,areas.length?areas:[['','Ingen gemte områder']],areaId||'');
+ showAreaAlertChoice();
+}
+function showAreaAlertChoice(){
+ const id=$('#alert-area').value,choice=areaAlerts(alertsConfig,id);
+ $('#area-alert-enter').checked=choice.enter;
+ $('#area-alert-exit').checked=choice.exit;
+ $('#area-alerts-form').inert=!id||$('#alerts-form').inert;
+ $('#area-alerts-status').textContent=id?'':'Gem først et område under Område.';
+}
+$('#alert-area').onchange=showAreaAlertChoice;
 async function loadAlerts(force=false){
  const id=selected()?.trackerId||null;if(!force&&alertsId===id)return;alertsId=id;const gen=++alertsGeneration;
- $('#alerts-form').inert=true;$('#alerts-status').textContent=id?'Henter dine alarmvalg…':'Tilknyt en tracker for at vælge beskeder.';
+ alertsConfig=cleanAlerts();
+ $('#alerts-form').inert=true;$('#area-alerts-form').inert=true;
+ $('#alerts-status').textContent=id?'Henter dine alarmvalg…':'Tilknyt en tracker for at vælge beskeder.';
  if(!id)return;
  try{const result=await trackerRequest('alerts?identifier='+encodeURIComponent(id));if(gen!==alertsGeneration)return;
- alertsConfig=result.config;for(const [k,v] of Object.entries(result.config)){const el=$('#alert-'+k);if(typeof v==='boolean')el.checked=v;else el.value=v;}
- $('#alerts-form').inert=false;$('#alerts-status').textContent='Dine alarmvalg er hentet.';
+  alertsConfig=result.config;
+  for(const k of Object.keys(defaultAlerts())){const el=$('#alert-'+k),v=alertsConfig[k];if(typeof v==='boolean')el.checked=v;else el.value=v;}
+  $('#alerts-form').inert=false;renderAreaAlerts(true);$('#alerts-status').textContent='Dine alarmvalg er hentet.';
  }catch(e){if(gen===alertsGeneration){alertsId=null;$('#alerts-status').textContent=e.message;}}
 }
-$('#alerts-form').onsubmit=async e=>{
- e.preventDefault();const identifier=selected()?.trackerId;if(!identifier)return;
- const config=cleanAlerts(Object.fromEntries(Object.entries(cleanAlerts()).map(([k,v])=>[k,typeof v==='boolean'?$('#alert-'+k).checked:typeof v==='number'?Number($('#alert-'+k).value):$('#alert-'+k).value])));
- const gen=sessionGeneration;$('#alerts-form').inert=true;
- try{await trackerRequest('alerts',{identifier,config});alertsConfig=config;if(gen===sessionGeneration&&selected()?.trackerId===identifier)$('#alerts-status').textContent='Dine alarmindstillinger er gemt. Husk at aktivere push på hver enhed.';}
- catch(e){if(gen===sessionGeneration)$('#alerts-status').textContent=e.message;}
- finally{if(gen===sessionGeneration)$('#alerts-form').inert=false;}
+async function saveAlertSettings(config,areaId){
+ const identifier=selected()?.trackerId;if(!identifier)return;
+ const status=$(areaId?'#area-alerts-status':'#alerts-status'),gen=alertsGeneration,session=sessionGeneration;
+ const isCurrent=()=>gen===alertsGeneration&&session===sessionGeneration&&selected()?.trackerId===identifier;
+ $('#alerts-form').inert=true;$('#area-alerts-form').inert=true;
+ try{
+  const result=await trackerRequest('alerts',{identifier,config,...(areaId?{areaId}:{})});
+  if(!isCurrent())return;
+  alertsConfig=result.config;
+  showAreaAlertChoice();
+  status.textContent=areaId?'Beskeder for området er gemt.':'Dine alarmindstillinger er gemt. Husk at aktivere push på hver enhed.';
+ }catch(e){if(isCurrent())status.textContent=e.message;}
+ finally{if(isCurrent()){$('#alerts-form').inert=false;$('#area-alerts-form').inert=!$('#alert-area').value;}}
+}
+$('#alerts-form').onsubmit=e=>{
+ e.preventDefault();
+ const config=Object.fromEntries(Object.entries(defaultAlerts()).map(([k,v])=>[k,typeof v==='boolean'?$('#alert-'+k).checked:typeof v==='number'?Number($('#alert-'+k).value):$('#alert-'+k).value]));
+ return saveAlertSettings(config);
+};
+$('#area-alerts-form').onsubmit=e=>{
+ e.preventDefault();
+ const areaId=$('#alert-area').value;if(!areaId)return;
+ return saveAlertSettings({enter:$('#area-alert-enter').checked,exit:$('#area-alert-exit').checked},areaId);
 };
 $('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value,role:$('#family-role').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
 $('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';sessionStorage.removeItem('pejlo-invitation');await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
