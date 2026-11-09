@@ -56,6 +56,7 @@ test('Firestore signs read-only access and totals only the current Pacific day a
   const now = new Date('2026-11-01T13:00:00Z');
   const usage = await adminUsage(env, async (url, init) => {
     const target = new URL(url);
+    assert.equal(init.redirect, 'manual');
     if (target.hostname === 'oauth2.googleapis.com') {
       const [header, claims, signature] = init.body.get('assertion').split('.');
       const payload = JSON.parse(Buffer.from(claims, 'base64url'));

@@ -36,6 +36,7 @@ function setup(caller = admin) {
     if (target.pathname === '/v1/accounts:lookup') {
       return Response.json({users: [{localId: caller, emailVerified: true}]});
     }
+    assert.equal(options.redirect, 'manual');
     if (target.hostname === 'oauth2.googleapis.com') return Response.json({access_token: 'service-token'});
     assert.equal(options.headers.Authorization, 'Bearer service-token');
     assert.ok(target.pathname.startsWith('/v1/projects/'+firebaseConfig.projectId+'/accounts'));
