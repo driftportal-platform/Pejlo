@@ -1,7 +1,13 @@
-import {cpSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
+import {cpSync,mkdirSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 rmSync('dist/src',{recursive:true,force:true});
 mkdirSync('dist',{recursive:true});
-cpSync('apps/web/index.html','dist/index.html');
+const index=readFileSync('apps/web/index.html','utf8');
+const auth=index.match(/<!-- shared-auth:start -->([\s\S]*?)<!-- shared-auth:end -->/)?.[1];
+if(!auth)throw new Error('Fælles login mangler i index.html.');
+const admin=readFileSync('apps/web/admin.html','utf8').replace('<!-- shared-auth -->',()=>auth);
+writeFileSync('dist/index.html',index);
+mkdirSync('dist/admin',{recursive:true});
+writeFileSync('dist/admin/index.html',admin);
 cpSync('apps/web/sw.js','dist/sw.js');
 cpSync('apps/web/manifest.webmanifest','dist/manifest.webmanifest');
 cpSync('apps/web/src','dist/src',{recursive:true});

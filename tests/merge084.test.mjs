@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 test('merged layout preserves all functional panels and compact history controls',()=>{
  const html=readFileSync('dist/index.html','utf8');
- for(const id of ['profile-photo','keep-awake','last-contact','home-observation','alarm-list','snooze-status','admin-status','pairing-qr','show-distance-line','show-distance-rings','history-slider'])assert.ok(html.includes('id="'+id+'"'),id);
+ for(const id of ['profile-photo','keep-awake','last-contact','home-observation','alarm-list','snooze-status','show-distance-line','show-distance-rings','history-slider'])assert.ok(html.includes('id="'+id+'"'),id);
  assert.match(html,/<details class="history-more">/);assert.match(html,/class="playbar"/);
  for(const file of ['photo','wake-lock','snooze','admin','alarm-archive','pairing','profile-sheet','settings-tabs','hints','status-strip'])assert.ok(existsSync('dist/src/features/'+file+'.js'));
 });
