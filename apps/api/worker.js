@@ -1,6 +1,8 @@
 import {trustedGps,gpsPoint} from './gps.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 import {adminStatus} from './operations.js';
+import {adminUsers} from './admin-users.js';
+import {adminUsage} from './usage.js';
 import {snoozeUntil,setSnooze} from './snooze.js';
 import {listAlarms} from './archive.js';
 import {mailReady,reserveInvitationMail,sendInvitationMail} from './mail.js';
@@ -19,7 +21,7 @@ async function body(request,limit=12000){if(Number(request.headers.get('content-
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  const routes={'/api/admin/status':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -30,8 +32,20 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!lookup.ok){if(lookup.status>=300&&lookup.status<400)throw new Failure(503,'Loginserveren svarede med en uventet viderestilling.');if(lookup.status>=500)throw new Failure(503,'Loginserveren er midlertidigt utilgængelig.');throw new Failure(401,'Log ind igen.');}
   const account=(await lookup.json()).users?.[0];
   if(!account?.localId||account.disabled||account.emailVerified!==true)throw new Failure(403,'Bekræft din e-mail, og log ind igen.');
-  if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
   const uid=account.localId,isAdmin=!!env.TRACCAR_ADMIN_UID&&uid===env.TRACCAR_ADMIN_UID;
+  if(path==='/api/admin/access'){
+   if(!isAdmin)throw new Failure(403,'Denne side er kun for Pejlos systemadmin.');
+   return json({allowed:true});
+  }
+  if(path==='/api/admin/usage'){
+   if(!isAdmin)throw new Failure(403,'Kun administratoren kan se forbruget.');
+   return json(await adminUsage(env,fetcher));
+  }
+  if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
+  if(path==='/api/admin/users'){
+   if(!isAdmin)throw new Failure(403,'Kun systemadmin kan administrere brugere.');
+   return json(await adminUsers(env,uid,url.searchParams,request.method==='GET'?null:(await body(request))??{},fetcher));
+  }
   if(path==='/api/admin/status'){
    if(!isAdmin)throw new Failure(403,'Kun administratoren kan se driftsstatus.');
    await ensureNotifications(env.DB);return json(await adminStatus(env));

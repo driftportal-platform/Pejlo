@@ -22,12 +22,12 @@ export function createAuth(authSDK,app){
  catch(error){if(error?.code==='auth/already-initialized')return authSDK.getAuth(app);throw error;}
 }
 export const authError=e=>messages[e?.code]??'Handlingen kunne ikke gennemføres. Prøv igen.';
-export async function startAuthentication(onSession){
+export async function startAuthentication(onSession,{administration=false}={}){
  let appSDK,authSDK,dbSDK;
  const message=t=>{$('#auth-message').textContent=t;};
- try{[appSDK,authSDK,dbSDK]=await Promise.all(['app','auth','firestore'].map(name=>import(`https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}.js`)));}
+ try{[appSDK,authSDK,dbSDK]=await Promise.all((administration?['app','auth']:['app','auth','firestore']).map(name=>import(`https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}.js`)));}
  catch{message('Login kunne ikke indlæses. Kontrollér internetforbindelsen, og genindlæs siden.');$('#auth-retry').hidden=false;return;}
- const app=appSDK.initializeApp(firebaseConfig),auth=createAuth(authSDK,app),db=dbSDK.getFirestore(app);
+ const app=appSDK.initializeApp(firebaseConfig),auth=createAuth(authSDK,app),db=dbSDK?.getFirestore(app);
  auth.languageCode='da';let mode='login';
  const actionSettings={url:window.location.origin+'/',handleCodeInApp:false};
  function setMode(m){mode=m;$('#auth-password-wrap').hidden=m==='reset';$('#auth-confirm-wrap').hidden=m!=='signup';$('#auth-remember-wrap').hidden=m==='reset';$('#auth-password').required=m!=='reset';$('#auth-confirm').required=m==='signup';$('#auth-password').minLength=m==='signup'?10:1;$('#auth-password').autocomplete=m==='signup'?'new-password':'current-password';$('#auth-title').textContent={login:'Velkommen til Pejlo',signup:'Opret din konto',reset:'Glemt adgangskode?'}[m];$('#auth-submit').textContent={login:'Log ind',signup:'Opret konto',reset:'Send nulstillingsmail'}[m];$('#auth-password').value='';$('#auth-confirm').value='';message('');document.querySelectorAll('[data-auth-mode]').forEach(b=>b.classList.toggle('active',b.dataset.authMode===m));}
@@ -43,7 +43,7 @@ export async function startAuthentication(onSession){
    try{await authSDK.sendEmailVerification(result.user,actionSettings);message('Bekræftelsesmail sendt. Se også i spam.');}catch(e){message('Kontoen er oprettet, men mailen kunne ikke sendes. Brug Send bekræftelsesmail igen.');}
   }else{await authSDK.signInWithEmailAndPassword(auth,email,password);$('#auth-password').value='';}
  });};
- $('#account-logout').onclick=async()=>{try{if('serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('/');const sub=await registration?.pushManager.getSubscription();if(sub){try{const token=await auth.currentUser.getIdToken();await fetch('/api/push/remove',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON()}),signal:AbortSignal.timeout(5000)});}catch{}await sub.unsubscribe();}}await authSDK.signOut(auth);}catch(e){message(authError(e));}};
+ $('#account-logout').onclick=async()=>{try{if(!administration&&'serviceWorker' in navigator){const registration=await navigator.serviceWorker.getRegistration('/');const sub=await registration?.pushManager.getSubscription();if(sub){try{const token=await auth.currentUser.getIdToken();await fetch('/api/push/remove',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({subscription:sub.toJSON()}),signal:AbortSignal.timeout(5000)});}catch{}await sub.unsubscribe();}}await authSDK.signOut(auth);}catch(e){message(authError(e));}};
  $('#verify-resend').onclick=async e=>{e.target.disabled=true;try{await authSDK.sendEmailVerification(auth.currentUser,actionSettings);message('Bekræftelsesmail sendt. Se også i spam.');}catch(error){message(authError(error));}finally{e.target.disabled=false;}};
  $('#verify-check').onclick=async e=>{e.target.disabled=true;try{await authSDK.reload(auth.currentUser);await auth.currentUser.getIdToken(true);await changed(auth.currentUser);if(!auth.currentUser.emailVerified)message('E-mailen er ikke bekræftet endnu. Åbn linket i mailen, og prøv igen.');}catch(error){message(authError(error));}finally{e.target.disabled=false;}};
  async function changed(user){

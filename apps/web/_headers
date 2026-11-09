@@ -8,3 +8,5 @@
   Cache-Control: no-cache
 /src/*.js
   Cache-Control: no-cache
+/admin/
+  Cache-Control: no-cache

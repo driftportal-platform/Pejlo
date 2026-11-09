@@ -6,8 +6,7 @@ import {createProfileSheet} from './features/profile-sheet.js';
 import {initStatusStrip} from './features/status-strip.js';
 import {collapseHints} from './features/hints.js';
 import {createSnooze} from './features/snooze.js';
-import {createAdmin} from './features/admin.js';
-import {parsePairing,pairingLink,drawPairingQR} from './features/pairing.js';
+import {parsePairing,pairingLink} from './features/pairing.js';
 import {createPhotoEditor} from './features/photo.js';
 import {createWakeLock} from './features/wake-lock.js';
 import {createAlarmArchive} from './features/alarm-archive.js';
@@ -60,7 +59,6 @@ const geofenceMonitor=createGeofenceMonitor();
 let polygonDraft=null;
 let family=new Map(),settingsDirty=false,familyReady=false,lastInviteProfile=null,lastInviteText='',familyLoading=false,familySaving=false,alertsId=null,alertsConfig=cleanAlerts(),alertsGeneration=0,historyProfile=null;
 const snooze=createSnooze({request:trackerRequest,selected,notice:toast});
-const admin=createAdmin({request:trackerRequest});
 const alarms=createAlarmArchive({request:trackerRequest,selected});
 const wake=createWakeLock({onState:text=>$('#wake-status').textContent=text});
 const history=createHistoryView({request:trackerRequest,selected,layer:()=>chosenLayer,key:()=>mapConfig.apiKey,notice:toast});
@@ -123,7 +121,7 @@ for(const button of document.querySelectorAll('[data-request-position]'))button.
 async function loadTrackers(){
  const gen=sessionGeneration;
  try{const result=await trackerRequest('trackers');if(gen!==sessionGeneration)return;
- ownedTrackers=result.trackers;$('#tracker-admin').hidden=!result.isAdmin;admin.enable(result.isAdmin);$('#my-uid').textContent=result.uid;trackerError='';updateTrackerStatus();
+ ownedTrackers=result.trackers;$('#system-admin-link').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;trackerError='';updateTrackerStatus();
  }catch(error){if(gen===sessionGeneration){trackerError=error.message;updateTrackerStatus();}}
 }
 function connectTracker(){
@@ -370,17 +368,9 @@ $('#claim-tracker').onsubmit=async event=>{
  const profile=state.profiles.find(p=>p.id===profileId);if(!profile)return;profile.trackerId=result.tracker.identifier;pendingPairing=null;pairingPresented=false;sessionStorage.removeItem('pejlo-pairing');$('#pairing-input').value='';$('#pairing-status').textContent='';$('#claim-code').value='';await loadTrackers();persist();refresh();toast('Trackeren er tilknyttet din konto og profilen '+profile.name+'.');
  }catch(error){if(gen===sessionGeneration)$('#claim-result').textContent=error.message;}finally{button.disabled=false;}
 };
-$('#provision-tracker').onsubmit=async event=>{
- event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;const gen=sessionGeneration;
- try{const result=await trackerRequest('admin/trackers',{identifier:$('#provision-id').value.trim(),name:$('#provision-name').value.trim()});if(gen!==sessionGeneration)return;
- $('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';
- $('#provision-result').textContent='Tracker-ID: '+result.identifier+' · Parringskode: '+result.code+' — Gem koden nu. Den vises kun denne gang.';
- const link=pairingLink(result.identifier,result.code,window.location.origin);$('#pairing-link').value=link;$('#pairing-output').hidden=false;try{await drawPairingQR($('#pairing-qr'),link);if(gen!==sessionGeneration){$('#pairing-qr').replaceChildren();return;}}catch{if(gen===sessionGeneration)toast('QR-koden kunne ikke tegnes. Parringslinket kan stadig kopieres.');}
- }catch(error){if(gen===sessionGeneration)$('#provision-result').textContent=error.message;}finally{button.disabled=false;}
-};
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();admin.clear();$('#pause-action').hidden=true;$('#pairing-output').hidden=true;$('#pairing-qr').replaceChildren();$('#pairing-link').value='';familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#tracker-admin').hidden=true;$('#provision-result').textContent='';$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
  positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
@@ -580,7 +570,6 @@ function presentPairing(){
  if(!pendingPairing)return;settingsTabs?.select('tracker');pairingPresented=true;$('#claim-id').value=pendingPairing.identifier;$('#claim-code').value=pendingPairing.code;$('#pairing-status').textContent='Parringslinket er læst. Kontrollér tracker-ID, vælg en tom profil, og tryk Tilføj tracker til denne profil.';
 }
 $('#read-pairing').onclick=()=>{const value=parsePairing($('#pairing-input').value.trim(),window.location.origin);if(!value)return toast('Linket er ikke et gyldigt parringslink til denne Pejlo-app.');pendingPairing=value;sessionStorage.setItem('pejlo-pairing',pairingLink(value.identifier,value.code,window.location.origin));presentPairing();$('#pairing-input').value='';$('#pairing-pending').hidden=false;};
-$('#copy-pairing').onclick=async()=>{try{await navigator.clipboard.writeText($('#pairing-link').value);toast('Parringslinket er kopieret.');}catch{$('#pairing-link').select();toast('Markér og kopiér linket manuelt.');}};
 
 $('#toggle-map-info').onclick=()=>{const card=$('.status-card'),expanded=card.classList.toggle('expanded');$('#toggle-map-info').setAttribute('aria-expanded',String(expanded));$('#toggle-map-info').textContent=expanded?'Færre oplysninger ⌄':'Flere oplysninger ⌃';};
 $('#fit').onclick=$('#center-loui').onclick=()=>{const point=data()?.position;if(!point)return toast('Der er ingen gyldig GPS-position endnu.');overviewMap?.center(point);};

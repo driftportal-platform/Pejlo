@@ -1,6 +1,6 @@
 export function createAdmin({request}){
- const $=s=>document.querySelector(s);let generation=0,allowed=false;
- function clear(){generation++;allowed=false;$('#admin-status').hidden=true;$('#admin-summary').replaceChildren();$('#admin-runs').replaceChildren();$('#admin-push-users').replaceChildren();$('#admin-message').textContent='';}
+ const $=s=>document.querySelector(s);let generation=0,usageGeneration=0,allowed=false;
+ function clear(){generation++;usageGeneration++;allowed=false;$('#admin-usage').replaceChildren();$('#admin-usage-message').textContent='';$('#admin-usage-reload').disabled=false;$('#admin-status').hidden=true;$('#admin-summary').replaceChildren();$('#admin-runs').replaceChildren();$('#admin-push-users').replaceChildren();$('#admin-message').textContent='';}
  function enable(value){allowed=value;$('#admin-status').hidden=!value;if(!value)clear();}
  const paragraph=(root,text)=>{const p=document.createElement('p');p.textContent=text;root.append(p);};
  async function load(){
@@ -17,5 +17,44 @@ export function createAdmin({request}){
    if(v.pushUsersTruncated)paragraph($('#admin-push-users'),'Viser de første 100 konti.');
   }catch(e){if(gen===generation)$('#admin-message').textContent=e.message;}
  }
+ async function loadUsage(){
+  if(!allowed)return;
+  const gen=++usageGeneration,root=$('#admin-usage'),message=$('#admin-usage-message'),button=$('#admin-usage-reload');
+  button.disabled=true;
+  root.replaceChildren();
+  message.textContent='Henter forbrug…';
+  try{
+   const data=await request('admin/usage');
+   if(gen!==usageGeneration)return;
+   const number=new Intl.NumberFormat('da-DK',{maximumFractionDigits:0});
+   const percent=new Intl.NumberFormat('da-DK',{style:'percent',maximumFractionDigits:1});
+   const counter=(label,value,limit)=>paragraph(root,
+    label+' · '+number.format(value)+' af '+number.format(limit)+' ('+percent.format(value/limit)+')');
+   const show=(label,usage,period,render)=>{
+    if(usage.status!=='ok'){
+     paragraph(root,label+' · '+(usage.status==='unconfigured'?'Mangler adgang til målinger.':'Målingerne kunne ikke hentes.'));
+     return;
+    }
+    paragraph(root,label+' · '+usage.day+' ('+period+')');
+    render();
+   };
+   show('Cloudflare',data.cloudflare,'UTC, hele kontoen',()=>{
+    counter('Workers-forespørgsler',data.cloudflare.workers,100000);
+    counter('D1 · læste rækker',data.cloudflare.rowsRead,5000000);
+    counter('D1 · skrevne rækker',data.cloudflare.rowsWritten,100000);
+   });
+   show('Firebase Firestore',data.firestore,'californisk tid, standarddatabasen',()=>{
+    counter('Læste dokumenter',data.firestore.reads,50000);
+    counter('Skrevne dokumenter',data.firestore.writes,20000);
+   });
+   const checkedAt=new Date(data.checkedAt).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'});
+   message.textContent='Hentet kl. '+checkedAt+'. Tallene kan være forsinkede. Procenterne bruger gratisplanernes grænser.';
+  }catch(e){
+   if(gen===usageGeneration)message.textContent=e.message;
+  }finally{
+   if(gen===usageGeneration)button.disabled=false;
+  }
+ }
+ $('#admin-usage-reload').onclick=loadUsage;
  $('#admin-reload').onclick=load;return {clear,enable,load};
 }

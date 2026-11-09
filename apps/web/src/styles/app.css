@@ -182,3 +182,19 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 #photo-editor input[type="range"]{padding:0;accent-color:var(--green)}
 .photo-editor-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
 .photo-editor-actions .primary{margin-top:0}
+
+.platform-grid { display:grid; gap:1.5rem; margin:1rem 0; }
+.platform-grid > div { min-width:0; }
+.platform-grid details { margin-top:1rem; }
+.platform-user { display:block; width:100%; margin:.4rem 0; text-align:left; overflow-wrap:anywhere; }
+.platform-user[aria-pressed="true"] { border-color:currentColor; font-weight:700; }
+#system-admin-panel { grid-column:1/-1; }
+#system-admin-panel h3 { overflow-wrap:anywhere; }
+@media (min-width: 780px) {
+ .platform-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); }
+}
+
+.admin-page { max-width:1100px; }
+.admin-page[hidden], #system-admin-link[hidden] { display:none; }
+.admin-page main { padding-bottom:2rem; }
+.admin-document .auth-card a { margin-right:.5rem; }
