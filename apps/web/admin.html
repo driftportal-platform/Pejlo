@@ -14,28 +14,50 @@
  <main>
   <header><div><span class="eyebrow">PEJLO</span><h1>Systemadmin</h1></div><a class="outline-button" href="/">Til Pejlo</a></header>
 <article class="panel" id="system-admin-panel">
-<span class="eyebrow">SYSTEMADMIN</span><h2>Brugere og abonnementer</h2>
-<p>Administrér Pejlo-konti og se deres abonnementer. Udløb vises i overblikket.</p>
-<form id="platform-search"><label>Søg på brugerens e-mail<input type="email" id="platform-search-email" maxlength="254" placeholder="Vis alle ved tomt felt"></label><button class="outline-button">Hent brugere</button></form>
+<span class="eyebrow">SYSTEMADMIN</span><h2>Kunder og abonnementer</h2>
+<p>Se kundernes aftalte priser, betalingsperioder og tid til udløb.</p>
+<form id="platform-search"><label>Søg på brugerens e-mail<input type="email" id="platform-search-email" autocomplete="off" maxlength="254" placeholder="Vis alle ved tomt felt"></label><button class="outline-button">Hent brugere</button></form>
 <p id="platform-message" role="status"></p>
-<div class="platform-grid"><div>
-<h3>Brugere</h3><div class="admin-rows" id="platform-users"></div>
+<h3>Abonnementsoversigt</h3>
+<div class="platform-table-wrap" id="platform-overview" hidden tabindex="0" aria-label="Abonnementsoversigt">
+<table class="platform-table">
+<thead><tr><th scope="col">Kunde</th><th scope="col">Abonnement</th><th scope="col">Pris</th><th scope="col">Udløbsdato</th><th scope="col">Tid tilbage</th></tr></thead>
+<tbody id="platform-users"></tbody>
+</table>
+</div>
 <button type="button" class="outline-button" id="platform-more" hidden>Vis flere</button>
 <details id="platform-create-panel"><summary>Opret bruger</summary>
 <form id="platform-create"><label>Navn<input id="platform-create-name" maxlength="100"></label>
 <label>E-mail<input id="platform-create-email" type="email" maxlength="254" required></label>
 <button class="outline-button">Opret konto</button></form></details>
-</div><div id="platform-detail" hidden>
-<h3 id="platform-user-title"></h3><p id="platform-user-meta"></p>
+<section id="platform-detail" hidden aria-labelledby="platform-user-title">
+<h3 id="platform-user-title" tabindex="-1"></h3><p id="platform-user-meta"></p>
+<div class="platform-grid">
 <form id="platform-account"><label>Navn<input id="platform-user-name" maxlength="100"></label>
-<label>Loginadgang<select id="platform-user-access"><option value="enabled">Åben</option><option value="disabled">Spærret</option></select></label>
+<label>Loginadgang<select id="platform-user-access"><option value="enabled">Åben</option><option value="disabled">Sat på pause</option></select></label>
 <button class="outline-button">Gem konto</button></form>
+<details id="platform-delete-panel" hidden>
+<summary>Slet kundens login</summary>
+<p>Sætter du først login på pause, kan du bagefter slette det permanent. Abonnementsoplysninger og kundedata bevares.</p>
+<form id="platform-delete">
+<label>Bekræft kundens e-mail<input id="platform-delete-email" type="email" maxlength="254" required autocomplete="off"></label>
+<button class="outline-button">Slet login permanent</button>
+</form></details>
 <form id="platform-subscription"><h3>Abonnement</h3>
 <label>Abonnementsnavn<input id="platform-plan" maxlength="80" placeholder="Fx Pejlo Basis"></label>
 <label>Status<select id="platform-stage"><option value="none">Intet abonnement</option><option value="trial">Prøveperiode</option><option value="active">Aktivt</option><option value="paused">Sat på pause</option></select></label>
+<label>Pris pr. periode (DKK)<input id="platform-price" inputmode="decimal" maxlength="10" placeholder="Fx 49,00"></label>
+<label>Prisperiode<select id="platform-cycle"><option value="">Vælg periode</option><option value="monthly">Pr. måned</option><option value="annual">Pr. år</option></select></label>
 <label>Udløbsdato<input id="platform-expiry" type="date" min="2000-01-01" max="2099-12-31"></label>
 <button class="outline-button">Gem abonnement</button></form>
-</div></div>
+</div></section>
+<section aria-labelledby="admin-subscription-requests-title">
+<h3 id="admin-subscription-requests-title">Abonnementsanmodninger</h3>
+<p>Ret kundens aftale ved behov, og markér derefter anmodningen som behandlet.</p>
+<button type="button" id="reload-subscription-requests" class="outline-button">Hent anmodninger</button>
+<p id="admin-subscription-request-status" role="status"></p>
+<div id="admin-subscription-requests" class="admin-rows"></div>
+</section>
 <div id="admin-status" hidden><h3>Administrator: driftsstatus</h3><button type="button" id="admin-reload" class="outline-button">Hent driftsstatus</button><p id="admin-message" role="status"></p><div id="admin-summary"></div><h4>Forbrug i dag</h4><button type="button" id="admin-usage-reload" class="outline-button">Hent forbrug</button><p id="admin-usage-message" class="hint" role="status"></p><div id="admin-usage" class="admin-rows"></div><h4>Seneste 20 baggrundskørsler</h4><div id="admin-runs" class="admin-rows"></div><h4>Konti med tilmeldt push</h4><p class="hint">Bruger-ID kan sammenlignes med kontoens ID ovenfor. Tilmelding er ikke en leveringskvittering.</p><div id="admin-push-users" class="admin-rows"></div></div><div id="tracker-admin" hidden><h3>Administrator: klargør tracker</h3><p>Opret en parringskode, som kan gives til trackerens ejer.</p><form id="provision-tracker"><label>Tracker-ID<input id="provision-id" required minlength="4" maxlength="100" autocomplete="off"></label><label>Navn<input id="provision-name" required maxlength="60" autocomplete="off"></label><button class="outline-button">Opret tracker og parringskode</button></form><p id="provision-result" role="status" style="overflow-wrap:anywhere"></p><div id="pairing-output" hidden><label>Parringslink<input id="pairing-link" readonly autocomplete="off"></label><button type="button" id="copy-pairing" class="outline-button">Kopiér parringslink</button><div id="pairing-qr" class="pairing-qr"></div><p class="hint">Del kun QR-kode/link med den kommende ejer. De indeholder parringskoden. Scan med telefonens kamera. Efter tilknytning kan en anden konto ikke bruge koden.</p></div></div></article>
  </main>
 </div>

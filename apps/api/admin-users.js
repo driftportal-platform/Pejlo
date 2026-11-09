@@ -1,10 +1,11 @@
 import {firebaseConfig} from '../web/src/config/firebase.js';
 import {googleAccessToken} from './google-auth.js';
-import {once} from './schema.js';
+import {ensureSubscriptions,publicSubscription} from './subscriptions.js';
+import {ensureFamily} from './family.js';
 
 const identityUrl = 'https://identitytoolkit.googleapis.com/v1/projects/' + firebaseConfig.projectId + '/accounts';
 const stages = ['none', 'trial', 'active', 'paused'];
-const danishDate = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Europe/Copenhagen'});
+const billingCycles = ['monthly', 'annual'];
 
 function fail(status, message) {
   throw Object.assign(new Error(message), {status});
@@ -35,14 +36,17 @@ function subscriptionInput(input) {
       fail(400, 'Skriv en gyldig udløbsdato.');
     }
   }
-  return {plan, stage, expiresOn};
-}
-
-function publicSubscription(subscription) {
-  const stage = subscription?.stage ?? 'none';
-  const expiresOn = subscription?.expires_on ?? '';
-  const expired = (stage === 'active' || stage === 'trial') && expiresOn && expiresOn < danishDate.format(new Date());
-  return {plan: subscription?.plan ?? '', stage, expiresOn, status: expired ? 'expired' : stage};
+  // Older clients omit both fields. Preserve an existing price in that case.
+  const updatePricing = stage === 'none' || input.price !== undefined || input.billingCycle !== undefined;
+  const price = input.price ?? '';
+  const billingCycle = stage === 'none' ? '' : (input.billingCycle ?? '');
+  if (typeof price !== 'string' || !/^(?:\d{1,7}(?:[,.]\d{1,2})?)?$/.test(price) ||
+      (billingCycle !== '' && !billingCycles.includes(billingCycle)) || (price && (!billingCycle || stage === 'none'))) {
+    fail(400, 'Skriv en pris i kroner med højst to decimaler, og vælg en prisperiode.');
+  }
+  const [kroner, decimal = ''] = price.split(/[,.]/);
+  const priceOre = price === '' ? null : Number(kroner) * 100 + Number(decimal.padEnd(2, '0'));
+  return {plan, stage, expiresOn, updatePricing, priceOre, billingCycle};
 }
 
 function publicUser(user, adminUid, subscription) {
@@ -54,7 +58,7 @@ function publicUser(user, adminUid, subscription) {
 }
 
 async function identityClient(secret, fetcher) {
-  if (!secret) fail(503, 'Brugeradministration mangler opsætning i Cloudflare.');
+  if (!secret) fail(503, 'Brugeradministrationen mangler Cloudflare Secret GCP_FIREBASE_AUTH_SERVICE_ACCOUNT.');
   let token;
   try {
     token = await googleAccessToken(secret, fetcher, 'https://www.googleapis.com/auth/cloud-platform');
@@ -81,10 +85,6 @@ async function identityClient(secret, fetcher) {
     fail(502, 'Firebase kunne ikke gennemføre handlingen. Kontrollér tjenestekontoens adgang.');
   };
 }
-
-const ensureSubscriptions = db => once(db, 'adminSubscriptions', () => db.prepare(
-  'CREATE TABLE IF NOT EXISTS pejlo_subscriptions(uid TEXT PRIMARY KEY, plan TEXT NOT NULL, stage TEXT NOT NULL, expires_on TEXT NOT NULL)'
-).run());
 
 async function withSubscriptions(db, users, adminUid) {
   if (!users.length) return [];
@@ -124,7 +124,7 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
     if (!created.localId) fail(502, 'Oprettelsen kunne ikke bekræftes. Søg efter e-mailen.');
     return {user: publicUser({...created, email, displayName}, adminUid)};
   }
-  if (!['account', 'subscription'].includes(input?.action) ||
+  if (!['account', 'subscription', 'delete'].includes(input?.action) ||
       typeof input.uid !== 'string' || !input.uid || input.uid.length > 128) fail(400, 'Vælg en gyldig bruger.');
   if (input.action === 'account') {
     const displayName = inputText(input.name, 100);
@@ -134,13 +134,36 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
     await identity(':update', {localId: input.uid, displayName, disableUser: input.disabled});
     return {name: displayName, disabled: input.disabled};
   }
-  const {plan, stage, expiresOn} = subscriptionInput(input);
+  if (input.action === 'delete') {
+    if (input.uid === adminUid) fail(400, 'Systemadmin kan ikke slette sit eget login.');
+    const confirmedEmail = inputEmail(input.confirmEmail);
+    const identity = await identityClient(env.GCP_FIREBASE_AUTH_SERVICE_ACCOUNT, fetcher);
+    const found = await identity(':lookup', {localId: [input.uid]});
+    const user = found.users?.find(candidate => candidate.localId === input.uid);
+    if (!user) fail(404, 'Brugeren findes ikke længere. Hent kundelisten igen.');
+    if (user.email?.toLowerCase() !== confirmedEmail) fail(400, 'E-mailen matcher ikke den valgte kunde.');
+    if (user.disabled !== true) fail(409, 'Sæt kundens login på pause før sletning.');
+
+    await ensureFamily(env.DB);
+    const attached = await env.DB.prepare(`
+      SELECT 1 FROM trackers WHERE owner_uid=?
+      UNION ALL SELECT 1 FROM pejlo_members WHERE uid=?
+      LIMIT 1`).bind(input.uid, input.uid).first();
+    if (attached) fail(409, 'Kunden ejer eller har adgang til en tracker. Fjern trackeradgangen før sletning.');
+    await identity(':delete', {localId: input.uid});
+    return {deleted: true};
+  }
+  const {plan, stage, expiresOn, updatePricing, priceOre, billingCycle} = subscriptionInput(input);
   const identity = await identityClient(env.GCP_FIREBASE_AUTH_SERVICE_ACCOUNT, fetcher);
   const found = await identity(':lookup', {localId: [input.uid]});
   if (!found.users?.some(user => user.localId === input.uid)) fail(404, 'Brugeren findes ikke længere.');
   await ensureSubscriptions(env.DB);
-  await env.DB.prepare(`INSERT INTO pejlo_subscriptions (uid, plan, stage, expires_on) VALUES (?,?,?,?)
-    ON CONFLICT(uid) DO UPDATE SET plan=excluded.plan, stage=excluded.stage, expires_on=excluded.expires_on`)
-    .bind(input.uid, plan, stage, expiresOn).run();
-  return {subscription: publicSubscription({plan, stage, expires_on: expiresOn})};
+  const saved = await env.DB.prepare(`INSERT INTO pejlo_subscriptions (uid, plan, stage, expires_on, price_ore, billing_cycle)
+    VALUES (?,?,?,?,?,?)
+    ON CONFLICT(uid) DO UPDATE SET plan=excluded.plan, stage=excluded.stage, expires_on=excluded.expires_on,
+      price_ore=CASE WHEN ? THEN excluded.price_ore ELSE pejlo_subscriptions.price_ore END,
+      billing_cycle=CASE WHEN ? THEN excluded.billing_cycle ELSE pejlo_subscriptions.billing_cycle END
+    RETURNING plan, stage, expires_on, price_ore, billing_cycle`)
+    .bind(input.uid, plan, stage, expiresOn, priceOre, billingCycle, +updatePricing, +updatePricing).first();
+  return {subscription: publicSubscription(saved)};
 }

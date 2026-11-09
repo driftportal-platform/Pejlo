@@ -1,3 +1,4 @@
+import {createMySubscription} from './features/subscription.js';
 import {initPageScroll} from './features/page-scroll.js';
 import {createFenceEditor} from './features/fence-editor.js';
 import {installCspDiagnostics} from './features/csp-diagnostics.js';
@@ -58,6 +59,7 @@ const trackerClient=createTrackerClient();
 const geofenceMonitor=createGeofenceMonitor();
 let polygonDraft=null;
 let family=new Map(),settingsDirty=false,familyReady=false,lastInviteProfile=null,lastInviteText='',familyLoading=false,familySaving=false,alertsId=null,alertsConfig=cleanAlerts(),alertsGeneration=0,historyProfile=null;
+const mySubscription=createMySubscription({request:trackerRequest});
 const snooze=createSnooze({request:trackerRequest,selected,notice:toast});
 const alarms=createAlarmArchive({request:trackerRequest,selected});
 const wake=createWakeLock({onState:text=>$('#wake-status').textContent=text});
@@ -207,7 +209,7 @@ function refresh(){
   if(trackerUser&&(selected()?.trackerId||null)!==pollingId)connectTracker();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
-  if(empty){profileSheet.update([],null);snooze.clear();alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
+  if(empty){profileSheet.update([],null);snooze.clear();mySubscription.enable(false);alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
@@ -374,7 +376,7 @@ startAuthentication(async(user,{db,dbSDK,auth})=>{
  positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
- trackerUser=user;loadTrackers();connectTracker();
+ trackerUser=user;mySubscription.enable(true);loadTrackers();connectTracker();
  $('#sync-state').textContent='Forbinder…';$('.app').inert=true;$('#cloud-help').textContent='Opretter forbindelse til dine private profiler…';
  const fail=()=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);$('.app').hidden=true;$('#auth-shell').hidden=false;$('#cloud-help').textContent='Profillagring kunne ikke åbnes. Kontrollér, at Firestore-databasen og reglerne fra pakken er oprettet. Derefter: Prøv forbindelsen igen.';$('#sync-state').textContent='Ingen forbindelse';};
  slowTimer=setTimeout(fail,15000);

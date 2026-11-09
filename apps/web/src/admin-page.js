@@ -1,5 +1,6 @@
 import {startAuthentication} from './features/auth.js';
 import {createAdmin} from './features/admin.js';
+import {createSubscriptionQueue} from './features/subscription.js';
 import {createPlatformAdmin} from './features/platform-admin.js';
 import {pairingLink,drawPairingQR} from './features/pairing.js';
 
@@ -22,6 +23,11 @@ async function request(path,body){
 
 const admin=createAdmin({request});
 const platform=createPlatformAdmin({request});
+const subscriptionQueue=createSubscriptionQueue({request,openCustomer(email){
+ $('#platform-search-email').value=email;
+ $('#platform-search').requestSubmit();
+ $('#platform-search-email').focus();
+}});
 $('#auth-loading h2').textContent='Åbner systemadmin';
 $('#auth-shell .brand').href='/';
 $('#auth-shell [data-auth-mode="signup"]').hidden=true;
@@ -32,7 +38,7 @@ $('#auth-shell .auth-card').append(back);
 startAuthentication(async user=>{
  const current=++generation;
  session=user?.emailVerified?user:null;
- admin.clear();platform.enable(false);
+ admin.clear();platform.enable(false);subscriptionQueue.enable(false);
  $('#tracker-admin').hidden=true;
  $('#provision-tracker').reset();
  $('#provision-tracker button').disabled=false;
@@ -46,7 +52,7 @@ startAuthentication(async user=>{
  try{
   await request('admin/access');
   if(current!==generation)return;
-  admin.enable(true);platform.enable(true);
+  admin.enable(true);platform.enable(true);subscriptionQueue.enable(true);
   $('#tracker-admin').hidden=false;
   $('#auth-shell').hidden=true;
   $('.admin-page').hidden=false;

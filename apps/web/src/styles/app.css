@@ -184,8 +184,8 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .photo-editor-actions .primary{margin-top:0}
 
 .platform-grid { display:grid; gap:1.5rem; margin:1rem 0; }
-.platform-grid > div { min-width:0; }
-.platform-grid details { margin-top:1rem; }
+.platform-grid > * { min-width:0; }
+#platform-create-panel { margin-top:1rem; }
 .platform-user { display:block; width:100%; margin:.4rem 0; text-align:left; overflow-wrap:anywhere; }
 .platform-user[aria-pressed="true"] { border-color:currentColor; font-weight:700; }
 #system-admin-panel { grid-column:1/-1; }
@@ -198,3 +198,14 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .admin-page[hidden], #system-admin-link[hidden] { display:none; }
 .admin-page main { padding-bottom:2rem; }
 .admin-document .auth-card a { margin-right:.5rem; }
+
+.platform-table-wrap { overflow-x:auto; margin:0 0 1rem; }
+.platform-table { width:100%; border-collapse:collapse; text-align:left; }
+.platform-table th, .platform-table td { padding:.65rem .7rem; border-bottom:1px solid var(--line); }
+.platform-table th { white-space:nowrap; }
+.platform-table .platform-user { margin:0; }
+.platform-table td:last-child { white-space:nowrap; }
+#platform-detail { margin-top:1.5rem; }
+
+#open-my-subscription[hidden], #my-subscription button[hidden] { display:none; }
+#admin-subscription-requests p { overflow-wrap:anywhere; }

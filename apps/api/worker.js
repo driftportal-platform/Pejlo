@@ -1,6 +1,7 @@
 import {trustedGps,gpsPoint} from './gps.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 import {adminStatus} from './operations.js';
+import {customerSubscription,adminSubscriptionRequests} from './subscriptions.js';
 import {adminUsers} from './admin-users.js';
 import {adminUsage} from './usage.js';
 import {snoozeUntil,setSnooze} from './snooze.js';
@@ -21,7 +22,7 @@ async function body(request,limit=12000){if(Number(request.headers.get('content-
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  const routes={'/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/subscription':'GETPOST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -42,6 +43,15 @@ export async function handleAPI(request,env,fetcher=fetch){
    return json(await adminUsage(env,fetcher));
   }
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
+  if(path==='/api/subscription'){
+   const input=request.method==='GET'?null:(await body(request))??{};
+   return json(await customerSubscription(env.DB,account,input));
+  }
+  if(path==='/api/admin/subscription-requests'){
+   if(!isAdmin)throw new Failure(403,'Kun systemadmin kan behandle abonnementsanmodninger.');
+   const input=request.method==='GET'?null:(await body(request))??{};
+   return json(await adminSubscriptionRequests(env.DB,input));
+  }
   if(path==='/api/admin/users'){
    if(!isAdmin)throw new Failure(403,'Kun systemadmin kan administrere brugere.');
    return json(await adminUsers(env,uid,url.searchParams,request.method==='GET'?null:(await body(request))??{},fetcher));

@@ -1,5 +1,16 @@
 const statusLabel={none:'Intet abonnement',trial:'Prøveperiode',active:'Aktivt',paused:'Sat på pause',expired:'Udløbet'};
 
+const priceFormat=new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK'});
+const dateFormat=new Intl.DateTimeFormat('da-DK',{dateStyle:'short',timeZone:'UTC'});
+const cycleLabel={monthly:'pr. måned',annual:'pr. år'};
+
+function timeLeft(days){
+ if(days===null)return '—';
+ if(days===0)return 'Udløber i dag';
+ if(days<0)return 'Udløbet';
+ return days+(days===1?' dag':' dage');
+}
+
 export function createPlatformAdmin({request}){
  const $=id=>document.getElementById('platform-'+id);
  const users=new Map();
@@ -10,7 +21,7 @@ export function createPlatformAdmin({request}){
   if(value)return;
   generation++;
   users.clear();selected=null;cursor=null;email='';busy=false;
-  for(const id of ['search','create','account','subscription'])$(id).reset();
+  for(const id of ['search','create','account','subscription','delete'])$(id).reset();
   $('create-panel').open=false;
   $('message').textContent='';
   render();
@@ -27,25 +38,45 @@ export function createPlatformAdmin({request}){
   $('user-name').value=user.name;
   $('user-access').value=user.disabled?'disabled':'enabled';
   $('user-access').disabled=user.isAdmin;
+  $('delete-panel').hidden=user.isAdmin||!user.email;
+  $('delete-panel').open=false;
+  $('delete').reset();
   $('plan').value=user.subscription.plan;
   $('stage').value=user.subscription.stage;
   $('expiry').value=user.subscription.expiresOn;
+  showPricing(user.subscription);
+ }
+
+ function showPricing(subscription){
+  $('price').value=subscription.priceOre===null?'':(subscription.priceOre/100).toFixed(2).replace('.',',');
+  $('cycle').value=subscription.billingCycle;
  }
 
  function render(){
-  $('users').replaceChildren();
-  for(const user of users.values()){
+  const rows=$('users');
+  rows.replaceChildren();
+  $('overview').hidden=!users.size;
+  const ordered=[...users.values()].sort((a,b)=>
+   (a.subscription.expiresOn||'9999').localeCompare(b.subscription.expiresOn||'9999'));
+  for(const user of ordered){
+   const row=rows.insertRow();
+   const customer=row.insertCell();
    const button=document.createElement('button');
-   button.type='button';button.className='outline-button platform-user';
-   const subscription=user.subscription;
-   button.textContent=(user.name?user.name+' · ':'')+(user.email||user.uid)+' · '+
-     [subscription.plan,statusLabel[subscription.status],subscription.expiresOn,user.disabled?'Login spærret':''].filter(Boolean).join(' · ');
+   button.type='button';button.className='text-button platform-user';
+   button.textContent=user.name?user.name+' · '+user.email:user.email||user.uid;
    button.setAttribute('aria-pressed',String(user.uid===selected));
    button.onclick=()=>{
     choose(user.uid);
-    for(const row of $('users').children)row.setAttribute('aria-pressed',String(row===button));
+    for(const control of rows.querySelectorAll('button'))control.setAttribute('aria-pressed',String(control===button));
+    $('user-title').focus();
    };
-   $('users').append(button);
+   customer.append(button);
+   const subscription=user.subscription;
+   row.insertCell().textContent=[subscription.plan,statusLabel[subscription.status]].filter(Boolean).join(' · ');
+   row.insertCell().textContent=subscription.priceOre===null?'—':
+    priceFormat.format(subscription.priceOre/100)+' '+cycleLabel[subscription.billingCycle];
+   row.insertCell().textContent=subscription.expiresOn?dateFormat.format(new Date(subscription.expiresOn)):'—';
+   row.insertCell().textContent=timeLeft(subscription.daysToExpiry);
   }
   $('more').hidden=!cursor;
   if(!users.has(selected))choose(null);
@@ -100,14 +131,26 @@ export function createPlatformAdmin({request}){
   if(selected===uid)$('user-name').value=result.name;
   $('message').textContent='Konto gemt.';
  });};
+ $('delete').onsubmit=event=>{event.preventDefault();run(async active=>{
+  const uid=selected;
+  const user=users.get(uid);
+  if(!user.disabled){$('message').textContent='Sæt login på pause og gem kontoen først.';return;}
+  await request('admin/users',{action:'delete',uid,confirmEmail:$('delete-email').value});
+  if(!active())return;
+  users.delete(uid);
+  if(selected===uid){choose(null);$('delete').reset();}
+  render();
+  $('message').textContent='Kundens login er slettet.';
+ });};
  $('subscription').onsubmit=event=>{event.preventDefault();run(async active=>{
   const uid=selected,stage=$('stage').value;
   const result=await request('admin/users',{action:'subscription',uid,stage,
-   plan:stage==='none'?'':$('plan').value,expiresOn:stage==='none'?'':$('expiry').value});
+   plan:stage==='none'?'':$('plan').value,expiresOn:stage==='none'?'':$('expiry').value,
+   price:stage==='none'?'':$('price').value.trim(),billingCycle:stage==='none'?'':$('cycle').value});
   if(!active())return;
   users.get(uid).subscription=result.subscription;
   render();
-  if(selected===uid){$('plan').value=result.subscription.plan;$('expiry').value=result.subscription.expiresOn;}
+  if(selected===uid){$('plan').value=result.subscription.plan;$('expiry').value=result.subscription.expiresOn;showPricing(result.subscription);}
   $('message').textContent='Abonnement gemt.';
  });};
  return {enable};
