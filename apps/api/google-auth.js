@@ -24,7 +24,7 @@ export async function googleAccessToken(secret, fetcher, scope, now = new Date()
   });
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(assertion));
   const response = await fetcher(googleTokenUrl, {
-    redirect: 'error', signal: AbortSignal.timeout(8000),
+    redirect: 'manual', signal: AbortSignal.timeout(8000),
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     body: new URLSearchParams({

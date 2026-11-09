@@ -72,7 +72,7 @@ async function identityClient(secret, fetcher) {
         method: body ? 'POST' : 'GET',
         headers: {Authorization: 'Bearer ' + token, ...(body ? {'Content-Type': 'application/json'} : {})},
         body: body ? JSON.stringify(body) : undefined,
-        redirect: 'error', signal: AbortSignal.timeout(8000)
+        redirect: 'manual', signal: AbortSignal.timeout(8000)
       });
       data = await response.json();
     } catch {

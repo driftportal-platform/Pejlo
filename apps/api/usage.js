@@ -32,7 +32,7 @@ function firestoreDay(now) {
 
 async function providerJSON(fetcher, url, init) {
   const response = await fetcher(url, {
-    ...init, redirect: 'error', signal: AbortSignal.timeout(8000)
+    ...init, redirect: 'manual', signal: AbortSignal.timeout(8000)
   });
   if (!response.ok) throw new Error('Målingen kunne ikke hentes.');
   return response.json();
