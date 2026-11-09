@@ -143,10 +143,15 @@ input::-webkit-date-and-time-value{min-width:0;text-align:center}
 }
 @media(max-width:359px){#ture .history-dates{grid-template-columns:minmax(0,1fr)}}
 
-/* 0.8.9: a dedicated row for the home action, taller map and opaque status area. */
 :root{--status-area:env(safe-area-inset-top,0px)}
-body{padding-top:var(--status-area)}
-body::before{content:"";position:fixed;top:0;left:0;right:0;height:var(--status-area);background:#f5f6f1;z-index:10000;pointer-events:none}
+/* Reserve space even if an iPhone home-screen app reports a zero top inset. */
+@supports (-webkit-touch-callout:none){
+ @media (display-mode:standalone) and (orientation:portrait){
+  :root{--status-area:max(env(safe-area-inset-top,0px),60px)}
+ }
+}
+.status-bar{position:sticky;top:0;height:var(--status-area);background:var(--bg);z-index:1000}
+.settings-tabs{top:var(--status-area)}
 html{scroll-padding-top:calc(var(--status-area) + 12px)}
 #kort>.map-bottom{position:static;inset:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;pointer-events:auto;margin:10px 0 0;z-index:auto}
 #kort>.map-bottom button{max-width:100%;white-space:normal;border:1px solid var(--line);box-shadow:none}

@@ -48,6 +48,7 @@ installCspDiagnostics();
 if(invitationMatch){sessionStorage.setItem('pejlo-invitation',invitationMatch[1]);window.history.replaceState(null,'','#indstillinger');}
 
 let saveCloud=null,cloud=null,sessionGeneration=0;
+let overviewFocusKey=null;
 let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome=false, user=null, heading=null, headingTime=0, watching=false, simulation=false, demoStep=0, toastTimer;
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
 let trackerData=null,trackerError='',trackerUser=null,ownedTrackers=[],pollingId=null;
@@ -169,7 +170,16 @@ function showPage(name){
   document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('active',e.dataset.page===name||(name==='soeg'&&e.dataset.page==='kort')));
   $('#page-title').textContent={kort:'Dit overblik',ture:'Ture og bevægelser',indstillinger:'Dine profiler og indstillinger',soeg:'Find '+(selected()?.name??''),velkommen:'Velkommen til Pejlo'}[name];
   if(openingHistory){history.load();alarms.load();}
-  if(name==='kort'&&!polygonDraft)requestAnimationFrame(()=>overviewMap?.fit(selected(),data()));
+  if(name!=='kort')overviewFocusKey=null;
+  else if(!polygonDraft&&!choosingHome)requestAnimationFrame(()=>{
+   const profile=selected(),point=data()?.position;
+   if(currentPage!=='kort'||polygonDraft||choosingHome||!profile||!overviewMap)return;
+   const key=JSON.stringify([profile.id,profile.trackerId]);
+   if(key===overviewFocusKey)return;
+   if(!point){overviewMap.invalidate();return;}
+   overviewMap.center(point);
+   overviewFocusKey=key;
+  });
   if(name==='soeg')requestAnimationFrame(()=>{if(!searchMap){searchMap=createMap('search-map',{notice:toast,onManual:()=>{$('#autozoom').checked=false;}});searchMap?.layer(chosenLayer,mapConfig.apiKey);}renderMap(searchMap);searchMap?.fit(selected(),data());updateSearch();});
 }
 function go(name,tab){if(tab)settingsTabs?.select(tab);window.location.hash=name;showPage(name);}
@@ -283,7 +293,13 @@ overviewMap=createMap('map',{notice:toast,onTracker:()=>{
  return true;
 },onHome:p=>{if(polygonDraft){if(polygonDraft.points.length>=50)return toast('Højst 50 punkter.');polygonDraft.points.push(p);updateDraft();return;}if(!choosingHome)return;choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';if(confirm('Gem dette som hjemmeområdets midtpunkt for '+selected().name+'?'+(chosenLayer==='demo'?' Eksempelkortets veje er skematiske.':''))){selected().home={...selected().home,...p};selected().homeConfirmed=true;const stored=selected().fencePresets.find(f=>f.id===selected().activeFenceId);if(stored)stored.home=structuredClone(selected().home);persist();refresh();}}});
 $('#profile-select').onchange=e=>{settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
-$('#fit').onclick=()=>{if(selected())overviewMap?.fit(selected(),data());};
+$('#fit-route').onclick=()=>{
+ const route=data()?.route;
+ if(!route||!overviewMap?.fitRoute(route))return toast('Der er ingen rute at vise endnu.');
+ $('#show-route').checked=true;
+ renderMap(overviewMap);
+ renderMap(searchMap);
+};
 $('#find').onclick=()=>go('soeg');
 $('#show-route').onchange=()=>{renderMap(overviewMap);renderMap(searchMap);};$('#show-home').onchange=$('#show-route').onchange;$('#show-distance-line').onchange=$('#show-route').onchange;$('#show-distance-rings').onchange=$('#show-route').onchange;
 $('#set-map-home').onclick=()=>{choosingHome=!choosingHome;$('#set-map-home').textContent=choosingHome?'Annuller valg':'Sæt fast udgangspunkt';if(choosingHome)toast(chosenLayer==='demo'?'Vælg først et geografisk kortlag til dit rigtige hjem.':'Tryk på dit hjem på kortet for at vælge midtpunkt.');};
@@ -544,7 +560,7 @@ $('#read-pairing').onclick=()=>{const value=parsePairing($('#pairing-input').val
 $('#copy-pairing').onclick=async()=>{try{await navigator.clipboard.writeText($('#pairing-link').value);toast('Parringslinket er kopieret.');}catch{$('#pairing-link').select();toast('Markér og kopiér linket manuelt.');}};
 
 $('#toggle-map-info').onclick=()=>{const card=$('.status-card'),expanded=card.classList.toggle('expanded');$('#toggle-map-info').setAttribute('aria-expanded',String(expanded));$('#toggle-map-info').textContent=expanded?'Færre oplysninger ⌄':'Flere oplysninger ⌃';};
-$('#center-loui').onclick=()=>{const point=data()?.position;if(!point)return toast('Der er ingen gyldig GPS-position endnu.');overviewMap?.center(point);};
+$('#fit').onclick=$('#center-loui').onclick=()=>{const point=data()?.position;if(!point)return toast('Der er ingen gyldig GPS-position endnu.');overviewMap?.center(point);};
 $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('ture');$('#map-pause').onclick=()=>go('indstillinger','beskeder');
 
 initPageScroll();

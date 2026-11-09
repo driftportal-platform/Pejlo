@@ -54,6 +54,13 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
       if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
     },
     fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.homeConfirmed&&p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},
+    fitRoute(route){
+      const points=routeAnalysis(route).segments.flat().map(p=>[p.lat,p.lon]);
+      if(!points.length)return false;
+      map.invalidateSize();
+      map.fitBounds(L.latLngBounds(points),{padding:[24,48],maxZoom:17});
+      return true;
+    },
     search(user,target,auto) {
       phone.clearLayers();if(!user)return;
       L.circleMarker([user.lat,user.lon],{radius:7,color:'white',weight:3,fillColor:'#477fc1',fillOpacity:1}).addTo(phone);
