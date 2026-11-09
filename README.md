@@ -194,3 +194,9 @@ Cloudflare Build: `npm run build`. Deploy: `npx wrangler deploy`.
 `TRACCAR_TOKEN` og `TRACCAR_ADMIN_UID` sættes som runtime-secrets. `MAPTILER_API_KEY` er den offentlige, domænebegrænsede kortnøgle under Builds. Ingen bruger skal oprette sin egen kortnøgle eller Traccar-konto.
 
 Testserveren er låst til `https://demo3.traccar.org`. Denne udgave kræver ingen ny server. Trackerens protokol og mobilnet skal passe til testserveren.
+
+## 0.8.20
+
+Under **Indstillinger → Beskeder** kan hver bruger gemme ankomst og afgang pr. område. Områder uden egne valg bruger trackerens standardvalg. Beskeder for et område kræver, at området er valgt til overvågning. Batteri, GPS og stilleperiode gælder fortsat hele trackeren.
+
+Wrangler bevarer variabler, der er oprettet i Cloudflare. Hvis push- eller mailvariabler allerede mangler, skal de gendannes i Cloudflare.

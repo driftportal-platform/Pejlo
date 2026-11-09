@@ -89,3 +89,39 @@ test('cron archives fence transitions without push keys and preserves them after
  assert.equal((await handleAPI(request(),env,auth('stranger'))).status,403);
  const result=await(await handleAPI(request(),env,auth('owner'))).json();assert.equal(result.events.length,1);assert.equal(result.events[0].kind,'exit');
 });
+
+test('personal area choices survive tracker settings changes and control scheduled transitions',async()=>{
+ const db=await setup();
+ const summer={id:'summer',name:'Sommerhus',home:profile.home};
+ await call(db,owner,{action:'save',identifier:'1234',profile:{...profile,fencePresets:[...profile.fencePresets,summer]},revision:0});
+ const {code}=await call(db,owner,{action:'invite',identifier:'1234',email:member.email,role:'viewer'});
+ await call(db,member,{action:'join',code});
+ const env={DB:db,TRACCAR_TOKEN:'token'};
+ const save=(account,config,areaId)=>handleAPI(new Request('https://pejlo.example/api/alerts',{
+  method:'POST',headers:{Authorization:'Bearer test','Content-Type':'application/json'},
+  body:JSON.stringify({identifier:'1234',config,areaId})
+ }),env,async()=>Response.json({users:[{...account,emailVerified:true}]}));
+
+ assert.equal((await save(owner,{enter:true,exit:true,lowBattery:true})).status,200);
+ assert.equal((await save(owner,{enter:true,exit:false},'home')).status,200);
+ assert.equal((await save(owner,{enter:false,exit:true},'summer')).status,200);
+ assert.equal((await save(member,{enter:true,exit:true},'home')).status,200);
+ assert.equal((await save(owner,{enter:true,exit:true},'deleted')).status,400);
+ const {config}=await (await save(owner,{enter:true,exit:false,lowBattery:true})).json();
+ assert.equal(config.lowBattery,true);
+ assert.deepEqual(config.areas,{home:{enter:true,exit:false},summer:{enter:false,exit:true}});
+
+ const base=Date.now()-90000;
+ let n=0;
+ const fetcher=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[
+  {id:2,deviceId:1,valid:true,latitude:n<2?56:56.002,longitude:8,fixTime:new Date(base+n*20000).toISOString()}
+ ]);
+ for(n=0;n<5;n++)await runNotifications(env,fetcher);
+ const statuses=await db.prepare("SELECT uid,push_status FROM pejlo_alarm_history WHERE kind='exit' ORDER BY uid").all();
+ assert.deepEqual(statuses.results.map(row=>[row.uid,row.push_status]),[['member','unconfigured'],['owner','disabled']]);
+
+ await call(db,owner,{action:'save',identifier:'1234',profile:{...profile,fencePresets:[...profile.fencePresets,summer],activeFenceId:'summer'},revision:1});
+ const fence=await db.prepare('SELECT config,state FROM pejlo_fences WHERE identifier=?').bind('1234').first();
+ assert.equal(JSON.parse(fence.config).areaId,'summer');
+ assert.deepEqual(JSON.parse(fence.state),{});
+});

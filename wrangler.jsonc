@@ -1,5 +1,6 @@
 {
   "name": "pejlo",
+  "keep_vars": true,
   "triggers": {"crons": ["* * * * *"]},
   "compatibility_date": "2026-11-05",
   "assets": {
