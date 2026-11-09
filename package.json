@@ -1,7 +1,7 @@
 {
   "name": "pejlo",
   "private": true,
-  "version": "0.8.28",
+  "version": "0.8.31",
   "type": "module",
   "engines": {
     "node": ">=20"

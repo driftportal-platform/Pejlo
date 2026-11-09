@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
 import {handleAPI} from '../apps/api/worker.js';
 import {firebaseConfig} from '../apps/web/src/config/firebase.js';
 
@@ -16,18 +17,17 @@ const secret = JSON.stringify({
 function setup(caller = admin) {
   const calls = [];
   const users = new Map([[member, {localId: member, email, emailVerified: true, passwordHash: 'not-for-clients'}]]);
-  const subscriptions = new Map();
+  const database = new DatabaseSync(':memory:');
+  database.exec('CREATE TABLE trackers(identifier TEXT PRIMARY KEY, owner_uid TEXT)');
+  database.exec("CREATE TABLE pejlo_subscriptions(uid TEXT PRIMARY KEY, plan TEXT NOT NULL, stage TEXT NOT NULL, expires_on TEXT NOT NULL)");
   const DB = {prepare(sql) {
-    let args = [];
+    const statement=database.prepare(sql);
+    let args=[];
     return {
-      bind(...values) { args = values; return this; },
-      async all() { return {results: args.map(uid => subscriptions.get(uid)).filter(Boolean)}; },
-      async run() {
-        if (sql.includes('INSERT INTO pejlo_subscriptions')) {
-          const [uid,plan,stage,expires_on] = args;
-          subscriptions.set(uid,{uid,plan,stage,expires_on});
-        }
-      }
+      bind(...values) { args=values;return this; },
+      async all() { return {results:statement.all(...args)}; },
+      async first() { return statement.get(...args); },
+      async run() { return statement.run(...args); }
     };
   }};
   const fetcher = async (url, options) => {
@@ -48,6 +48,10 @@ function setup(caller = admin) {
       return Response.json({users: [...users.values()].filter(user =>
         body.email?.includes(user.email) || body.localId?.includes(user.localId))});
     }
+    if (target.pathname.endsWith(':delete')) {
+      assert.ok(users.delete(body.localId));
+      return Response.json({});
+    }
     if (target.pathname.endsWith(':update')) {
       Object.assign(users.get(body.localId),{displayName: body.displayName, disabled: body.disableUser});
       return Response.json({localId: body.localId});
@@ -67,7 +71,7 @@ function setup(caller = admin) {
     }),{DB,TRACCAR_ADMIN_UID:admin,GCP_FIREBASE_AUTH_SERVICE_ACCOUNT:secret},fetcher);
     return {status:response.status,body:await response.json()};
   }
-  return {request,calls};
+  return {request,calls,database};
 }
 
 test('ordinary users cannot list or change accounts through the admin API',async()=>{
@@ -83,12 +87,21 @@ test('system admin sees existing users and can manage subscriptions independentl
   assert.equal(first.body.nextCursor,'next-page');
   assert.equal(first.body.users[0].subscription.status,'none');
   assert.doesNotMatch(JSON.stringify(first.body),/passwordHash|not-for-clients/);
-  const expired=await request('',{action:'subscription',uid:member,plan:'Basis',stage:'active',expiresOn:'2020-01-01'});
+  const input={action:'subscription',uid:member,plan:'Basis',stage:'active',expiresOn:'2020-01-01'};
+  const expired=await request('',{...input,price:'49,95',billingCycle:'monthly'});
   assert.equal(expired.body.subscription.status,'expired');
+  assert.equal(expired.body.subscription.priceOre,4995);
+  assert.ok(expired.body.subscription.daysToExpiry<0);
+  assert.equal((await request('',input)).body.subscription.priceOre,4995);
+  assert.equal((await request('',{...input,price:'4,999',billingCycle:'monthly'})).status,400);
   assert.equal((await request('',{action:'subscription',uid:member,plan:'Basis',stage:'active',expiresOn:'2026-02-30'})).status,400);
   assert.equal((await request('',{action:'account',uid:admin,name:'Admin',disabled:true})).status,400);
   const lookup=await request('?email='+encodeURIComponent(email));
   assert.equal(lookup.body.users[0].subscription.plan,'Basis');
+  assert.equal(lookup.body.users[0].subscription.billingCycle,'monthly');
+  const free=await request('',{...input,price:'0',billingCycle:'annual',expiresOn:''});
+  assert.equal(free.body.subscription.priceOre,0);
+  assert.equal(free.body.subscription.daysToExpiry,null);
   assert.equal(lookup.body.users[0].disabled,false);
   assert.equal((await request('',{action:'account',uid:member,name:'Kunde',disabled:true})).status,200);
   assert.equal((await request()).body.users[0].disabled,true);
@@ -110,7 +123,7 @@ test('system admin has a separate page and its access check is enforced server-s
   const appHtml=readFileSync('dist/index.html','utf8');
   const adminHtml=readFileSync('dist/admin/index.html','utf8');
   assert.match(appHtml, /id="system-admin-link"[^>]+href="\/admin\/" hidden/);
-  for(const id of ['platform-users','admin-status','admin-usage','pairing-qr']){
+  for(const id of ['platform-users','platform-price','platform-cycle','platform-delete','admin-status','admin-usage','pairing-qr']){
     assert.ok(adminHtml.includes('id="'+id+'"'),id);
     assert.ok(!appHtml.includes('id="'+id+'"'),id);
   }
@@ -130,4 +143,24 @@ test('system admin has a separate page and its access check is enforced server-s
     assert.equal(response.status,status);
     assert.equal(response.headers.get('cache-control'),'no-store');
   }
+});
+
+
+test('systemadmin can delete only a paused account after confirming its email and checking tracker links',async()=>{
+  const {request,calls,database}=setup();
+  const remove={action:'delete',uid:member,confirmEmail:email};
+  assert.equal((await setup(member).request('',remove)).status,403);
+  assert.equal((await request('',{...remove,uid:admin})).status,400);
+  assert.equal((await request('',remove)).status,409);
+  assert.equal((await request('',{action:'account',uid:member,name:'Kunde',disabled:true})).status,200);
+  assert.equal((await request('',{...remove,confirmEmail:'other@example.com'})).status,400);
+  database.prepare('INSERT INTO trackers VALUES (?,?)').run('tracker',member);
+  assert.equal((await request('',remove)).status,409);
+  database.exec('DELETE FROM trackers');
+  database.prepare('INSERT INTO pejlo_members(identifier,uid,email) VALUES (?,?,?)').run('shared',member,email);
+  assert.equal((await request('',remove)).status,409);
+  database.exec('DELETE FROM pejlo_members');
+  assert.ok(!calls.some(path=>path.endsWith(':delete')));
+  assert.deepEqual(await request('',remove),{status:200,body:{deleted:true}});
+  assert.equal((await request('?email='+encodeURIComponent(email))).body.users.length,0);
 });
