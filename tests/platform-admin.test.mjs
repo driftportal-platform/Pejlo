@@ -165,3 +165,13 @@ test('systemadmin can delete only a paused account after confirming its email an
   assert.deepEqual(await request('',remove),{status:200,body:{deleted:true}});
   assert.equal((await request('?email='+encodeURIComponent(email))).body.users.length,0);
 });
+
+test('standard Pejlo prices separate the first and additional trackers',async()=>{
+ const {standardSubscriptionPrice}=await import('../dist/src/features/platform-admin.js');
+ assert.equal(standardSubscriptionPrice('monthly',1),4900);
+ assert.equal(standardSubscriptionPrice('annual',1),44900);
+ assert.equal(standardSubscriptionPrice('monthly',2),7800);
+ assert.equal(standardSubscriptionPrice('annual',2),71800);
+ assert.equal(standardSubscriptionPrice('annual',1.5),null);
+ assert.equal(standardSubscriptionPrice('annual',0),null);
+});

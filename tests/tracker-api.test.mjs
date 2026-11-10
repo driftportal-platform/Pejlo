@@ -6,6 +6,10 @@ function database(owner='owner-uid'){
  const gps=new Map(),requests=new Map();const rows=new Map([[identifier,{identifier,name:'Pejlo',code_hash:'test-hash',owner_uid:owner}]]);
  return {rows,prepare(sql){let args=[];return {bind(...values){args=values;return this;},async all(){return {results:[...rows.values()].filter(r=>r.owner_uid===args[0]).map(({identifier,name})=>({identifier,name}))};},async first(){
  if(sql.includes('pejlo_gps_filter')){if(sql.startsWith('SELECT'))return {state:gps.get(args[0]+args[1])};if(sql.startsWith('UPDATE')){const k=args[1]+args[2];if(gps.get(k)!==args[3])return null;gps.set(k,args[0]);return {identifier:args[1]};}}
+ if(sql.startsWith('INSERT INTO pejlo_tracker_actions')){
+  const key=args[0]+args[1];if(requests.get(key)>args[3])return null;
+  requests.set(key,args[2]);return {identifier:args[0]};
+ }
  if(sql.startsWith('INSERT INTO pejlo_position_requests')){
   if(requests.get(args[0])>args[2])return null;
   requests.set(args[0],args[1]);return {identifier:args[0]};
@@ -128,4 +132,26 @@ test('Google and Traccar redirects fail closed without forwarding credentials',a
   };
   const response=await handleAPI(req(),env,fetcher);assert.equal(response.status,provider==='google'?503:502);assert.equal(calls.length,provider==='google'?1:2);assert.ok(calls.every(url=>!url.startsWith('https://other.example')));assert.equal((await response.text()).includes('server-secret'),false);
  }
+});
+
+
+test('tracker actions are owner-only, capability-gated, rate-limited, and use server commands',async()=>{
+ const configured={...env,DB:database(),PEJLO_TRACKER_ACTIONS:JSON.stringify({[identifier]:{find:'7e82027e'}})};
+ const post=action=>new Request('https://pejlo.example/api/tracker/action',{method:'POST',headers:{Authorization:'Bearer user-token'},
+  body:JSON.stringify({identifier,action,data:'aabb'})});
+ const owner=fixture({status:'online',commandTypes:[{type:'custom'}]});
+ const viewer=fixture({uid:'viewer-uid',status:'online',commandTypes:[{type:'custom'}]});
+ assert.equal((await handleAPI(post('find'),configured,viewer.fetcher)).status,403);
+ assert.equal((await handleAPI(post('sound'),configured,owner.fetcher)).status,409);
+ const result=await handleAPI(post('find'),configured,owner.fetcher);
+ assert.equal(result.status,200);
+ const session=await result.json();
+ assert.equal(session.until-session.startedAt,600000);
+ assert.equal((await handleAPI(post('find'),configured,owner.fetcher)).status,429);
+ const sends=owner.calls.filter(call=>call.url.endsWith('/api/commands/send'));
+ assert.equal(sends.length,1);
+ assert.deepEqual(JSON.parse(sends[0].options.body),{deviceId:7,type:'custom',textChannel:false,attributes:{data:'7e82027e',noQueue:true}});
+ const read=await (await handleAPI(req(),configured,owner.fetcher)).json();
+ assert.deepEqual(read.actions,{find:true,sound:false});
+ assert.doesNotMatch(JSON.stringify(read),/7e82027e/);
 });

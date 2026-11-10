@@ -71,3 +71,38 @@ test('late pause responses cannot cross profiles, overwrite a pause or survive l
  pendingGet=()=>{};const logout=view.load(true);view.clear();current=null;pendingGet({until:Date.now()+3600000,serverTime:Date.now()});await logout;assert.equal(view.paused(),false);assert.match(element('#snooze-status').textContent,/Vælg en profil/);
  delete globalThis.document;
 });
+
+test('shared handoff respects roles, has one active handler, and pauses delivery for the whole profile',async()=>{
+ const DB=await setup(),now=Date.now(),env={DB};
+ const position={lat:56,lon:8,timestamp:now-1000};
+ const start={identifier:'1234',action:'start',position};
+ const call=(uid,path,input)=>handleAPI(req(path,input),env,auth(uid));
+ assert.equal((await call('stranger','handoff?identifier=1234')).status,403);
+ assert.equal((await call('member','handoff',start)).status,403);
+ DB.raw.exec("UPDATE pejlo_members SET role='editor' WHERE uid='member'");
+ const results=await Promise.all(['owner','member'].map(async uid=>(await (await call(uid,'handoff',start)).json()).handoff));
+ assert.ok(results[0]?.id);
+ assert.equal(results[0].id,results[1].id);
+ assert.equal(results[0].until-results[0].startedAt,3600000);
+ assert.deepEqual(results[0].position,position);
+ assert.equal(await snoozeUntil(DB,'1234','member'),0);
+ DB.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify({lat:56,lon:8,radius:100,buffer:5,shape:'circle'}));
+ let i=0;
+ const upstream=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:i<2?56:56.002,longitude:8,fixTime:new Date(now-90000+i*20000).toISOString()}]);
+ for(i=0;i<4;i++)await runNotifications({...env,TRACCAR_TOKEN:'test'},upstream);
+ assert.deepEqual(DB.raw.prepare("SELECT push_status FROM pejlo_alarm_history WHERE kind='exit'").all().map(r=>r.push_status),['snoozed','snoozed']);
+ const res=await call('owner','handoff',{identifier:'1234',action:'stop',id:results[0].id});
+ assert.equal((await res.json()).handoff,null);
+ const archive=await (await call('member','alarms?identifier=1234')).json();
+ assert.equal(archive.handoffs.length,1);
+ assert.ok(archive.handoffs[0].endedAt>=archive.handoffs[0].startedAt);
+ assert.deepEqual(archive.handoffs[0].position,position);
+});
+
+test('directions use the reported coordinates and omit invalid positions',async()=>{
+ const {directionsURL}=await import('../dist/src/features/handoff.js');
+ const url=new URL(directionsURL({lat:56.5,lon:8.3}));
+ assert.equal(url.searchParams.get('destination'),'56.5,8.3');
+ assert.equal(url.searchParams.get('travelmode'),'walking');
+ assert.equal(directionsURL({lat:95,lon:8}),'');
+});
