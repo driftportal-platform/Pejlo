@@ -1,6 +1,15 @@
+import {subscriptionRates as standardPrices} from '../shared/pricing.js';
 const statusLabel={none:'Intet abonnement',trial:'Prøveperiode',active:'Aktivt',paused:'Sat på pause',expired:'Udløbet'};
 
 const priceFormat=new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK'});
+const trackerPrice=34900;
+export function standardSubscriptionPrice(cycle,quantity){
+ const rates=Object.hasOwn(standardPrices,cycle)?standardPrices[cycle]:null;
+ return rates&&Number.isInteger(quantity)&&quantity>=1&&quantity<=1000
+  ?rates.first+(quantity-1)*rates.extra:null;
+}
+const kroner=ore=>priceFormat.format(ore/100);
+const priceInput=ore=>(ore/100).toFixed(2).replace('.',',');
 const dateFormat=new Intl.DateTimeFormat('da-DK',{dateStyle:'short',timeZone:'UTC'});
 const cycleLabel={monthly:'pr. måned',annual:'pr. år'};
 
@@ -15,6 +24,29 @@ export function createPlatformAdmin({request}){
  const $=id=>document.getElementById('platform-'+id);
  const users=new Map();
  let allowed=false,generation=0,selected=null,cursor=null,email='',busy=false;
+ for(const [label,key] of [['Første tracker','first'],['Hver ekstra tracker','extra']]){
+  const row=$('catalog').insertRow();
+  for(const value of [label,kroner(standardPrices.monthly[key]),kroner(standardPrices.annual[key])])row.insertCell().textContent=value;
+ }
+ $('hardware').textContent='Klargjort Q8 4G: '+kroner(trackerPrice)+' · Startpakke med én tracker og ét år: '+kroner(trackerPrice+standardPrices.annual.first)+'. Priser inkl. moms. SIM, data og evt. fragt betales særskilt.';
+
+ function preview(){
+  const quantity=$('quantity').valueAsNumber;
+  const monthly=standardSubscriptionPrice('monthly',quantity),annual=standardSubscriptionPrice('annual',quantity);
+  $('monthly').disabled=$('annual').disabled=monthly===null;
+  $('price-preview').textContent=monthly===null?'Vælg et helt antal fra 1 til 1.000.':
+   kroner(monthly)+' pr. måned eller '+kroner(annual)+' pr. år. Tryk Gem abonnement for at bruge prisen.';
+ }
+ $('quantity').oninput=preview;
+ for(const cycle of ['monthly','annual'])$(cycle).onclick=()=>{
+  const quantity=$('quantity').valueAsNumber,price=standardSubscriptionPrice(cycle,quantity);
+  if(price===null)return;
+  $('plan').value='Pejlo · '+quantity+(quantity===1?' tracker':' trackere');
+  if($('stage').value==='none')$('stage').value='active';
+  $('price').value=priceInput(price);
+  $('cycle').value=cycle;
+ };
+ preview();
 
  function enable(value){
   allowed=value;
@@ -38,9 +70,15 @@ export function createPlatformAdmin({request}){
   $('user-name').value=user.name;
   $('user-access').value=user.disabled?'disabled':'enabled';
   $('user-access').disabled=user.isAdmin;
-  $('delete-panel').hidden=user.isAdmin||!user.email;
+  const stripe=user.subscription.managed;
+  $('subscription').hidden=stripe;
+  $('managed-subscription').hidden=!stripe;
+  $('delete-panel').hidden=user.isAdmin||!user.email||stripe;
   $('delete-panel').open=false;
   $('delete').reset();
+  const quantity=user.subscription.plan.match(/^Pejlo · (\d+) tracker(?:e)?$/);
+  $('quantity').value=quantity?.[1]||1;
+  preview();
   $('plan').value=user.subscription.plan;
   $('stage').value=user.subscription.stage;
   $('expiry').value=user.subscription.expiresOn;
@@ -48,7 +86,7 @@ export function createPlatformAdmin({request}){
  }
 
  function showPricing(subscription){
-  $('price').value=subscription.priceOre===null?'':(subscription.priceOre/100).toFixed(2).replace('.',',');
+  $('price').value=subscription.priceOre===null?'':priceInput(subscription.priceOre);
   $('cycle').value=subscription.billingCycle;
  }
 
@@ -72,7 +110,7 @@ export function createPlatformAdmin({request}){
    };
    customer.append(button);
    const subscription=user.subscription;
-   row.insertCell().textContent=[subscription.plan,statusLabel[subscription.status]].filter(Boolean).join(' · ');
+   row.insertCell().textContent=[subscription.plan,statusLabel[subscription.status],subscription.provider==='stripe'?'Stripe':'',subscription.cancelAtEnd?'Opsagt ved periodens udløb':''].filter(Boolean).join(' · ');
    row.insertCell().textContent=subscription.priceOre===null?'—':
     priceFormat.format(subscription.priceOre/100)+' '+cycleLabel[subscription.billingCycle];
    row.insertCell().textContent=subscription.expiresOn?dateFormat.format(new Date(subscription.expiresOn)):'—';

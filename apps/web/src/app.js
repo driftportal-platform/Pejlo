@@ -1,3 +1,4 @@
+import {createHandoff,directionsURL} from './features/handoff.js';
 import {createMySubscription} from './features/subscription.js';
 import {initPageScroll} from './features/page-scroll.js';
 import {createFenceEditor} from './features/fence-editor.js';
@@ -54,6 +55,7 @@ let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
 let trackerData=null,trackerError='',trackerUser=null,ownedTrackers=[],pollingId=null;
 const positionRequests=new Map();
+const trackerActions=new Map();
 const trackerDetails=$('#tracker-details');
 const trackerClient=createTrackerClient();
 const geofenceMonitor=createGeofenceMonitor();
@@ -71,6 +73,8 @@ const fenceEditor=createFenceEditor({selected,layer:()=>chosenLayer,key:()=>mapC
 }});
 const isLinked=()=>!!selected()?.trackerId;
 const data=()=>!selected()?null:!isLinked()?demoFor(selected()):trackerData?.device.identifier===selected().trackerId?trackerData:{source:'traccar',position:null,route:[],historyAvailable:false};
+const handoff=createHandoff({request:trackerRequest,identifier:()=>trackerUser&&selected()?.trackerId||null,
+ position:()=>{const d=data();return d?.gpsProvisional||d?.gpsUncertain?null:d?.position;},notice:toast});
 async function trackerRequest(path,body,timeout=20000){
  const token=await trackerUser.getIdToken();
  const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store',signal:AbortSignal.timeout(timeout)});
@@ -96,6 +100,19 @@ function updatePositionRequest(){
   const message=request?.message||'';
   if(status.textContent!==message)status.textContent=message;
  }
+ const actionState=trackerActions.get(identifier);
+ const remaining=Math.ceil(((actionState?.until??0)-Date.now())/1000);
+ const canFind=!!d?.actions?.find,canSound=!!d?.actions?.sound;
+ $('#tracker-extra-actions').hidden=!canFind&&!canSound;
+ $('#tracker-find-session').hidden=!canFind;
+ $('#tracker-sound').hidden=!canSound;
+ $('#tracker-find-session').disabled=!!actionState?.busy||remaining>0||d?.device?.status!=='online';
+ $('#tracker-sound').disabled=!!actionState?.busy||d?.device?.status!=='online';
+ for(const status of document.querySelectorAll('[data-tracker-action-status]')){
+  const message=[remaining>0?'Find aktiv · '+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0')+' tilbage.':'',actionState?.message].filter(Boolean).join(' ');
+  status.hidden=!message;
+  if(status.textContent!==message)status.textContent=message;
+ }
  if(!trackerDetails.open)return;
  if(!profile||trackerDetails.dataset.profile!==profile.id){trackerDetails.close();return;}
  $('#tracker-details-name').textContent=profile.name;
@@ -104,6 +121,10 @@ function updatePositionRequest(){
  $('#tracker-details-gps').textContent=position?ageText(position.timestamp)+(d.gpsProvisional?' · afventer bekræftelse':d.gpsUncertain?' · usikkert GPS-signal':''):'Ingen gyldig position';
  $('#tracker-details-battery').textContent=position?.battery!=null?position.battery+' %':'Ikke oplyst';
  $('#tracker-details-home').textContent=identifier?homeStatus(profile,position):'Eksempelposition';
+ const directions=$('#tracker-directions'),url=identifier&&directionsURL(position);
+ directions.hidden=!url;
+ if(url&&directions.getAttribute('href')!==url)directions.href=url;
+ if(!url)directions.removeAttribute('href');
 }
 async function requestTrackerPosition(){
  const identifier=selected()?.trackerId,gen=sessionGeneration;
@@ -120,6 +141,27 @@ async function requestTrackerPosition(){
  finally{request.sending=false;if(gen===sessionGeneration)updatePositionRequest();}
 }
 for(const button of document.querySelectorAll('[data-request-position]'))button.onclick=requestTrackerPosition;
+async function startTrackerAction(action){
+ const identifier=selected()?.trackerId,gen=sessionGeneration;
+ if(!identifier||!trackerUser||!data()?.actions?.[action])return;
+ const state=trackerActions.get(identifier)??{};
+ if(state.busy)return;
+ trackerActions.set(identifier,state);
+ state.busy=true;state.message='Sender kommando…';updatePositionRequest();
+ try{
+  const result=await trackerRequest('tracker/action',{identifier,action},45000);
+  state.message=action==='sound'?'Lydkommando sendt. Trackeren har ikke bekræftet lyden.':'';
+  if(action==='find'){
+   state.until=result.until;
+   if(gen===sessionGeneration&&selected()?.trackerId===identifier){
+    trackerDetails.close();go('soeg');connectTracker();
+   }
+  }
+ }catch(error){state.message=error.message;}
+ finally{state.busy=false;if(gen===sessionGeneration)updatePositionRequest();}
+}
+$('#tracker-find-session').onclick=()=>startTrackerAction('find');
+$('#tracker-sound').onclick=()=>startTrackerAction('sound');
 async function loadTrackers(){
  const gen=sessionGeneration;
  try{const result=await trackerRequest('trackers');if(gen!==sessionGeneration)return;
@@ -131,7 +173,7 @@ function connectTracker(){
  if(!trackerUser||!selected()?.trackerId){trackerData=null;updateTrackerStatus();return;}
  const id=selected().trackerId;pollingId=id;const gen=sessionGeneration;
  trackerError='Henter trackerdata…';updateTrackerStatus();
- trackerClient.start(trackerUser,id,value=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=value;trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;updateTrackerStatus();});
+ trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id?{...trackerData,...value,route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;updateTrackerStatus();},trackerActions.get(id)?.until);
 }
 function updateTrackerStatus(){
  const d=data(),live=isLinked();
@@ -209,11 +251,11 @@ function refresh(){
   if(trackerUser&&(selected()?.trackerId||null)!==pollingId)connectTracker();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
-  if(empty){profileSheet.update([],null);snooze.clear();mySubscription.enable(false);alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
+  if(empty){profileSheet.update([],null);snooze.clear();handoff.clear();mySubscription.enable(false);alarms.clear();history.clear();historyProfile=null;options($('#profile-select'),[],null);$('#side-name').textContent='';$('#side-type').textContent='';$('#timeline').replaceChildren();for(const id of ['status-title','history-title','search-title'])$('#'+id).textContent='';for(const id of ['profile-name','profile-device','lat','lon','radius'])$('#'+id).value='';showPage('velkommen');return;}
   if(currentPage==='velkommen')currentPage='kort';
   const p=selected(),d=data(),meta=types[p.type];
   if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
-  renderFamily();loadAlerts();renderAreaAlerts();snooze.load();
+  renderFamily();loadAlerts();renderAreaAlerts();snooze.load();handoff.load();
   if(pendingPairing&&!pairingPresented){presentPairing();currentPage='indstillinger';settingsTabs?.select('tracker');}
   options($('#saved-fences'),[['','Intet gemt område valgt'],...(p.fencePresets||[]).map(f=>[f.id,f.name])],p.activeFenceId||'');
   $('#fence-name').value=p.fencePresets?.find(f=>f.id===p.activeFenceId)?.name||'';$('#delete-fence').disabled=!p.activeFenceId;$('#fence-buffer').value=p.home.buffer??5;
@@ -248,11 +290,11 @@ function updateGeofence(){
  if(!selected())return;
  const result=geofenceMonitor.evaluate(selected(),data(),{unavailable:!!trackerError});
  const area=selected().fencePresets?.find(f=>f.id===selected().activeFenceId);$('#geofence-status').textContent=(area?area.name+' · ':'')+result.text;$('#fence-margin-description').textContent='To nye positioner og '+(selected().home.buffer??5)+' meters ekstra margen.';$('.geofence-summary').dataset.state=result.kind;
- if(result.transition&&!snooze.paused()&&areaAlerts(alertsConfig,area?.id)[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
+ if(result.transition&&!snooze.paused()&&!handoff.paused()&&areaAlerts(alertsConfig,area?.id)[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
 }
 function updateAge(){
  updateGeofence();
- snooze.tick();
+ snooze.tick();handoff.tick();
  updatePositionRequest();
  if(!selected())return;
  const d=data(),p=d.position,live=isLinked();
@@ -306,6 +348,7 @@ async function selectLayer(name){
 for(const select of document.querySelectorAll('.layer-select')){options(select,Object.entries(layers),'demo');select.onchange=()=>selectLayer(select.value);}
 overviewMap=createMap('map',{notice:toast,onTracker:()=>{
  if(choosingHome||polygonDraft||!selected())return false;
+ handoff.load(true);
  trackerDetails.dataset.profile=selected().id;
  if(!trackerDetails.open)trackerDetails.showModal();
  updatePositionRequest();
@@ -372,7 +415,7 @@ $('#claim-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();handoff.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;trackerActions.clear();ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
  positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;
@@ -539,8 +582,8 @@ $('#area-alerts-form').onsubmit=e=>{
 $('#family-invite').onsubmit=async e=>{e.preventDefault();const p=selected();if(!p?.trackerId)return toast('Tilknyt først en tracker.');try{await saveFamilyProfile(p);const result=await trackerRequest('family',{action:'invite',identifier:p.trackerId,email:$('#family-email').value,role:$('#family-role').value});lastInviteProfile=p.id;lastInviteText=(result.mailSent?'Invitationsmailen er afleveret til mailtjenesten. Bed modtageren kontrollere indbakke og spam. ':result.message+' ')+'Invitationskode: '+result.code+' · Gyldig i 7 dage.';$('#family-result').textContent=lastInviteText;}catch(error){$('#family-result').textContent=error.message;}};
 $('#family-join').onsubmit=async e=>{e.preventDefault();try{await trackerRequest('family',{action:'join',code:$('#family-code').value.trim()});$('#family-code').value='';sessionStorage.removeItem('pejlo-invitation');await loadFamily(true);persist();$('#join-result').textContent='Den delte profil er tilføjet. Vælg den øverst.';}catch(error){$('#join-result').textContent=error.message;}};
 $('#family-leave').onclick=()=>$('#delete-profile').click();
-setInterval(()=>{if(trackerUser&&!document.hidden){loadFamily();snooze.load(true);}},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&trackerUser)snooze.load(true);});
+setInterval(()=>{if(trackerUser&&!document.hidden){loadFamily();snooze.load(true);handoff.load(true);}},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&trackerUser){snooze.load(true);handoff.load(true);}});
 
 for(const form of ['profile-form','home-form'])for(const event of ['input','change'])$('#'+form).addEventListener(event,()=>{settingsDirty=true;});
 

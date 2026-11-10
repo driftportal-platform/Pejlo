@@ -209,3 +209,6 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 
 #open-my-subscription[hidden], #my-subscription button[hidden] { display:none; }
 #admin-subscription-requests p { overflow-wrap:anywhere; }
+
+#tracker-directions:not([hidden]){display:inline-flex;margin-bottom:.75rem}
+#shared-handoff:not([hidden]){margin-bottom:.75rem}

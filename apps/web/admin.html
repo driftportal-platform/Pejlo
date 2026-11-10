@@ -16,6 +16,14 @@
 <article class="panel" id="system-admin-panel">
 <span class="eyebrow">SYSTEMADMIN</span><h2>Kunder og abonnementer</h2>
 <p>Se kundernes aftalte priser, betalingsperioder og tid til udløb.</p>
+<section aria-labelledby="platform-catalog-title">
+<h3 id="platform-catalog-title">Pejlos standardpriser</h3>
+<div class="platform-table-wrap">
+<table class="platform-table">
+<thead><tr><th scope="col">Abonnement</th><th scope="col">Pr. måned</th><th scope="col">Pr. år</th></tr></thead>
+<tbody id="platform-catalog"></tbody></table></div>
+<p class="hint" id="platform-hardware"></p>
+</section>
 <form id="platform-search"><label>Søg på brugerens e-mail<input type="email" id="platform-search-email" autocomplete="off" maxlength="254" placeholder="Vis alle ved tomt felt"></label><button class="outline-button">Hent brugere</button></form>
 <p id="platform-message" role="status"></p>
 <h3>Abonnementsoversigt</h3>
@@ -43,7 +51,13 @@
 <label>Bekræft kundens e-mail<input id="platform-delete-email" type="email" maxlength="254" required autocomplete="off"></label>
 <button class="outline-button">Slet login permanent</button>
 </form></details>
-<form id="platform-subscription"><h3>Abonnement</h3>
+<p id="platform-managed-subscription" class="hint" hidden>Abonnementet styres i Stripe.</p><form id="platform-subscription"><h3>Abonnement</h3>
+<fieldset><legend>Udfyld med standardpris</legend>
+<label>Antal trackere<input id="platform-quantity" type="number" min="1" max="1000" step="1" value="1"></label>
+<button type="button" class="outline-button" id="platform-monthly">Brug månedspris</button>
+<button type="button" class="outline-button" id="platform-annual">Brug årspris</button>
+<p class="hint" id="platform-price-preview" aria-live="polite"></p>
+</fieldset>
 <label>Abonnementsnavn<input id="platform-plan" maxlength="80" placeholder="Fx Pejlo Basis"></label>
 <label>Status<select id="platform-stage"><option value="none">Intet abonnement</option><option value="trial">Prøveperiode</option><option value="active">Aktivt</option><option value="paused">Sat på pause</option></select></label>
 <label>Pris pr. periode (DKK)<input id="platform-price" inputmode="decimal" maxlength="10" placeholder="Fx 49,00"></label>

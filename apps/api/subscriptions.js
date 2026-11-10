@@ -1,3 +1,4 @@
+import {ensureBilling,billingReady,billingSnapshot,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
 import {once} from './schema.js';
 
 const danishDate = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Europe/Copenhagen'});
@@ -12,7 +13,8 @@ export function publicSubscription(subscription) {
   const expired = (stage === 'active' || stage === 'trial') && daysToExpiry !== null && daysToExpiry < 0;
   return {
     plan: subscription?.plan ?? '', stage, expiresOn, status: expired ? 'expired' : stage,
-    daysToExpiry, priceOre: subscription?.price_ore ?? null, billingCycle: subscription?.billing_cycle ?? ''
+    daysToExpiry, provider: subscription?.provider ?? 'manual',
+    managed: !!subscription?.stripeStatus && !['canceled','incomplete_expired'].includes(subscription.stripeStatus), cancelAtEnd: !!subscription?.cancelAtEnd, priceOre: subscription?.price_ore ?? null, billingCycle: subscription?.billing_cycle ?? ''
   };
 }
 
@@ -35,19 +37,27 @@ function fail(status, message) {
   throw Object.assign(new Error(message), {status});
 }
 
-async function customerView(db, uid) {
+async function customerView(db, uid, env) {
   const subscription = await db.prepare('SELECT * FROM pejlo_subscriptions WHERE uid=?').bind(uid).first();
   const request = await db.prepare('SELECT kind,created_at AS createdAt,handled_at AS handledAt FROM pejlo_subscription_requests WHERE uid=?')
     .bind(uid).first();
-  return {subscription: publicSubscription(subscription), request: request ?? null};
+  const billing = await db.prepare('SELECT snapshot FROM pejlo_billing WHERE uid=?').bind(uid).first();
+  const effective = publicSubscription(effectiveSubscription(subscription, billing));
+  return {subscription: effective, request: request ?? null,
+    checkout: billingReady(env) && !stripeOwnsSubscription(billing) && ['none','expired'].includes(effective.status),
+    portal: billingReady(env) && !!billingSnapshot(billing)};
 }
 
-export async function customerSubscription(db, account, input) {
+export async function customerSubscription(db, account, input, env = {}) {
   const uid = account.localId;
   if (input !== null && !['renew', 'cancel'].includes(input.kind)) fail(400, 'Vælg forlængelse eller opsigelse.');
   await ensureSubscriptions(db);
   await ensureRequests(db);
-  if (input === null) return customerView(db, uid);
+  await ensureBilling(db);
+  if (input === null) return customerView(db, uid, env);
+  if (stripeOwnsSubscription(await db.prepare('SELECT snapshot FROM pejlo_billing WHERE uid=?').bind(uid).first())) {
+    fail(409, 'Administrér dit Stripe-abonnement via abonnementsstyring.');
+  }
 
   const {kind} = input;
   // The eligibility check and the pending-request limit are part of one write.
@@ -61,7 +71,7 @@ export async function customerSubscription(db, account, input) {
     RETURNING id`)
     .bind(crypto.randomUUID(), account.email ?? '', kind, Date.now(), uid, kind, todayInDenmark()).first();
 
-  const view = await customerView(db, uid);
+  const view = await customerView(db, uid, env);
   if (saved || (view.request?.kind === kind && view.request.handledAt === null)) return view;
   if (view.request?.handledAt === null) fail(409, 'Du har allerede en anmodning under behandling.');
   fail(409, 'Handlingen er ikke tilgængelig for dit abonnement.');

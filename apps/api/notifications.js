@@ -1,3 +1,4 @@
+import {currentHandoff,pruneHandoffs} from './handoffs.js';
 import {trustedGps,gpsPoint} from './gps.js';
 import {ensureOperations} from './operations.js';
 import {snoozeUntil} from './snooze.js';
@@ -80,6 +81,7 @@ async function processNotifications(env,fetcher,stats){
    const name=profileName||label(row.tracker_name),fence=label(row.fence_name);
    const context={name,area:fence&&fence!==name?'«'+fence+'»':'hjemmeområdet',battery:raw?.attributes?.batteryLevel};
    const recipients=[row.owner_uid,...(await env.DB.prepare('SELECT uid FROM pejlo_members WHERE identifier=?').bind(row.identifier).all()).results.map(m=>m.uid)];
+   const sharedPause=await currentHandoff(env.DB,row.identifier,now);
    for(const uid of new Set(recipients)){
     const prefs=await env.DB.prepare('SELECT config,state FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(row.identifier,uid).first();
     const config=cleanAlerts(prefs?JSON.parse(prefs.config):null),result=advanceAlerts(config,raw,prefs?JSON.parse(prefs.state):{},now);
@@ -87,7 +89,7 @@ async function processNotifications(env,fetcher,stats){
      const changed=await env.DB.prepare('UPDATE pejlo_alerts SET state=? WHERE identifier=? AND uid=? AND state=? AND config=? RETURNING identifier').bind(JSON.stringify(result.state),row.identifier,uid,prefs.state,prefs.config).first();
      if(!changed)continue;
     }
-    const paused=await snoozeUntil(env.DB,row.identifier,uid)>now;
+    const paused=sharedPause||await snoozeUntil(env.DB,row.identifier,uid)>now;
     const kinds=[...(transition?[transition]:[]),...result.events];
     for(const kind of kinds){
      const id=[row.identifier,uid,kind,kind==='missing'?result.state.lastFix||result.state.started:Date.parse(raw?.fixTime)||now].join(':');
@@ -99,6 +101,7 @@ async function processNotifications(env,fetcher,stats){
   }catch{stats.errors++; /* Upstream failures cannot create geofence or battery events. */ }
  }
  await env.DB.prepare('DELETE FROM pejlo_alarm_history WHERE created_at<?').bind(Date.now()-90*86400000).run();
+ await pruneHandoffs(env.DB,Date.now());
  if(!pushReady(env))return;
  const queue=await env.DB.prepare('SELECT id,attempts FROM pejlo_events WHERE attempts<3 AND lease_until<=? ORDER BY created_at LIMIT 4').bind(Date.now()).all();
  for(const queued of queue.results){
@@ -110,7 +113,7 @@ async function processNotifications(env,fetcher,stats){
   const enabled=item.kind==='enter'||item.kind==='exit'
    ?areaAlerts(config,areaId)[item.kind]
    :item.kind==='fencechange'||config[item.kind==='battery'?'lowBattery':item.kind];
-  const paused=await snoozeUntil(env.DB,item.identifier,item.uid)>Date.now();
+  const paused=await currentHandoff(env.DB,item.identifier)||await snoozeUntil(env.DB,item.identifier,item.uid)>Date.now();
   if(paused||Date.now()-item.created_at>300000||!enabled||isQuiet(config)||!await trackerAccess(env.DB,item.identifier,item.uid)){
    await archiveStatus(env.DB,item.id,paused?'snoozed':Date.now()-item.created_at>300000?'expired':'suppressed');await env.DB.prepare('DELETE FROM pejlo_events WHERE id=?').bind(item.id).run();continue;
   }

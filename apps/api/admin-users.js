@@ -1,3 +1,4 @@
+import {ensureBilling,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
 import {firebaseConfig} from '../web/src/config/firebase.js';
 import {googleAccessToken} from './google-auth.js';
 import {ensureSubscriptions,publicSubscription} from './subscriptions.js';
@@ -93,6 +94,10 @@ async function withSubscriptions(db, users, adminUid) {
   const rows = await db.prepare('SELECT * FROM pejlo_subscriptions WHERE uid IN (' + placeholders + ')')
     .bind(...users.map(user => user.localId)).all();
   const byUid = new Map(rows.results.map(row => [row.uid, row]));
+  await ensureBilling(db);
+  const billing = await db.prepare('SELECT uid,snapshot FROM pejlo_billing WHERE uid IN (' + placeholders + ')')
+    .bind(...users.map(user => user.localId)).all();
+  for (const row of billing.results) byUid.set(row.uid, effectiveSubscription(byUid.get(row.uid), row));
   return users.map(user => publicUser(user, adminUid, byUid.get(user.localId)));
 }
 
@@ -144,6 +149,7 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
     if (user.email?.toLowerCase() !== confirmedEmail) fail(400, 'E-mailen matcher ikke den valgte kunde.');
     if (user.disabled !== true) fail(409, 'Sæt kundens login på pause før sletning.');
 
+    await guardBilling(env.DB, input.uid);
     await ensureFamily(env.DB);
     const attached = await env.DB.prepare(`
       SELECT 1 FROM trackers WHERE owner_uid=?
@@ -158,12 +164,24 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
   const found = await identity(':lookup', {localId: [input.uid]});
   if (!found.users?.some(user => user.localId === input.uid)) fail(404, 'Brugeren findes ikke længere.');
   await ensureSubscriptions(env.DB);
+  await ensureBilling(env.DB);
   const saved = await env.DB.prepare(`INSERT INTO pejlo_subscriptions (uid, plan, stage, expires_on, price_ore, billing_cycle)
-    VALUES (?,?,?,?,?,?)
+    SELECT ?,?,?,?,?,? WHERE NOT EXISTS (
+      SELECT 1 FROM pejlo_billing WHERE uid=? AND
+      (checkout_until>? OR json_extract(snapshot,'$.stripeStatus') NOT IN ('canceled','incomplete_expired')))
     ON CONFLICT(uid) DO UPDATE SET plan=excluded.plan, stage=excluded.stage, expires_on=excluded.expires_on,
       price_ore=CASE WHEN ? THEN excluded.price_ore ELSE pejlo_subscriptions.price_ore END,
       billing_cycle=CASE WHEN ? THEN excluded.billing_cycle ELSE pejlo_subscriptions.billing_cycle END
     RETURNING plan, stage, expires_on, price_ore, billing_cycle`)
-    .bind(input.uid, plan, stage, expiresOn, priceOre, billingCycle, +updatePricing, +updatePricing).first();
+    .bind(input.uid, plan, stage, expiresOn, priceOre, billingCycle, input.uid, Math.floor(Date.now()/1000), +updatePricing, +updatePricing).first();
+  if (!saved) fail(409, 'Kunden har et åbent køb eller et Stripe-abonnement.');
   return {subscription: publicSubscription(saved)};
+}
+
+async function guardBilling(db, uid) {
+  await ensureBilling(db);
+  const billing = await db.prepare('SELECT snapshot,checkout_until FROM pejlo_billing WHERE uid=?').bind(uid).first();
+  if (stripeOwnsSubscription(billing) || billing?.checkout_until > Date.now()/1000) {
+    fail(409, 'Kunden har et åbent køb eller et Stripe-abonnement. Administrér det i Stripe først.');
+  }
 }

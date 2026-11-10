@@ -1,3 +1,4 @@
+import {ensureHandoffs} from './handoffs.js';
 import {ensureSnooze} from './snooze.js';
 import {archiveEvent} from './archive.js';
 import {cleanProfile} from '../../packages/shared/profiles.js';
@@ -86,6 +87,7 @@ export async function familyAPI(db,account,input,hashCode){
   await db.prepare('DELETE FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(input.identifier,String(input.uid||'')).run();return {revoked:true};
  }
  if(input.action==='delete'){
+  await ensureHandoffs(db);await db.prepare('DELETE FROM pejlo_handoffs WHERE identifier=?').bind(input.identifier).run();
   await ensureSnooze(db);await db.prepare('DELETE FROM pejlo_snooze WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('UPDATE pejlo_fences SET enabled=0 WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('DELETE FROM pejlo_alerts WHERE identifier=?').bind(input.identifier).run();
