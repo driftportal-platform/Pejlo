@@ -1,4 +1,8 @@
-# Pejlo 0.8.37
+# Pejlo 0.8.38
+
+Det nye Pejlo-logo bruges på login og i systemadmin. Appikonet bruges på hjemmeskærmen, i browserfanen og i pushbeskeder på enheder, der viser et særskilt ikon. Logo og ikonvarianter ligger i `apps/web/src/assets/icons/`.
+
+## Pejlo 0.8.37
 
 Kundesletning kræver, at Firestore bekræfter sletning af profildata. En trackerkommando med timeout eller serverfejl beholder sin spærring, så en kommando, der måske allerede er sendt, ikke bliver sendt igen med det samme.
 

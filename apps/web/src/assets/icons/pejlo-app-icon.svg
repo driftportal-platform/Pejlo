@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-labelledby="title">
+  <title id="title">Pejlo appikon</title>
+  <rect width="108" height="108" rx="27" fill="#183e35"/>
+  <path fill="#fafbf7" d="M52 23c-15.5 0-28 12.5-28 28 0 19.6 22.5 35.3 26.5 38.1a2.6 2.6 0 0 0 3 0C57.5 86.3 80 70.6 80 51c0-15.5-12.5-28-28-28Z"/>
+  <path fill="#183e35" d="m66 38-26.8 11a2 2 0 0 0 .2 3.8l9.3 2.5 2.5 9.3a2 2 0 0 0 3.8.2L66 38Z"/>
+  <path fill="none" stroke="#c9d9b6" stroke-width="4.8" stroke-linecap="round" d="M79 23a22 22 0 0 1 10 12"/>
+</svg>

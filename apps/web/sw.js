@@ -4,7 +4,7 @@ self.addEventListener('push',event=>{
  let payload={};try{payload=event.data.json();}catch{}
  const tracker=trackerId(payload.tracker),limit=typeof Notification==='undefined'?0:Notification.maxActions||0;
  const actions=tracker?[{action:'map',title:'Vis på kort'},{action:'pause',title:'Pause 1 time…'}].slice(0,limit):[];
- event.waitUntil(self.registration.showNotification(payload.title||'Pejlo',{body:payload.body||'Der er nyt i Pejlo.',tag:payload.tag||'pejlo',actions,data:{tracker}}));
+ event.waitUntil(self.registration.showNotification(payload.title||'Pejlo',{body:payload.body||'Der er nyt i Pejlo.',tag:payload.tag||'pejlo',icon:'/src/assets/icons/pejlo-icon-192.png',actions,data:{tracker}}));
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();const tracker=trackerId(event.notification.data?.tracker),action=tracker&&event.action==='pause'?'pause':'map';
