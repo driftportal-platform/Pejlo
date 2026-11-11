@@ -20,7 +20,7 @@ function database(owner='owner-uid'){
  const row=rows.get(sql.startsWith('UPDATE')?args[1]:args[0]);
  if(sql.startsWith('UPDATE')){if(!row||row.code_hash!==args[2]||(row.owner_uid!==null&&row.owner_uid!==args[3]))return null;row.owner_uid=args[0];return {identifier:row.identifier,name:row.name};}
  return row&&(!sql.includes('AND owner_uid')||row.owner_uid===args[1])?{identifier:row.identifier}:null;
- },async run(){if(sql.startsWith('INSERT OR IGNORE INTO pejlo_gps_filter')){const k=args[0]+args[1];if(!gps.has(k))gps.set(k,'{}');return {success:true};}if(sql.startsWith('CREATE')||sql.startsWith('ALTER'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
+ },async run(){if(sql.startsWith('INSERT OR IGNORE INTO pejlo_gps_filter')){const k=args[0]+args[1];if(!gps.has(k))gps.set(k,'{}');return {success:true};}if(sql.startsWith('UPDATE pejlo_tracker_actions')){if(requests.get(args[0]+args[1])===args[2])requests.set(args[0]+args[1],0);return {success:true};}if(sql.startsWith('UPDATE pejlo_position_requests')){if(requests.get(args[0])===args[1])requests.set(args[0],0);return {success:true};}if(sql.startsWith('CREATE')||sql.startsWith('ALTER'))return {success:true};if(rows.has(args[0]))throw new Error();rows.set(args[0],{identifier:args[0],name:args[1],code_hash:args[2],owner_uid:null});return {success:true};}};}};
 }
 const env={DB:database(),TRACCAR_ADMIN_UID:'owner-uid',TRACCAR_TOKEN:'server-secret'};
 const position={id:42,deviceId:7,valid:true,latitude:56.55,longitude:8.31,fixTime:new Date().toISOString(),attributes:{batteryLevel:55,secret:'never expose'}};
@@ -154,4 +154,46 @@ test('tracker actions are owner-only, capability-gated, rate-limited, and use se
  const read=await (await handleAPI(req(),configured,owner.fetcher)).json();
  assert.deepEqual(read.actions,{find:true,sound:false});
  assert.doesNotMatch(JSON.stringify(read),/7e82027e/);
+});
+
+test('a command Traccar rejects releases the rate limit at once; a queued one keeps it',async()=>{
+ const post=(path,value)=>new Request('https://pejlo.example/api/'+path,{method:'POST',headers:{Authorization:'Bearer firebase-token','Content-Type':'application/json'},body:JSON.stringify(value)});
+ // position request
+ const db=database(),local={...env,DB:db};
+ assert.equal((await handleAPI(post('tracker/position',{identifier}),local,fixture({status:'online',commandStatus:400}).fetcher)).status,502);
+ assert.equal((await handleAPI(post('tracker/position',{identifier}),local,fixture({status:'online'}).fetcher)).status,200);
+ assert.equal((await handleAPI(post('tracker/position',{identifier}),local,fixture({status:'online'}).fetcher)).status,429);
+ // find / sound
+ const actions=JSON.stringify({[identifier]:{find:'7e82027e',sound:'aabb'}}),action=(which)=>post('tracker/action',{identifier,action:which});
+ const adb=database(),owner={...env,DB:adb,PEJLO_TRACKER_ACTIONS:actions},types=[{type:'custom'}];
+ assert.equal((await handleAPI(action('find'),owner,fixture({status:'online',commandTypes:types,commandStatus:400}).fetcher)).status,502);
+ assert.equal((await handleAPI(action('find'),owner,fixture({status:'online',commandTypes:types}).fetcher)).status,200);
+ assert.equal((await handleAPI(action('find'),owner,fixture({status:'online',commandTypes:types}).fetcher)).status,429);
+ assert.equal((await handleAPI(action('sound'),owner,fixture({status:'online',commandTypes:types,commandStatus:202}).fetcher)).status,502);
+ assert.equal((await handleAPI(action('sound'),owner,fixture({status:'online',commandTypes:types}).fetcher)).status,429,'a queued command may still run: keep the limit');
+});
+
+
+test('timeouts and server errors keep tracker commands from being sent twice',async()=>{
+ const options={status:'online',commandTypes:[{type:'positionSingle'},{type:'custom'}]};
+ const trackerActions=JSON.stringify({[identifier]:{find:'7e82027e',sound:'aabb'}});
+ for(const action of ['position','find','sound']){
+  for(const failure of ['timeout','server']){
+   const local={...env,DB:database(),PEJLO_TRACKER_ACTIONS:trackerActions};
+   const path=action==='position'?'position':'action';
+   const payload=action==='position'?{identifier}:{identifier,action};
+   const request=()=>new Request('https://pejlo.example/api/tracker/'+path,{
+    method:'POST',headers:{Authorization:'Bearer firebase-token'},body:JSON.stringify(payload)
+   });
+   const source=fixture({...options,commandStatus:500});
+   const fetcher=(url,init)=>{
+    if(failure==='timeout'&&url.endsWith('/api/commands/send'))throw new DOMException('Timed out','TimeoutError');
+    return source.fetcher(url,init);
+   };
+   assert.equal((await handleAPI(request(),local,fetcher)).status,502);
+   const retry=fixture(options);
+   assert.equal((await handleAPI(request(),local,retry.fetcher)).status,429);
+   assert.equal(retry.calls.some(call=>call.url.endsWith('/api/commands/send')),false);
+  }
+ }
 });

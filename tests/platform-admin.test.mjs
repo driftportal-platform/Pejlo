@@ -14,7 +14,7 @@ const secret = JSON.stringify({
   private_key: privateKey.export({type: 'pkcs8', format: 'pem'})
 });
 
-function setup(caller = admin) {
+function setup(caller = admin, firestoreStatus = 200) {
   const calls = [];
   const users = new Map([[member, {localId: member, email, emailVerified: true, passwordHash: 'not-for-clients'}]]);
   const database = new DatabaseSync(':memory:');
@@ -35,6 +35,12 @@ function setup(caller = admin) {
     calls.push(target.pathname);
     if (target.pathname === '/v1/accounts:lookup') {
       return Response.json({users: [{localId: caller, emailVerified: true}]});
+    }
+    if (target.hostname === 'firestore.googleapis.com') {
+      assert.equal(options.method, 'DELETE');
+      assert.equal(options.headers.Authorization, 'Bearer service-token');
+      assert.equal(target.pathname, '/v1/projects/' + firebaseConfig.projectId + '/databases/(default)/documents/users/' + member + '/private/state');
+      return Response.json({}, {status: firestoreStatus});
     }
     assert.equal(options.redirect, 'manual');
     if (target.hostname === 'oauth2.googleapis.com') return Response.json({access_token: 'service-token'});
@@ -166,8 +172,25 @@ test('systemadmin can delete only a paused account after confirming its email an
   assert.equal((await request('',remove)).status,409);
   database.exec('DELETE FROM pejlo_members');
   assert.ok(!calls.some(path=>path.endsWith(':delete')));
-  assert.deepEqual(await request('',remove),{status:200,body:{deleted:true}});
+  database.exec('CREATE TABLE pejlo_push(endpoint TEXT PRIMARY KEY, owner_uid TEXT NOT NULL, subscription TEXT NOT NULL)');
+  database.prepare('INSERT INTO pejlo_push VALUES (?,?,?)').run('https://fcm.googleapis.com/a',member,'{}');
+  database.prepare('INSERT INTO pejlo_push VALUES (?,?,?)').run('https://fcm.googleapis.com/b','someone-else','{}');
+  assert.deepEqual(await request('',remove),{status:200,body:{deleted:true,cleanup:{rows:1,firestore:'deleted'}}});
+  assert.deepEqual(database.prepare('SELECT owner_uid FROM pejlo_push').all().map(r=>r.owner_uid),['someone-else'],'only the deleted account\'s rows are removed');
   assert.equal((await request('?email='+encodeURIComponent(email))).body.users.length,0);
+});
+
+test('Firestore failure preserves the paused login and database rows',async()=>{
+  const {request,calls,database}=setup(admin,403);
+  await request('',{action:'account',uid:member,name:'Kunde',disabled:true});
+  database.prepare('INSERT INTO pejlo_subscriptions VALUES (?,?,?,?)').run(member,'Pejlo','active','2099-01-01');
+  const result=await request('',{action:'delete',uid:member,confirmEmail:email});
+  assert.equal(result.status,502);
+  assert.match(result.body.error,/Firestore/);
+  assert.ok(!calls.some(path=>path.endsWith(':delete')));
+  assert.equal(database.prepare('SELECT uid FROM pejlo_subscriptions WHERE uid=?').get(member).uid,member);
+  const user=await request('?email='+encodeURIComponent(email));
+  assert.equal(user.body.users[0].disabled,true);
 });
 
 test('standard Pejlo prices separate the first and additional trackers',async()=>{
