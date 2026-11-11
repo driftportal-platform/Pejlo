@@ -1,4 +1,11 @@
-# Pejlo 0.8.19
+# Pejlo 0.8.35
+
+Systemadmin og Mit abonnement viser priser og besparelser for 1, 12 og 24 måneder. Systemadmin kan gemme en 24-måneders aftale. Onlinekøb af 24 måneder kan afprøves i Stripes testmiljø.
+
+- [Priser og opsætning for 0.8.35](docs/version-0.8.35.md)
+- [Stripe og trackerfunktioner i 0.8.34](docs/version-0.8.34.md)
+
+## Pejlo 0.8.19
 
 Profilfoto kan flyttes og zoomes i en rund ramme før det gemmes. Nye fotos gemmes i op til 384 × 384 pixel.
 
