@@ -100,6 +100,10 @@ test('system admin sees existing users and can manage subscriptions independentl
   const lookup=await request('?email='+encodeURIComponent(email));
   assert.equal(lookup.body.users[0].subscription.plan,'Basis');
   assert.equal(lookup.body.users[0].subscription.billingCycle,'monthly');
+  const twoYears=await request('',{...input,price:'799',billingCycle:'biennial',expiresOn:'2099-01-01'});
+  assert.equal(twoYears.status,200);
+  assert.equal(twoYears.body.subscription.billingCycle,'biennial');
+  assert.equal(twoYears.body.subscription.priceOre,79900);
   const free=await request('',{...input,price:'0',billingCycle:'annual',expiresOn:''});
   assert.equal(free.body.subscription.priceOre,0);
   assert.equal(free.body.subscription.daysToExpiry,null);
@@ -167,11 +171,15 @@ test('systemadmin can delete only a paused account after confirming its email an
 });
 
 test('standard Pejlo prices separate the first and additional trackers',async()=>{
- const {standardSubscriptionPrice}=await import('../dist/src/features/platform-admin.js');
+ const {standardSubscriptionPrice,subscriptionSavings}=await import('../packages/shared/pricing.js');
  assert.equal(standardSubscriptionPrice('monthly',1),4900);
  assert.equal(standardSubscriptionPrice('annual',1),44900);
  assert.equal(standardSubscriptionPrice('monthly',2),7800);
  assert.equal(standardSubscriptionPrice('annual',2),71800);
+ assert.equal(standardSubscriptionPrice('biennial',1),79900);
+ assert.equal(standardSubscriptionPrice('biennial',2),127800);
+ assert.equal(subscriptionSavings('annual',2),21800);
+ assert.equal(subscriptionSavings('biennial',2),59400);
  assert.equal(standardSubscriptionPrice('annual',1.5),null);
  assert.equal(standardSubscriptionPrice('annual',0),null);
 });

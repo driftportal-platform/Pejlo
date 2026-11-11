@@ -4,7 +4,7 @@ import {createHmac} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {handleAPI} from '../apps/api/worker.js';
 
-function setup() {
+function setup(extraEnv={}) {
  const sqlite = new DatabaseSync(':memory:');
  const DB = {prepare(sql) {
   const stmt = sqlite.prepare(sql);let args=[];
@@ -13,7 +13,7 @@ function setup() {
  }};
  const env={DB,STRIPE_SECRET_KEY:'sk_test_mock',STRIPE_WEBHOOK_SECRET:'whsec_mock',
   STRIPE_PORTAL_CONFIGURATION:'bpc_test',STRIPE_PRICE_MONTHLY_FIRST:'price_mfirst',
-  STRIPE_PRICE_MONTHLY_EXTRA:'price_mextra',STRIPE_PRICE_ANNUAL_FIRST:'price_afirst',STRIPE_PRICE_ANNUAL_EXTRA:'price_aextra'};
+  STRIPE_PRICE_MONTHLY_EXTRA:'price_mextra',STRIPE_PRICE_ANNUAL_FIRST:'price_afirst',STRIPE_PRICE_ANNUAL_EXTRA:'price_aextra',...extraEnv};
  const recorded=[],sessions=new Map();
  let remote=[];
  const fetcher=async (url,options)=>{
@@ -22,8 +22,9 @@ function setup() {
   assert.equal(options.redirect,'manual');
   if(path.startsWith('/v1/prices/')){
    const id=path.split('/').at(-1);
-   return Response.json({id,currency:'dkk',active:true,unit_amount:id==='price_afirst'?44900:26900,
-    recurring:{interval:'year',interval_count:1},tax_behavior:'inclusive'});
+   const amounts={price_afirst:44900,price_aextra:26900,price_bfirst:79900,price_bextra:47900};
+   return Response.json({id,currency:'dkk',active:true,unit_amount:amounts[id],
+    recurring:{interval:'year',interval_count:id.startsWith('price_b')?2:1},tax_behavior:'inclusive'});
   }
   if(path==='/v1/customers')return Response.json({id:'cus_demo'});
   if(path==='/v1/subscriptions')return Response.json({data:remote,has_more:false});
@@ -90,4 +91,24 @@ test('Stripe Checkout reserves one session and signed events reconcile current s
  view=await (await api('subscription')).json();
  assert.equal(view.subscription.status,'expired');
  assert.equal(view.checkout,true);
+});
+
+
+test('24 months checkout is limited to Stripe sandbox and uses two-year prices',async()=>{
+ const config={STRIPE_PRICE_BIENNIAL_FIRST:'price_bfirst',STRIPE_PRICE_BIENNIAL_EXTRA:'price_bextra'};
+ const input={action:'checkout',cycle:'biennial',quantity:2};
+ const sandbox=setup(config);
+ const view=await (await sandbox.api('subscription')).json();
+ assert.deepEqual(view.checkoutCycles,['monthly','annual','biennial']);
+ assert.equal((await sandbox.api('billing',input)).status,200);
+ const {data}=sandbox.recorded[0];
+ assert.equal(data['line_items[0][price]'],'price_bfirst');
+ assert.equal(data['line_items[1][price]'],'price_bextra');
+ const production=setup({...config,STRIPE_SECRET_KEY:'sk_live_mock'});
+ assert.deepEqual((await (await production.api('subscription')).json()).checkoutCycles,['monthly','annual']);
+ assert.equal((await production.api('billing',input)).status,409);
+ assert.equal(production.recorded.length,0);
+ const legacy=setup();
+ assert.equal((await legacy.api('billing',input)).status,409);
+ assert.equal((await legacy.api('billing',{...input,cycle:'annual'})).status,200);
 });
