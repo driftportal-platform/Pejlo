@@ -7,7 +7,7 @@ export function mailReady(env){return typeof env.RESEND_API_KEY==='string'&&!!en
 export const appURL=env=>typeof env.APP_URL==='string'&&/^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(env.APP_URL.trim())?env.APP_URL.trim():DEFAULT_APP_URL;
 const clean=(value,max)=>String(value??'').replace(/[\u0000-\u001f\u007f<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,max);
 async function recipientHash(email){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(email).trim().toLowerCase()))),x=>x.toString(16).padStart(2,'0')).join('');}
-const ensureMail=db=>once(db,'mail',async()=>{
+export const ensureMail=db=>once(db,'mail',async()=>{
  for(const sql of [
   'CREATE TABLE IF NOT EXISTS pejlo_mail_limits(uid TEXT PRIMARY KEY,last_sent INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS pejlo_mail_log(uid TEXT NOT NULL,recipient TEXT NOT NULL,sent_at INTEGER NOT NULL)',

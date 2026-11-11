@@ -182,7 +182,7 @@ export function createPlatformAdmin({request}){
   users.delete(uid);
   if(selected===uid){choose(null);$('delete').reset();}
   render();
-  $('message').textContent='Kundens login er slettet.';
+  $('message').textContent='Kundens login og Pejlo-data er slettet.';
  });};
  $('subscription').onsubmit=event=>{event.preventDefault();run(async active=>{
   const uid=selected,stage=$('stage').value;

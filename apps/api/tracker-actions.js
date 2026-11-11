@@ -19,6 +19,9 @@ export function configuredTrackerActions(env, identifier) {
   }
 }
 
+// Only explicit client errors establish that the command was rejected before dispatch.
+export const commandWasRejected = status => [400,401,403,404,422].includes(status);
+
 export async function sendTrackerAction({db, identifier, device, action, command, traccar, traccarFetch}) {
   if (!command) fail(409, 'Funktionen er endnu ikke afprøvet og aktiveret for denne tracker.');
   if (device.status !== 'online') fail(409, 'Trackeren er offline. Prøv igen, når den er online.');
@@ -37,6 +40,12 @@ export async function sendTrackerAction({db, identifier, device, action, command
     deviceId:device.id, type:'custom', textChannel:false, attributes:{data:command,noQueue:true}
   })});
   if (response.status===202) fail(502, 'Traccar har sat kommandoen i kø. Handlingen er ikke bekræftet.');
-  if (!response.ok) fail(502, 'Traccar kunne ikke sende kommandoen.');
+  if (!response.ok) {
+    if (commandWasRejected(response.status)) {
+      await db.prepare('UPDATE pejlo_tracker_actions SET requested_at=0 WHERE identifier=? AND action=? AND requested_at=?')
+        .bind(identifier,action,startedAt).run();
+    }
+    fail(502, 'Traccar kunne ikke bekræfte kommandoen.');
+  }
   return {startedAt, until:startedAt+duration};
 }

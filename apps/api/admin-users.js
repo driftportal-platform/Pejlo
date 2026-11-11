@@ -4,6 +4,7 @@ import {firebaseConfig} from '../web/src/config/firebase.js';
 import {googleAccessToken} from './google-auth.js';
 import {ensureSubscriptions,publicSubscription} from './subscriptions.js';
 import {ensureFamily} from './family.js';
+import {deleteUserData,deleteFirestoreState} from './user-data.js';
 
 const identityUrl = 'https://identitytoolkit.googleapis.com/v1/projects/' + firebaseConfig.projectId + '/accounts';
 const stages = ['none', 'trial', 'active', 'paused'];
@@ -157,8 +158,13 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
       UNION ALL SELECT 1 FROM pejlo_members WHERE uid=?
       LIMIT 1`).bind(input.uid, input.uid).first();
     if (attached) fail(409, 'Kunden ejer eller har adgang til en tracker. Fjern trackeradgangen før sletning.');
+    const firestore = await deleteFirestoreState(env.GCP_FIREBASE_AUTH_SERVICE_ACCOUNT, fetcher, firebaseConfig.projectId, input.uid);
+    if (firestore !== 'deleted') {
+      fail(502, 'Kundens profildata kunne ikke slettes i Firestore. Kontoen er stadig sat på pause. Kontrollér tjenestekontoens adgang til Firestore, og prøv igen.');
+    }
+    const cleanup = {...await deleteUserData(env.DB, input.uid, user.email), firestore};
     await identity(':delete', {localId: input.uid});
-    return {deleted: true};
+    return {deleted: true, cleanup};
   }
   const {plan, stage, expiresOn, updatePricing, priceOre, billingCycle} = subscriptionInput(input);
   const identity = await identityClient(env.GCP_FIREBASE_AUTH_SERVICE_ACCOUNT, fetcher);

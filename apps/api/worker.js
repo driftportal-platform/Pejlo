@@ -1,6 +1,7 @@
-import {configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
+import {commandWasRejected,configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
 import {billingWebhook,startBilling} from './billing.js';
 import {ensureSubscriptions} from './subscriptions.js';
+import {once} from './schema.js';
 import {handoffAPI,handoffHistory} from './handoffs.js';
 import {validPoint} from '../../packages/shared/geo.js';
 import {trustedGps,gpsPoint} from './gps.js';
@@ -229,7 +230,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(device.status!=='online')throw new Failure(409,'Trackeren har ingen aktiv forbindelse. Prøv igen, når den er online.');
    const types=await traccar('/api/commands/types?'+new URLSearchParams({deviceId:String(device.id),textChannel:'false'}));
    if(!Array.isArray(types)||!types.some(command=>command.type==='positionSingle'))throw new Failure(409,'Traccar tilbyder ikke enkelt positionsrapport for denne tracker.');
-   await env.DB.prepare('CREATE TABLE IF NOT EXISTS pejlo_position_requests (identifier TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)').run();
+   await once(env.DB,'positionRequests',()=>env.DB.prepare('CREATE TABLE IF NOT EXISTS pejlo_position_requests (identifier TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)').run());
    const requestedAt=Date.now();
    const reserved=await env.DB.prepare(`INSERT INTO pejlo_position_requests (identifier,requested_at) VALUES (?,?)
     ON CONFLICT(identifier) DO UPDATE SET requested_at=excluded.requested_at
@@ -239,7 +240,13 @@ export async function handleAPI(request,env,fetcher=fetch){
     deviceId:device.id,type:'positionSingle',textChannel:false,attributes:{noQueue:true}
    })});
    if(response.status===202)return json({status:'queued',requestedAt});
-   if(!response.ok)throw new Failure(502,'Traccar kunne ikke sende positionsforespørgslen. Kontrollér trackerens forbindelse.');
+   if(!response.ok){
+    if(commandWasRejected(response.status)){
+     await env.DB.prepare('UPDATE pejlo_position_requests SET requested_at=0 WHERE identifier=? AND requested_at=?')
+      .bind(identifier,requestedAt).run();
+    }
+    throw new Failure(502,'Traccar kunne ikke bekræfte positionsforespørgslen. Kontrollér trackerens forbindelse.');
+   }
    return json({status:'sent',requestedAt});
   }
   const positions=device.positionId?await traccar('/api/positions?id='+encodeURIComponent(device.positionId)):[];
