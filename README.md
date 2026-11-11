@@ -1,8 +1,9 @@
-# Pejlo 0.8.35
+# Pejlo 0.8.37
 
-Systemadmin og Mit abonnement viser priser og besparelser for 1, 12 og 24 måneder. Systemadmin kan gemme en 24-måneders aftale. Onlinekøb af 24 måneder kan afprøves i Stripes testmiljø.
+Kundesletning kræver, at Firestore bekræfter sletning af profildata. En trackerkommando med timeout eller serverfejl beholder sin spærring, så en kommando, der måske allerede er sendt, ikke bliver sendt igen med det samme.
 
-- [Priser og opsætning for 0.8.35](docs/version-0.8.35.md)
+- [Kundesletning og trackerkommandoer i 0.8.37](docs/version-0.8.37.md)
+- [Priser og opsætning i 0.8.35](docs/version-0.8.35.md)
 - [Stripe og trackerfunktioner i 0.8.34](docs/version-0.8.34.md)
 
 ## Pejlo 0.8.19
