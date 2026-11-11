@@ -218,3 +218,30 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
   width: min(144px, 100%);
   height: auto;
 }
+
+.account-toolbar .account-brand {
+  width: 100px;
+  margin-right: auto;
+}
+.account-details,
+.account-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .account-toolbar .account-brand {
+    width: 84px;
+  }
+  .account-details {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
+@media (width > 700px) {
+  body:not(.admin-document) .account-toolbar .account-brand {
+    display: none;
+  }
+}
