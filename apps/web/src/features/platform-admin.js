@@ -1,17 +1,13 @@
-import {subscriptionRates as standardPrices} from '../shared/pricing.js';
+import {subscriptionRates as standardPrices,standardSubscriptionPrice,subscriptionSavings} from '../shared/pricing.js';
 const statusLabel={none:'Intet abonnement',trial:'Prøveperiode',active:'Aktivt',paused:'Sat på pause',expired:'Udløbet'};
 
 const priceFormat=new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK'});
 const trackerPrice=34900;
-export function standardSubscriptionPrice(cycle,quantity){
- const rates=Object.hasOwn(standardPrices,cycle)?standardPrices[cycle]:null;
- return rates&&Number.isInteger(quantity)&&quantity>=1&&quantity<=1000
-  ?rates.first+(quantity-1)*rates.extra:null;
-}
 const kroner=ore=>priceFormat.format(ore/100);
 const priceInput=ore=>(ore/100).toFixed(2).replace('.',',');
 const dateFormat=new Intl.DateTimeFormat('da-DK',{dateStyle:'short',timeZone:'UTC'});
-const cycleLabel={monthly:'pr. måned',annual:'pr. år'};
+const cycleLabel={monthly:'pr. måned',annual:'pr. 12 mdr.',biennial:'pr. 24 mdr.'};
+const cycles=Object.keys(standardPrices);
 
 function timeLeft(days){
  if(days===null)return '—';
@@ -26,19 +22,27 @@ export function createPlatformAdmin({request}){
  let allowed=false,generation=0,selected=null,cursor=null,email='',busy=false;
  for(const [label,key] of [['Første tracker','first'],['Hver ekstra tracker','extra']]){
   const row=$('catalog').insertRow();
-  for(const value of [label,kroner(standardPrices.monthly[key]),kroner(standardPrices.annual[key])])row.insertCell().textContent=value;
+  row.insertCell().textContent=label;
+  for(const cycle of cycles){
+   const rate=standardPrices[cycle],saving=standardPrices.monthly[key]*rate.months-rate[key];
+   row.insertCell().textContent=kroner(rate[key])+(saving?' · spar '+kroner(saving):'');
+  }
  }
  $('hardware').textContent='Klargjort Q8 4G: '+kroner(trackerPrice)+' · Startpakke med én tracker og ét år: '+kroner(trackerPrice+standardPrices.annual.first)+'. Priser inkl. moms. SIM, data og evt. fragt betales særskilt.';
 
  function preview(){
   const quantity=$('quantity').valueAsNumber;
-  const monthly=standardSubscriptionPrice('monthly',quantity),annual=standardSubscriptionPrice('annual',quantity);
-  $('monthly').disabled=$('annual').disabled=monthly===null;
-  $('price-preview').textContent=monthly===null?'Vælg et helt antal fra 1 til 1.000.':
-   kroner(monthly)+' pr. måned eller '+kroner(annual)+' pr. år. Tryk Gem abonnement for at bruge prisen.';
+  const valid=standardSubscriptionPrice('monthly',quantity)!==null;
+  for(const cycle of cycles)$(cycle).disabled=!valid;
+  $('price-preview').textContent=!valid?'Vælg et helt antal fra 1 til 1.000.':
+   cycles.map(cycle=>{
+    const total=kroner(standardSubscriptionPrice(cycle,quantity));
+    const saving=subscriptionSavings(cycle,quantity);
+    return total+' '+cycleLabel[cycle]+(saving?' (spar '+kroner(saving)+')':'');
+   }).join(' · ') + '. Tryk Gem abonnement for at bruge prisen.';
  }
  $('quantity').oninput=preview;
- for(const cycle of ['monthly','annual'])$(cycle).onclick=()=>{
+ for(const cycle of cycles)$(cycle).onclick=()=>{
   const quantity=$('quantity').valueAsNumber,price=standardSubscriptionPrice(cycle,quantity);
   if(price===null)return;
   $('plan').value='Pejlo · '+quantity+(quantity===1?' tracker':' trackere');

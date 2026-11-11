@@ -1,4 +1,4 @@
-import {ensureBilling,billingReady,billingSnapshot,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
+import {ensureBilling,billingReady,checkoutCycles,billingSnapshot,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
 import {once} from './schema.js';
 
 const danishDate = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Europe/Copenhagen'});
@@ -45,6 +45,7 @@ async function customerView(db, uid, env) {
   const effective = publicSubscription(effectiveSubscription(subscription, billing));
   return {subscription: effective, request: request ?? null,
     checkout: billingReady(env) && !stripeOwnsSubscription(billing) && ['none','expired'].includes(effective.status),
+    checkoutCycles: checkoutCycles(env),
     portal: billingReady(env) && !!billingSnapshot(billing)};
 }
 

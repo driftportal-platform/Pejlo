@@ -1,3 +1,4 @@
+import {subscriptionRates} from '../../packages/shared/pricing.js';
 import {ensureBilling,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
 import {firebaseConfig} from '../web/src/config/firebase.js';
 import {googleAccessToken} from './google-auth.js';
@@ -6,7 +7,7 @@ import {ensureFamily} from './family.js';
 
 const identityUrl = 'https://identitytoolkit.googleapis.com/v1/projects/' + firebaseConfig.projectId + '/accounts';
 const stages = ['none', 'trial', 'active', 'paused'];
-const billingCycles = ['monthly', 'annual'];
+const billingCycles = Object.keys(subscriptionRates);
 
 function fail(status, message) {
   throw Object.assign(new Error(message), {status});

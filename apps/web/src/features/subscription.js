@@ -1,4 +1,4 @@
-import {subscriptionRates} from '../shared/pricing.js';
+import {subscriptionRates,standardSubscriptionPrice,subscriptionSavings} from '../shared/pricing.js';
 const requestLabel = {renew: 'Forlængelse', cancel: 'Opsigelse'};
 const statusLabel = {active: 'Aktivt', trial: 'Prøveperiode', paused: 'Sat på pause', expired: 'Udløbet', none: 'Intet abonnement'};
 const dateFormat = new Intl.DateTimeFormat('da-DK', {dateStyle: 'medium', timeZone: 'Europe/Copenhagen'});
@@ -15,12 +15,27 @@ export function createMySubscription({request}) {
  const checkout = $('my-subscription-checkout'), portal = $('my-subscription-portal');
  const cycle = $('my-subscription-cycle'), quantity = $('my-subscription-quantity');
  const total = $('my-subscription-total');
+ const prices = $('my-subscription-prices'), biennialNote = $('my-subscription-biennial-note');
  const kroner = new Intl.NumberFormat('da-DK',{style:'currency',currency:'DKK'});
+ function periodLabel(key) {
+  const months = subscriptionRates[key].months;
+  return months === 1 ? '1 måned' : months + ' måneder';
+ }
+ function quote(key, count) {
+  const amount = standardSubscriptionPrice(key,count);
+  const saving = subscriptionSavings(key,count);
+  return periodLabel(key) + ' ' + kroner.format(amount/100) +
+   (saving ? ' (spar ' + kroner.format(saving/100) + ')' : '');
+ }
  function updateTotal() {
-  const rate = subscriptionRates[cycle.value], count = quantity.valueAsNumber;
-  total.textContent = quantity.validity.valid
-   ? kroner.format((rate.first+(count-1)*rate.extra)/100)+(cycle.value==='annual'?' pr. år':' pr. måned')+' inkl. moms. Tracker og SIM betales særskilt.'
-   : '';
+  const count = quantity.validity.valid ? quantity.valueAsNumber : null;
+  total.textContent = count === null ? '' :
+   'Valgt: '+quote(cycle.value,count)+'. Inkl. moms. Tracker og SIM betales særskilt.';
+  const displayed = checkout.hidden ? 1 : count;
+  prices.textContent = displayed === null ? '' : 'Standardpriser for ' + displayed +
+   (displayed===1?' tracker: ':' trackere: ') +
+   Object.keys(subscriptionRates).map(key=>quote(key,displayed)).join(' · ') +
+   '. Besparelsen er i forhold til månedsbetaling.';
  }
  checkout.oninput = updateTotal;
  let generation = 0, busy = false, awaitingPayment = false;
@@ -41,7 +56,7 @@ export function createMySubscription({request}) {
    awaitingPayment = false;
    dialog.close();
    checkout.hidden = portal.hidden = true;
-   summary.textContent = status.textContent = '';
+   summary.textContent = status.textContent = prices.textContent = '';
   }
  }
 
@@ -68,7 +83,11 @@ export function createMySubscription({request}) {
   }
   checkout.hidden = !data.checkout || awaitingPayment;
   portal.hidden = !data.portal;
-  if (!checkout.hidden) updateTotal();
+  const available = data.checkoutCycles ?? ['monthly','annual'];
+  for(const option of cycle.options)option.disabled=!available.includes(option.value);
+  if(available.length&&!available.includes(cycle.value))cycle.value=available[0];
+  biennialNote.hidden=available.includes('biennial');
+  updateTotal();
   renew.hidden = pending || subscription.stage === 'none' || subscription.provider === 'stripe';
   cancel.hidden = renew.hidden || subscription.daysToExpiry < 0;
  }

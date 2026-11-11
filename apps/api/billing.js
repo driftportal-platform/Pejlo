@@ -2,10 +2,13 @@ import {once} from './schema.js';
 import {subscriptionRates} from '../../packages/shared/pricing.js';
 
 const fields = {
-  monthly: ['STRIPE_PRICE_MONTHLY_FIRST', 'STRIPE_PRICE_MONTHLY_EXTRA', 'month'],
-  annual: ['STRIPE_PRICE_ANNUAL_FIRST', 'STRIPE_PRICE_ANNUAL_EXTRA', 'year']
+  monthly: ['STRIPE_PRICE_MONTHLY_FIRST', 'STRIPE_PRICE_MONTHLY_EXTRA', 'month', 1],
+  annual: ['STRIPE_PRICE_ANNUAL_FIRST', 'STRIPE_PRICE_ANNUAL_EXTRA', 'year', 1],
+  biennial: ['STRIPE_PRICE_BIENNIAL_FIRST', 'STRIPE_PRICE_BIENNIAL_EXTRA', 'year', 2]
 };
 const validPrice = id => /^price_[A-Za-z0-9]+$/.test(id ?? '');
+const priceIds = (env, cycle) => fields[cycle].slice(0, 2).map(key => env[key]);
+const baseCycles = ['monthly','annual'];
 const validCustomer = id => /^cus_[A-Za-z0-9]+$/.test(id ?? '');
 const dateInDenmark = new Intl.DateTimeFormat('sv-SE', {timeZone: 'Europe/Copenhagen'});
 const nowSeconds = () => Math.floor(Date.now() / 1000);
@@ -16,11 +19,20 @@ function fail(status, message) {
 }
 
 export function billingReady(env) {
+  const ids = baseCycles.flatMap(cycle => priceIds(env, cycle));
   return /^sk_(test|live)_/.test(env.STRIPE_SECRET_KEY ?? '') &&
     /^whsec_/.test(env.STRIPE_WEBHOOK_SECRET ?? '') &&
     /^bpc_[A-Za-z0-9]+$/.test(env.STRIPE_PORTAL_CONFIGURATION ?? '') &&
-    new Set(Object.values(fields).flatMap(keys => keys.slice(0, 2).map(key => env[key]))).size === 4 &&
-    Object.values(fields).every(keys => keys.slice(0, 2).every(key => validPrice(env[key])));
+    new Set(ids).size === 4 && ids.every(validPrice);
+}
+
+export function checkoutCycles(env) {
+  if (!billingReady(env)) return [];
+  const twoYearIds = priceIds(env, 'biennial');
+  const allIds = [...baseCycles.flatMap(cycle => priceIds(env, cycle)), ...twoYearIds];
+  // Validate the 24-month purchase in Stripe's test environment until early cancellation/refunds are supported.
+  return env.STRIPE_SECRET_KEY.startsWith('sk_test_') && twoYearIds.every(validPrice) && new Set(allIds).size === 6
+    ? [...baseCycles,'biennial'] : baseCycles;
 }
 
 export const ensureBilling = db => once(db, 'stripeBilling', async () => {
@@ -64,17 +76,17 @@ function stripeURL(value, hostname) {
 }
 
 function plan(env, cycle, quantity) {
-  const [base, extra, interval] = fields[cycle];
+  const [base, extra, interval, intervalCount] = fields[cycle];
   const rate = subscriptionRates[cycle];
   return {
-    interval, items: [{id: env[base], amount: rate.first, quantity: 1},
+    interval, intervalCount, items: [{id: env[base], amount: rate.first, quantity: 1},
       ...(quantity > 1 ? [{id: env[extra], amount: rate.extra, quantity: quantity - 1}] : [])]
   };
 }
 
-function goodPrice(price, item, interval) {
+function goodPrice(price, item, interval, intervalCount) {
   return price.id === item.id && price.active && price.currency === 'dkk' &&
-    price.unit_amount === item.amount && price.recurring?.interval === interval && price.recurring?.interval_count === 1 &&
+    price.unit_amount === item.amount && price.recurring?.interval === interval && price.recurring?.interval_count === intervalCount &&
     price.tax_behavior === 'inclusive';
 }
 
@@ -106,10 +118,11 @@ export async function startBilling(env, fetcher, account, origin, input) {
       !Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 10) {
     fail(400, 'Vælg måneds- eller årsbetaling og 1–10 trackere.');
   }
+  if (!checkoutCycles(env).includes(input.cycle)) fail(409, 'Denne betalingsperiode kan endnu ikke købes online.');
   const offering = plan(env, input.cycle, input.quantity);
   await Promise.all(offering.items.map(async item => {
     const price = await stripe(env, fetcher, 'prices/' + item.id);
-    if (!goodPrice(price, item, offering.interval)) fail(503, 'Stripe-prisen matcher ikke Pejlos prisliste.');
+    if (!goodPrice(price, item, offering.interval, offering.intervalCount)) fail(503, 'Stripe-prisen matcher ikke Pejlos prisliste.');
   }));
   const customer = await ensureCustomer(env, fetcher, account);
   const dbRow = await db.prepare('SELECT * FROM pejlo_billing WHERE uid=?').bind(uid).first();
@@ -168,7 +181,7 @@ async function signedEvent(request, secret) {
 
 function subscriptionSnapshot(env, subscription) {
   const items = subscription.items?.data ?? [];
-  const cycle = Object.keys(fields).find(c => items.some(item => item.price.id === env[fields[c][0]]));
+  const cycle = Object.keys(fields).find(c => validPrice(env[fields[c][0]]) && items.some(item => item.price.id === env[fields[c][0]]));
   if (!cycle) fail(502, 'Stripe-abonnementets pris kunne ikke genkendes.');
   const quantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const periods = items.map(item => item.current_period_end).filter(Number.isFinite);

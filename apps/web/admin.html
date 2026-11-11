@@ -20,8 +20,9 @@
 <h3 id="platform-catalog-title">Pejlos standardpriser</h3>
 <div class="platform-table-wrap">
 <table class="platform-table">
-<thead><tr><th scope="col">Abonnement</th><th scope="col">Pr. måned</th><th scope="col">Pr. år</th></tr></thead>
+<thead><tr><th scope="col">Abonnement</th><th scope="col">1 måned</th><th scope="col">12 måneder</th><th scope="col">24 måneder</th></tr></thead>
 <tbody id="platform-catalog"></tbody></table></div>
+<p class="hint">Besparelserne er sammenlignet med månedsbetaling over samme periode.</p>
 <p class="hint" id="platform-hardware"></p>
 </section>
 <form id="platform-search"><label>Søg på brugerens e-mail<input type="email" id="platform-search-email" autocomplete="off" maxlength="254" placeholder="Vis alle ved tomt felt"></label><button class="outline-button">Hent brugere</button></form>
@@ -54,14 +55,15 @@
 <p id="platform-managed-subscription" class="hint" hidden>Abonnementet styres i Stripe.</p><form id="platform-subscription"><h3>Abonnement</h3>
 <fieldset><legend>Udfyld med standardpris</legend>
 <label>Antal trackere<input id="platform-quantity" type="number" min="1" max="1000" step="1" value="1"></label>
-<button type="button" class="outline-button" id="platform-monthly">Brug månedspris</button>
-<button type="button" class="outline-button" id="platform-annual">Brug årspris</button>
+<button type="button" class="outline-button" id="platform-monthly">Brug 1-månedspris</button>
+<button type="button" class="outline-button" id="platform-annual">Brug 12-månederspris</button>
+<button type="button" class="outline-button" id="platform-biennial">Brug 24-månederspris</button>
 <p class="hint" id="platform-price-preview" aria-live="polite"></p>
 </fieldset>
 <label>Abonnementsnavn<input id="platform-plan" maxlength="80" placeholder="Fx Pejlo Basis"></label>
 <label>Status<select id="platform-stage"><option value="none">Intet abonnement</option><option value="trial">Prøveperiode</option><option value="active">Aktivt</option><option value="paused">Sat på pause</option></select></label>
 <label>Pris pr. periode (DKK)<input id="platform-price" inputmode="decimal" maxlength="10" placeholder="Fx 49,00"></label>
-<label>Prisperiode<select id="platform-cycle"><option value="">Vælg periode</option><option value="monthly">Pr. måned</option><option value="annual">Pr. år</option></select></label>
+<label>Prisperiode<select id="platform-cycle"><option value="">Vælg periode</option><option value="monthly">Pr. måned</option><option value="annual">Pr. 12 måneder</option><option value="biennial">Pr. 24 måneder</option></select></label>
 <label>Udløbsdato<input id="platform-expiry" type="date" min="2000-01-01" max="2099-12-31"></label>
 <button class="outline-button">Gem abonnement</button></form>
 </div></section>
