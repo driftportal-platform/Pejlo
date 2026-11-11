@@ -1,4 +1,8 @@
-# Pejlo 0.8.38
+# Pejlo 0.8.39
+
+Logoet vises nu i kontobjælken efter login, også på mobil.
+
+## Pejlo 0.8.38
 
 Det nye Pejlo-logo bruges på login og i systemadmin. Appikonet bruges på hjemmeskærmen, i browserfanen og i pushbeskeder på enheder, der viser et særskilt ikon. Logo og ikonvarianter ligger i `apps/web/src/assets/icons/`.
 
