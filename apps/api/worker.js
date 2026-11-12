@@ -258,7 +258,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   }
   const positions=device.positionId?await traccar('/api/positions?id='+encodeURIComponent(device.positionId)):[];
   const raw=Array.isArray(positions)?positions.find(p=>p.deviceId===device.id&&p.id===device.positionId):null;
-  let position=point(raw);
+  const latestPosition=point(raw);
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
   let route=[],historyAvailable=true,historyTruncated=false;
   if(url.searchParams.get('live')!=='1')try{
@@ -271,11 +271,11 @@ export async function handleAPI(request,env,fetcher=fetch){
   let profile;try{profile=JSON.parse(profileRow?.profile||'{}');}catch{}
   const type=profile?.type||'object',home=profile?.homeConfirmed===true?profile.home:null;
   const ownerRow=await env.DB.prepare('SELECT owner_uid FROM trackers WHERE identifier=?').bind(identifier).first();
-  const filtered=filterGps(route,type,{},home),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(position?[position]:[])];
+  const filtered=filterGps(route,type,{},home),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(latestPosition?[latestPosition]:[])];
   // Historical queries must never rewind the shared live filter.
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home);
-  position=point(raw)?gps.trusted||null:null;route=filtered.points;
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,gpsUncertain:!!gps.uncertain,gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  const position=gps.trusted||null;route=filtered.points;
+  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,gpsUncertain:!!(gps.uncertain||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

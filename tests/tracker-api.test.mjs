@@ -55,8 +55,18 @@ test('missing registry setup fails closed and never contacts Traccar',async()=>{
 test('only configured device and sanitized valid points are returned; offline is preserved',async()=>{
  const f=fixture(),r=await handleAPI(req(),env,f.fetcher),d=await r.json();assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(d.device.status,'offline');assert.equal(d.position.battery,55);assert.equal(d.device.lastContact,Date.parse(position.fixTime)+1000);assert.equal(d.position.timestamp,Date.parse(position.fixTime));assert.equal(d.route.length,1);assert.equal(d.device.identifier,'080608317309');assert.equal(JSON.stringify(d).includes('private'),false);assert.equal(JSON.stringify(d).includes('server-secret'),false);assert.equal(JSON.stringify(d).includes('never expose'),false);
 });
+test('an invalid latest fix preserves the last trusted position with its original time',async()=>{
+ const localEnv={...env,DB:database()};
+ const first=fixture({history:false});
+ const good=await (await handleAPI(req(),localEnv,first.fetcher)).json();
+ assert.equal(good.position.timestamp,Date.parse(position.fixTime));
+ const invalid=fixture({positionValue:{...position,valid:false},history:false});
+ const result=await (await handleAPI(req(),localEnv,invalid.fetcher)).json();
+ assert.deepEqual(result.position,good.position);
+ assert.equal(result.gpsUncertain,true);
+});
 test('invalid GPS stays absent and report failure does not fabricate a route',async()=>{
- const f=fixture({positionValue:{...position,valid:false},history:false});const d=await(await handleAPI(req(),env,f.fetcher)).json();assert.equal(d.position,null);assert.deepEqual(d.route,[]);assert.equal(d.historyAvailable,false);
+ const f=fixture({positionValue:{...position,valid:false},history:false});const d=await(await handleAPI(req(),{...env,DB:database()},f.fetcher)).json();assert.equal(d.position,null);assert.deepEqual(d.route,[]);assert.equal(d.historyAvailable,false);
  for(const p of [{...position,latitude:'56.5'},{...position,longitude:181},{...position,fixTime:'bad'},{...position,fixTime:new Date(Date.now()+3600000).toISOString()}])assert.equal(point(p),null);
 });
 test('method and route are constrained, external server override fails closed',async()=>{
