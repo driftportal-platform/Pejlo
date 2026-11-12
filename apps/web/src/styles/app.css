@@ -245,3 +245,8 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
     display: none;
   }
 }
+
+.tracker-position-marker .map-marker {
+  border: 4px solid #db0064;
+  box-shadow: 0 0 0 2px #fff, 0 2px 7px 3px #15232180;
+}
