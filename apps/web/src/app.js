@@ -119,7 +119,13 @@ function updatePositionRequest(){
  $('#tracker-details-connection').textContent=identifier?({online:'Online',offline:'Offline'}[d.device?.status]||'Ukendt'):'Eksempeldata';
  $('#tracker-details-contact').textContent=identifier?ageText(d.device?.lastContact):'—';
  $('#tracker-details-gps').textContent=position?ageText(position.timestamp)+(d.gpsProvisional?' · afventer bekræftelse':d.gpsUncertain?' · usikkert GPS-signal':''):'Ingen gyldig position';
- $('#tracker-details-battery').textContent=position?.battery!=null?position.battery+' %':'Ikke oplyst';
+ if(d.telemetry?.gpsClockAhead)$('#tracker-details-gps').textContent+=' · trackeren melder GPS-tid i fremtiden';
+ const telemetry=d.telemetry;
+ const batteryInfo=[telemetry?.battery!=null?telemetry.battery+' %':'Ikke oplyst'];
+ if(telemetry?.charging===true)batteryInfo.push('Oplader');
+ if(telemetry?.charging===false)batteryInfo.push('Oplader ikke');
+ if(telemetry?.receivedAt!=null&&(telemetry.battery!=null||telemetry.charging!=null))batteryInfo.push(ageText(telemetry.receivedAt));
+ $('#tracker-details-battery').textContent=identifier?batteryInfo.join(' · '):(position?.battery!=null?position.battery+' % · eksempel':'Ikke oplyst');
  $('#tracker-details-home').textContent=identifier?homeStatus(profile,position):'Eksempelposition';
  const directions=$('#tracker-directions'),url=identifier&&directionsURL(position);
  directions.hidden=!url;
@@ -182,7 +188,8 @@ function updateTrackerStatus(){
  $('#tracker-message').textContent=trackerError||(trackerData?'Testserver: '+trackerData.device.name+' · '+trackerData.device.status:ownedTrackers.length?'Vælg din tracker i profilen, og gem.':'Tilføj din tracker med ID og parringskode nedenfor.');
  const value=selected()?.trackerId||'';
  options($('#profile-tracker'),[['','Ingen tracker · vis eksempeldata'],...ownedTrackers.map(t=>[t.identifier,t.name+' · '+t.identifier]),...(!ownedTrackers.some(t=>t.identifier===value)&&value?[[value,value]]:[])],value);
- $('#battery-value').textContent=d?.position?.battery!=null?d.position.battery+' %'+(live?'':' · eksempel'):'Ikke oplyst';
+ const battery=live?d?.telemetry?.battery:d?.position?.battery;
+ $('#battery-value').textContent=battery!=null?battery+' %'+(live?'':' · eksempel'):'Ikke oplyst';
  $('#find').disabled=live&&!d?.position;$('#navigate').hidden=live&&!d?.position;$('#map').setAttribute('aria-label',live?'Kort med senest kendte position':'Kort med eksempelposition');
  $('#simulate').closest('article').hidden=live;
  updatePositionRequest();

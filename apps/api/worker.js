@@ -4,7 +4,7 @@ import {ensureSubscriptions} from './subscriptions.js';
 import {once} from './schema.js';
 import {handoffAPI,handoffHistory} from './handoffs.js';
 import {validPoint} from '../../packages/shared/geo.js';
-import {trustedGps,gpsPoint} from './gps.js';
+import {trustedGps,gpsPoint,trackerTelemetry} from './gps.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 import {adminStatus} from './operations.js';
 import {customerSubscription,adminSubscriptionRequests} from './subscriptions.js';
@@ -275,7 +275,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   // Historical queries must never rewind the shared live filter.
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home);
   const position=gps.trusted||null;route=filtered.points;
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,gpsUncertain:!!(gps.uncertain||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,telemetry:trackerTelemetry(raw),gpsUncertain:!!(gps.uncertain||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

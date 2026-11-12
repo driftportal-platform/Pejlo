@@ -65,6 +65,19 @@ test('an invalid latest fix preserves the last trusted position with its origina
  assert.deepEqual(result.position,good.position);
  assert.equal(result.gpsUncertain,true);
 });
+test('battery and charge are reported independently of a future GPS fix',async()=>{
+ const localEnv={...env,DB:database()};
+ const serverTime=new Date().toISOString();
+ const future={...position,serverTime,fixTime:new Date(Date.now()+8*3600000).toISOString(),attributes:{batteryLevel:100,charge:true,secret:'never expose'}};
+ const f=fixture({positionValue:future,history:false});
+ const result=await (await handleAPI(req(),localEnv,f.fetcher)).json();
+ assert.equal(result.position,null);
+ assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),gpsClockAhead:true});
+ const absent=fixture({positionValue:{...future,attributes:{batteryLevel:101,charge:'true'}},history:false});
+ const unknown=await (await handleAPI(req(),localEnv,absent.fetcher)).json();
+ assert.equal(unknown.telemetry.battery,null);
+ assert.equal(unknown.telemetry.charging,null);
+});
 test('invalid GPS stays absent and report failure does not fabricate a route',async()=>{
  const f=fixture({positionValue:{...position,valid:false},history:false});const d=await(await handleAPI(req(),{...env,DB:database()},f.fetcher)).json();assert.equal(d.position,null);assert.deepEqual(d.route,[]);assert.equal(d.historyAvailable,false);
  for(const p of [{...position,latitude:'56.5'},{...position,longitude:181},{...position,fixTime:'bad'},{...position,fixTime:new Date(Date.now()+3600000).toISOString()}])assert.equal(point(p),null);
