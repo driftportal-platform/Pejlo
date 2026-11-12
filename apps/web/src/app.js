@@ -165,7 +165,7 @@ $('#tracker-sound').onclick=()=>startTrackerAction('sound');
 async function loadTrackers(){
  const gen=sessionGeneration;
  try{const result=await trackerRequest('trackers');if(gen!==sessionGeneration)return;
- ownedTrackers=result.trackers;$('#system-admin-link').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;trackerError='';updateTrackerStatus();
+ ownedTrackers=result.trackers;$('#system-admin-link').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;if(!pollingId)trackerError='';updateTrackerStatus();
  }catch(error){if(gen===sessionGeneration){trackerError=error.message;updateTrackerStatus();}}
 }
 function connectTracker(){
@@ -406,7 +406,12 @@ const importLocal=()=>{
  const ids=new Set(state.profiles.map(p=>p.id));state.profiles.push(...old.profiles.filter(p=>!ids.has(p.id)).slice(0,50-state.profiles.length));state.activeId=state.profiles[0]?.id??null;persist();refresh();
 };
 $('#import-local').onclick=importLocal;$('#import-first').onclick=importLocal;
-$('#tracker-retry').onclick=()=>{loadTrackers();connectTracker();};
+$('#tracker-retry').onclick=()=>{
+ if(selected()?.trackerId){connectTracker();return;}
+ trackerError='Henter dine tilknyttede trackere…';
+ updateTrackerStatus();
+ void loadTrackers();
+};
 $('#claim-tracker').onsubmit=async event=>{
  event.preventDefault();if(selected()?.trackerId&&selected().trackerId!==$('#claim-id').value.trim())return toast('Vælg eller opret en tom profil til den nye tracker.');const button=event.target.querySelector('button');button.disabled=true;const gen=sessionGeneration,profileId=state.activeId;$('#claim-result').textContent='';
  try{const result=await trackerRequest('trackers/claim',{identifier:$('#claim-id').value.trim(),code:$('#claim-code').value.trim()});if(gen!==sessionGeneration)return;

@@ -20,7 +20,14 @@ import {ensureNotifications,pushReady,validSubscription,validHome,sendPush,runNo
 import {firebaseConfig} from '../web/src/config/firebase.js';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 class Failure extends Error { constructor(status,message){super(message);this.status=status;} }
-async function checkedJSON(response){if(!response.ok)throw new Failure(502,'Traccar kunne ikke kontaktes. Kontrollér forbindelsen og adgangstokenet.');return response.json();}
+async function checkedJSON(response){
+ if(response.ok)return response.json();
+ const status=response.status;
+ const message=status===401||status===403
+  ? 'Traccar afviste adgangen. Kontrollér tokenet og kontoens rettigheder.'
+  : 'Traccar returnerede en fejl. Prøv at hente trackerdata igen.';
+ throw new Failure(502,'Traccar HTTP '+status+'. '+message);
+}
 export const point=gpsPoint;
 const identifierOK=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{4,100}$/.test(value);
 export async function codeHash(code){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code.trim().toUpperCase()))),x=>x.toString(16).padStart(2,'0')).join('');}
