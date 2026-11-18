@@ -85,7 +85,43 @@ test('a legacy mirrored anchor recovers across separate live polls without a hom
 });
 test('duplicate fixes and changing remote clusters do not confirm a jump',()=>{const r=filterGps([p(0,0),p(500,2),p(500,2),p(-500,8)],'cat');assert.equal(r.state.trusted.timestamp,1000000);assert.equal(r.state.uncertain,true)});
 test('normal cat movement and car-speed movement have different limits',()=>{assert.equal(filterGps([p(0,0),p(100,2)],'car').points.length,2);assert.equal(filterGps([p(0,0),p(10,2),p(25,4)],'cat').points.length,3)});
-test('reported poor accuracy is withheld and a later good fix recovers',()=>{const r=filterGps([p(0,0),p(1,2,{accuracy:150}),p(2,4,{accuracy:10})],'cat');assert.equal(r.points.length,2);assert.equal(r.state.uncertain,false);assert.equal(advanceGps({},p(0,0,{accuracy:150}),'cat').state.trusted,undefined)});
+test('reported poor accuracy is withheld and a later good fix recovers',()=>{const r=filterGps([p(0,0),p(1,2,{accuracy:200}),p(2,4,{accuracy:10})],'cat');assert.equal(r.points.length,2);assert.equal(r.state.uncertain,false);assert.equal(advanceGps({},p(0,0,{accuracy:200}),'cat').state.trusted,undefined)});
 test('persisted filter survives new calls, isolates owners and cannot rewind on a history request',async()=>{const db=database();await trustedGps(db,'1234','a',[p(0,0)],'cat');let state=await trustedGps(db,'1234','a',[p(100,2)],'cat');assert.equal(state.trusted.timestamp,1000000);state=await trustedGps(db,'1234','a',[p(0,-1)],'cat');assert.equal(state.seen,1002000);assert.equal(state.uncertain,true);const other=await trustedGps(db,'1234','b',[p(100,2)],'cat');assert.equal(other.trusted.lat,p(100,2).lat)});
 test('API removes hops from both live position and history with unchanged contact time',async()=>{const db=await setup(),now=Date.now(),start=now-20000;const raw=(m,s)=>({id:s+1,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(start+s*1000).toISOString()});const samples=[raw(0,0),raw(100,2)];const fetcher=async url=>url.includes('accounts:lookup')?Response.json({users:[{localId:'owner',emailVerified:true}]}):url.includes('/devices')?Response.json([{id:7,uniqueId:'1234',positionId:3,lastUpdate:new Date(now).toISOString()}]):Response.json(url.includes('/positions')?[samples[1]]:samples);const res=await handleAPI(new Request('https://pejlo.example/api/tracker?identifier=1234',{headers:{Authorization:'Bearer test'}}),{DB:db,TRACCAR_TOKEN:'test'},fetcher);const data=await res.json();assert.equal(res.status,200);assert.equal(data.position.timestamp,start);assert.equal(data.route.length,0);assert.equal(data.gpsUncertain,true);assert.equal(data.gpsProvisional,true);assert.equal(data.device.lastContact,now)});
 test('background geofence ignores a GPS jump and then detects a genuine sustained crossing',async()=>{const db=await setup(),home={lat:56,lon:8,radius:50,shape:'circle',buffer:5};db.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify(home));const base=Date.now()-90000;let m=0,s=0;const get=async url=>Response.json(url.includes('/devices')?[{id:7,uniqueId:'1234',positionId:9}]:[{id:9,deviceId:7,valid:true,latitude:p(m,0).lat,longitude:8,fixTime:new Date(base+s*1000).toISOString()}]);const env={DB:db,TRACCAR_TOKEN:'test'};await runNotifications(env,get);s=1;await runNotifications(env,get);m=100;s=2;await runNotifications(env,get);assert.equal(JSON.parse(db.raw.prepare('SELECT state FROM pejlo_fences').get().state).pending,0);m=1;s=4;await runNotifications(env,get);assert.equal(db.raw.prepare('SELECT count(*) n FROM pejlo_alarm_history').get().n,0);m=80;s=24;await runNotifications(env,get);m=90;s=44;await runNotifications(env,get);assert.equal(db.raw.prepare("SELECT count(*) n FROM pejlo_alarm_history WHERE kind='exit'").get().n,1)});
+test('battery is smoothed: zero readings and large swings while uncertain are ignored',()=>{
+ const withBat=(meters,seconds,battery,extra={})=>p(meters,seconds,{battery,...extra});
+ // First good reading is accepted.
+ let r=filterGps([withBat(0,0,78)],'cat');
+ assert.equal(r.state.battery,78);
+ assert.equal(r.state.trusted.battery,78);
+ // Garbage 0 % while we already know a higher value is ignored.
+ r=filterGps([withBat(0,0,78),withBat(1,30,0)],'cat');
+ assert.equal(r.state.battery,78);
+ assert.equal(r.state.trusted.battery,78);
+ // A modest real drop is accepted.
+ r=filterGps([withBat(0,0,78),withBat(1,30,62)],'cat');
+ assert.equal(r.state.battery,62);
+ // Large swing during an uncertain jump is ignored.
+ r=filterGps([withBat(0,0,80),withBat(200,2,5)],'cat');
+ assert.equal(r.state.uncertain,true);
+ assert.equal(r.state.battery,80);
+ assert.equal(r.state.trusted.battery,80);
+ // Confirmed movement with a plausible new battery updates it.
+ r=filterGps([withBat(0,0,80),withBat(40,20,71),withBat(42,40,69)],'cat');
+ assert.equal(r.state.uncertain,false);
+ assert.equal(r.state.battery,69);
+});
+test('first fix is provisional but not uncertain; uncertainty only after discarding later data',()=>{
+ const first=filterGps([p(0,0)],'cat');
+ assert.equal(first.state.provisional,true);
+ assert.equal(first.state.uncertain,false);
+ // A later jump that is discarded marks uncertainty while keeping the first fix.
+ const jumped=filterGps([p(0,0),p(200,2)],'cat');
+ assert.equal(jumped.state.trusted.timestamp,1000000);
+ assert.equal(jumped.state.uncertain,true);
+ // Moderate accuracy (120 m) is now accepted; only clearly poor accuracy is withheld.
+ const moderate=filterGps([p(0,0),p(5,30,{accuracy:120})],'cat');
+ assert.equal(moderate.points.length,2);
+ assert.equal(moderate.state.uncertain,false);
+});
