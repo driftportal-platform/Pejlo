@@ -1,13 +1,6 @@
-import {commandWasRejected,configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
-import {billingWebhook,startBilling} from './billing.js';
-import {ensureSubscriptions} from './subscriptions.js';
-import {once} from './schema.js';
-import {handoffAPI,handoffHistory} from './handoffs.js';
-import {validPoint} from '../../packages/shared/geo.js';
-import {trustedGps,gpsPoint,trackerTelemetry} from './gps.js';
+import {trustedGps,gpsPoint} from './gps.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 import {adminStatus} from './operations.js';
-import {customerSubscription,adminSubscriptionRequests} from './subscriptions.js';
 import {adminUsers} from './admin-users.js';
 import {adminUsage} from './usage.js';
 import {snoozeUntil,setSnooze} from './snooze.js';
@@ -20,14 +13,7 @@ import {ensureNotifications,pushReady,validSubscription,validHome,sendPush,runNo
 import {firebaseConfig} from '../web/src/config/firebase.js';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 class Failure extends Error { constructor(status,message){super(message);this.status=status;} }
-async function checkedJSON(response){
- if(response.ok)return response.json();
- const status=response.status;
- const message=status===401||status===403
-  ? 'Traccar afviste adgangen. Kontrollér tokenet og kontoens rettigheder.'
-  : 'Traccar returnerede en fejl. Prøv at hente trackerdata igen.';
- throw new Failure(502,'Traccar HTTP '+status+'. '+message);
-}
+async function checkedJSON(response){if(!response.ok)throw new Failure(502,'Traccar kunne ikke kontaktes. Kontrollér forbindelsen og adgangstokenet.');return response.json();}
 export const point=gpsPoint;
 const identifierOK=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{4,100}$/.test(value);
 export async function codeHash(code){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code.trim().toUpperCase()))),x=>x.toString(16).padStart(2,'0')).join('');}
@@ -35,11 +21,7 @@ async function body(request,limit=12000){if(Number(request.headers.get('content-
 export async function handleAPI(request,env,fetcher=fetch){
  try{
   const url=new URL(request.url),path=url.pathname;
-  if(path==='/api/stripe/webhook'){
-   if(request.method!=='POST')return json({error:'Metoden er ikke tilladt.'},405);
-   return json(await billingWebhook(env,request,fetcher));
-  }
-  const routes={'/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -60,19 +42,6 @@ export async function handleAPI(request,env,fetcher=fetch){
    return json(await adminUsage(env,fetcher));
   }
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
-  if(path==='/api/billing'){
-   await ensureSubscriptions(env.DB);
-   return json(await startBilling(env,fetcher,account,url.origin,await body(request)));
-  }
-  if(path==='/api/subscription'){
-   const input=request.method==='GET'?null:(await body(request))??{};
-   return json(await customerSubscription(env.DB,account,input,env));
-  }
-  if(path==='/api/admin/subscription-requests'){
-   if(!isAdmin)throw new Failure(403,'Kun systemadmin kan behandle abonnementsanmodninger.');
-   const input=request.method==='GET'?null:(await body(request))??{};
-   return json(await adminSubscriptionRequests(env.DB,input));
-  }
   if(path==='/api/admin/users'){
    if(!isAdmin)throw new Failure(403,'Kun systemadmin kan administrere brugere.');
    return json(await adminUsers(env,uid,url.searchParams,request.method==='GET'?null:(await body(request))??{},fetcher));
@@ -80,20 +49,6 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(path==='/api/admin/status'){
    if(!isAdmin)throw new Failure(403,'Kun administratoren kan se driftsstatus.');
    await ensureNotifications(env.DB);return json(await adminStatus(env));
-  }
-  if(path==='/api/handoff'){
-   const input=request.method==='POST'?(await body(request))??{}:null;
-   const identifier=input?input.identifier:url.searchParams.get('identifier');
-   const access=identifierOK(identifier)&&await trackerAccess(env.DB,identifier,uid);
-   if(!access)throw new Failure(403,'Du har ikke adgang til denne tracker.');
-   if(input){
-    if(!['start','stop'].includes(input.action))throw new Failure(400,'Vælg en gyldig handling.');
-    if(input.action==='start'&&!access.owner&&access.role!=='editor')throw new Failure(403,'Kun ejeren og redaktører kan tage en fælles alarm.');
-    if(input.action==='stop'&&!Number.isSafeInteger(input.id))throw new Failure(400,'Hent status og prøv igen.');
-    const p=input.position;
-    input.position=validPoint(p)&&Number.isSafeInteger(p.timestamp)?{lat:p.lat,lon:p.lon,timestamp:p.timestamp}:null;
-   }
-   return json(await handoffAPI(env.DB,identifier,account,access,input));
   }
   if(path==='/api/snooze'){
    const input=request.method==='GET'?{identifier:url.searchParams.get('identifier')}:await body(request);
@@ -106,9 +61,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(!identifierOK(identifier)||!await trackerAccess(env.DB,identifier,uid))throw new Failure(403,'Du har ikke adgang til denne tracker.');
    const before=url.searchParams.has('before')?Number(url.searchParams.get('before')):Date.now()+1,beforeId=url.searchParams.get('beforeId')||'~';
    if(!Number.isSafeInteger(before)||before<0||beforeId.length>400)throw new Failure(400,'Ugyldig side i alarmarkivet.');
-   const alarms=await listAlarms(env.DB,identifier,uid,before,beforeId);
-   if(!url.searchParams.has('before'))alarms.handoffs=await handoffHistory(env.DB,identifier);
-   return json(alarms);
+   return json(await listAlarms(env.DB,identifier,uid,before,beforeId));
   }
   if(path==='/api/family'){
    await ensureNotifications(env.DB);const input=request.method==='GET'?null:await body(request,120000);
@@ -219,25 +172,19 @@ export async function handleAPI(request,env,fetcher=fetch){
    return json({identifier:input.identifier,code},201);
   }
   const requestPosition=path==='/api/tracker/position';
-  const requestAction=path==='/api/tracker/action';
-  const input=requestPosition||requestAction?await body(request):null;
-  const identifier=requestPosition||requestAction?input?.identifier:url.searchParams.get('identifier');
+  const identifier=requestPosition?(await body(request))?.identifier:url.searchParams.get('identifier');
   if(!identifierOK(identifier))throw new Failure(400,'Vælg en tilknyttet tracker.');
   const owned=await trackerAccess(env.DB,identifier,uid);
   if(!owned)throw new Failure(403,'Trackeren er ikke tilknyttet din konto.');
   if(requestPosition&&!owned.owner)throw new Failure(403,'Kun ejeren kan bede trackeren om en ny position.');
-  if(requestAction&&!owned.owner)throw new Failure(403,'Kun ejeren kan styre trackeren.');
-  if(requestAction&&!['find','sound'].includes(input?.action))throw new Failure(400,'Vælg en gyldig trackerhandling.');
-  const actions=owned.owner?configuredTrackerActions(env,identifier):{};
   const devices=await traccar('/api/devices?uniqueId='+encodeURIComponent(identifier));
   const device=Array.isArray(devices)?devices.find(d=>d.uniqueId===identifier):null;
   if(!device||!Number.isSafeInteger(device.id))throw new Failure(404,'Trackeren findes ikke på Traccar-kontoen.');
-  if(requestAction)return json(await sendTrackerAction({db:env.DB,identifier,device,action:input.action,command:actions[input.action],traccar,traccarFetch}));
   if(requestPosition){
-   if(device.status!=='online')throw new Failure(409,'Trackeren har ingen aktiv forbindelse. Prøv igen, når den er online.');
+   const lastUpdate=Date.parse(device.lastUpdate);const recentlySeen=Number.isFinite(lastUpdate)&&Date.now()-lastUpdate<=5*60*1000;if(device.status!=='online'&&!recentlySeen)throw new Failure(409,'Trackeren har ingen aktiv forbindelse. Prøv igen, når den er online.');
    const types=await traccar('/api/commands/types?'+new URLSearchParams({deviceId:String(device.id),textChannel:'false'}));
    if(!Array.isArray(types)||!types.some(command=>command.type==='positionSingle'))throw new Failure(409,'Traccar tilbyder ikke enkelt positionsrapport for denne tracker.');
-   await once(env.DB,'positionRequests',()=>env.DB.prepare('CREATE TABLE IF NOT EXISTS pejlo_position_requests (identifier TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)').run());
+   await env.DB.prepare('CREATE TABLE IF NOT EXISTS pejlo_position_requests (identifier TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)').run();
    const requestedAt=Date.now();
    const reserved=await env.DB.prepare(`INSERT INTO pejlo_position_requests (identifier,requested_at) VALUES (?,?)
     ON CONFLICT(identifier) DO UPDATE SET requested_at=excluded.requested_at
@@ -247,21 +194,15 @@ export async function handleAPI(request,env,fetcher=fetch){
     deviceId:device.id,type:'positionSingle',textChannel:false,attributes:{noQueue:true}
    })});
    if(response.status===202)return json({status:'queued',requestedAt});
-   if(!response.ok){
-    if(commandWasRejected(response.status)){
-     await env.DB.prepare('UPDATE pejlo_position_requests SET requested_at=0 WHERE identifier=? AND requested_at=?')
-      .bind(identifier,requestedAt).run();
-    }
-    throw new Failure(502,'Traccar kunne ikke bekræfte positionsforespørgslen. Kontrollér trackerens forbindelse.');
-   }
+   if(!response.ok)throw new Failure(502,'Traccar kunne ikke sende positionsforespørgslen. Kontrollér trackerens forbindelse.');
    return json({status:'sent',requestedAt});
   }
   const positions=device.positionId?await traccar('/api/positions?id='+encodeURIComponent(device.positionId)):[];
   const raw=Array.isArray(positions)?positions.find(p=>p.deviceId===device.id&&p.id===device.positionId):null;
-  const latestPosition=point(raw);
+  let position=point(raw);
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
   let route=[],historyAvailable=true,historyTruncated=false;
-  if(url.searchParams.get('live')!=='1')try{
+  try{
    const points=await traccar('/api/reports/route?'+new URLSearchParams({deviceId:String(device.id),from:from.toISOString(),to:to.toISOString()}));
    if(!Array.isArray(points))throw new Error();
    route=points.filter(p=>p.deviceId===device.id).map(point).filter(p=>p&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime()).sort((a,b)=>a.timestamp-b.timestamp);historyTruncated=route.length>10000;route=route.slice(-10000);
@@ -271,11 +212,11 @@ export async function handleAPI(request,env,fetcher=fetch){
   let profile;try{profile=JSON.parse(profileRow?.profile||'{}');}catch{}
   const type=profile?.type||'object',home=profile?.homeConfirmed===true?profile.home:null;
   const ownerRow=await env.DB.prepare('SELECT owner_uid FROM trackers WHERE identifier=?').bind(identifier).first();
-  const filtered=filterGps(route,type,{},home),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(latestPosition?[latestPosition]:[])];
+  const filtered=filterGps(route,type,{},home),samples=[...route.filter(p=>p.timestamp>=Date.now()-300000),...(position?[position]:[])];
   // Historical queries must never rewind the shared live filter.
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home);
-  const position=gps.trusted||null;route=filtered.points;
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,telemetry:trackerTelemetry(raw),gpsUncertain:!!(gps.uncertain||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  position=point(raw)?gps.trusted||null:null;route=filtered.points;
+  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},position,route,gpsUncertain:!!gps.uncertain,gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};
