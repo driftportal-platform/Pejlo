@@ -26,11 +26,12 @@ test('pause API permits viewers own preferences and denies unrelated users',asyn
 });
 test('paused events stay archived, other members are unaffected, and paused queued events are dropped',async()=>{
  const DB=await setup(),now=Date.now(),home={lat:56,lon:8,radius:100,buffer:5,shape:'circle'};DB.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify(home));
- await setSnooze(DB,'1234','owner',1);const env={DB,TRACCAR_TOKEN:'server-secret'};let i=0;
- const upstream=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:i<2?56:56.002,longitude:8,fixTime:new Date(now-90000+i*20000).toISOString()}]);
+ await setSnooze(DB,'1234','owner',1);const env={DB,TRACCAR_TOKEN:'server-secret',TRACCAR_URL:'https://gps.example/'};let i=0;
+ const urls=[];
+ const upstream=async url=>{urls.push(url);return Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:i<2?56:56.002,longitude:8,fixTime:new Date(now-90000+i*20000).toISOString()}]);};
  for(i=0;i<4;i++)await runNotifications(env,upstream);
  const events=DB.raw.prepare("SELECT uid,push_status FROM pejlo_alarm_history WHERE kind='exit' ORDER BY uid").all();assert.equal(events.length,2);assert.equal(events.find(e=>e.uid==='owner').push_status,'snoozed');assert.equal(events.find(e=>e.uid==='member').push_status,'unconfigured');
- const run=DB.raw.prepare('SELECT * FROM pejlo_runs ORDER BY started_at DESC LIMIT 1').get();assert.equal(run.status,'completed');assert.equal(run.checked,1);assert.equal(run.upstream_requests,3);
+ const run=DB.raw.prepare('SELECT * FROM pejlo_runs ORDER BY started_at DESC LIMIT 1').get();assert.equal(run.status,'completed');assert.equal(run.checked,1);assert.equal(run.upstream_requests,3);assert.ok(urls.every(url=>url.startsWith('https://gps.example/api/')));
  DB.raw.prepare('INSERT INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').run('queued','1234','owner','exit','{}',now);
  DB.raw.prepare('INSERT INTO pejlo_alarm_history VALUES(?,?,?,?,?,?,?,?,?)').run('queued','1234','owner','exit','{}',now,null,null,'pending');
  await runNotifications({...env,VAPID_PUBLIC_KEY:'x',VAPID_PRIVATE_KEY:'x',VAPID_SUBJECT:'mailto:x@example.com'},upstream);
@@ -88,7 +89,8 @@ test('shared handoff respects roles, has one active handler, and pauses delivery
  assert.equal(await snoozeUntil(DB,'1234','member'),0);
  DB.raw.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').run('1234','owner','Hjem',JSON.stringify({lat:56,lon:8,radius:100,buffer:5,shape:'circle'}));
  let i=0;
- const upstream=async url=>Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:i<2?56:56.002,longitude:8,fixTime:new Date(now-90000+i*20000).toISOString()}]);
+ const urls=[];
+ const upstream=async url=>{urls.push(url);return Response.json(url.includes('/devices')?[{id:1,uniqueId:'1234',positionId:2}]:[{id:2,deviceId:1,valid:true,latitude:i<2?56:56.002,longitude:8,fixTime:new Date(now-90000+i*20000).toISOString()}]);};
  for(i=0;i<4;i++)await runNotifications({...env,TRACCAR_TOKEN:'test'},upstream);
  assert.deepEqual(DB.raw.prepare("SELECT push_status FROM pejlo_alarm_history WHERE kind='exit'").all().map(r=>r.push_status),['snoozed','snoozed']);
  const res=await call('owner','handoff',{identifier:'1234',action:'stop',id:results[0].id});

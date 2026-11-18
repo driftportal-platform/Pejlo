@@ -40,11 +40,11 @@ Token skal kun indtastes i Cloudflare, aldrig i GitHub eller et profilfelt. Der 
 
 Den delte kortnøgle `MAPTILER_API_KEY` bliver stående under **Builds → Variables and secrets** som før. Den bruges under build til kortene.
 
-Testserveren er fortsat `https://demo3.traccar.org`; ingen ny Traccar-server skal lejes eller oprettes.
+Standardserveren er `https://demo3.traccar.org`. Ved egen Traccar-server sættes `TRACCAR_URL` til serverens HTTPS-adresse uden sti, og `TRACCAR_TOKEN` til tokenet fra samme server. Begge værdier sættes i Cloudflare. Trackeren skal registreres med samme enheds-ID på den nye server og sende direkte til dens trackerport. Bekræft en ny position i Traccar, før Pejlo skiftes over.
 
 ## 3. Upload og deploy
 
-Upload hele pakkens indhold til roden af det eksisterende GitHub-repository `driftportal-platform/Pejlo`. Erstat filer ved samme navn. Behold den rettede `wrangler.jsonc`.
+Upload de udpakkede filer med deres mappestruktur til roden af det eksisterende GitHub-repository `driftportal-platform/Pejlo`. Erstat filer ved samme navn. Behold den rettede `wrangler.jsonc`.
 
 Cloudflare bygger med `npm run build` og udgiver med `npx wrangler deploy` som hidtil. Databasen bindes som `DB` gennem konfigurationen.
 

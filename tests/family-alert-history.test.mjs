@@ -125,3 +125,16 @@ test('personal area choices survive tracker settings changes and control schedul
  assert.equal(JSON.parse(fence.config).areaId,'summer');
  assert.deepEqual(JSON.parse(fence.state),{});
 });
+
+test('a low battery alert follows a confirmed drop even at zero percent',()=>{
+ const now=Date.now(),config=cleanAlerts({lowBattery:true,batteryThreshold:20});
+ const result=(stamp,level,state)=>advanceAlerts(config,{
+  valid:true,latitude:56,longitude:8,fixTime:new Date(stamp).toISOString(),
+  attributes:{batteryLevel:level}
+ },state,stamp);
+ const initial=result(now,90,{});
+ const pending=result(now+1000,0,initial.state);
+ assert.deepEqual(pending.events,[]);
+ assert.deepEqual(result(now+1000,0,pending.state).events,[]);
+ assert.deepEqual(result(now+2000,0,pending.state).events,['battery']);
+});

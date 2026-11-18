@@ -3,6 +3,7 @@ import {trustedGps,gpsPoint} from './gps.js';
 import {ensureOperations} from './operations.js';
 import {snoozeUntil} from './snooze.js';
 import {ensureArchive,archiveEvent,archiveStatus} from './archive.js';
+import {traccarOrigin} from './traccar-url.js';
 import {once} from './schema.js';
 import {notificationPayload,label} from './messages.js';
 import {advanceFence} from '../../packages/shared/fence-events.js';
@@ -39,19 +40,21 @@ export async function runNotifications(env,fetcher=fetch){
  await ensureOperations(env.DB);const id=crypto.randomUUID(),started=Date.now(),stats={checked:0,errors:0,requests:0,upstreamErrors:0};
  await env.DB.prepare("INSERT INTO pejlo_runs(id,started_at,status) VALUES(?,?,'running')").bind(id,started).run();
  let status=env.TRACCAR_TOKEN?'completed':'missing-token';
- const tracked=async(url,options)=>{const upstream=url.startsWith('https://demo3.traccar.org/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
- try{await processNotifications(env,tracked,stats);if(stats.errors||stats.upstreamErrors)status='partial';}
+ const base=traccarOrigin(env);
+ const tracked=async(url,options)=>{const upstream=!!base&&url.startsWith(base+'/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
+ try{await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
  catch{status='failed';stats.errors++;}
  finally{
   await env.DB.prepare('UPDATE pejlo_runs SET finished_at=?,status=?,checked=?,errors=?,upstream_requests=?,upstream_errors=? WHERE id=?').bind(Date.now(),status,stats.checked,stats.errors,stats.requests,stats.upstreamErrors,id).run();
   await env.DB.prepare('DELETE FROM pejlo_runs WHERE id NOT IN(SELECT id FROM pejlo_runs ORDER BY started_at DESC LIMIT 20)').run();
  }
 }
-async function processNotifications(env,fetcher,stats){
+async function processNotifications(env,fetcher,stats,base){
  if(!env.DB||!env.TRACCAR_TOKEN)return;
+ if(!base)throw Error('Ugyldig Traccar-adresse.');
  await ensureNotifications(env.DB);await ensureFamily(env.DB);await ensureArchive(env.DB);
  const rows=await env.DB.prepare(`SELECT t.identifier,t.owner_uid,t.name AS tracker_name,f.name AS fence_name,f.config,f.state,f.enabled FROM trackers t LEFT JOIN pejlo_fences f ON f.identifier=t.identifier AND f.owner_uid=t.owner_uid WHERE f.enabled=1 OR EXISTS(SELECT 1 FROM pejlo_alerts a WHERE a.identifier=t.identifier) ORDER BY COALESCE((SELECT MIN(a.checked_at) FROM pejlo_alerts a WHERE a.identifier=t.identifier),f.checked_at,0) LIMIT 8`).all();
- const get=async path=>{const r=await fetcher('https://demo3.traccar.org'+path,{headers:{Authorization:'Bearer '+env.TRACCAR_TOKEN},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('upstream');return r.json();};
+ const get=async path=>{const r=await fetcher(base+path,{headers:{Authorization:'Bearer '+env.TRACCAR_TOKEN},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('upstream');return r.json();};
  for(const row of rows.results){
   try{
    stats.checked++;const now=Date.now();

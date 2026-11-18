@@ -1,3 +1,4 @@
+import {advanceBattery} from './battery.js';
 export const defaultAlerts=()=>({exit:true,enter:true,lowBattery:false,batteryThreshold:20,missing:false,missingMinutes:30,quiet:false,quietStart:'22:00',quietEnd:'07:00'});
 export function cleanAlerts(value){
  const d=defaultAlerts(),v=value||{};
@@ -27,13 +28,12 @@ export function advanceAlerts(config,raw,previous={},now=Date.now()){
  const missing=now-(state.lastFix??state.started)>=config.missingMinutes*60000;
  if(config.missing&&missing&&!state.missing)events.push('missing');
  state.missing=missing;
- const battery=raw?.attributes?.batteryLevel;
- // Ignore the common garbage 0 % reading many trackers send while they still have power.
- const usable=typeof battery==='number'&&battery>=0&&battery<=100&&!(battery===0&&(state.lastBattery??0)>15);
- if(valid&&now-stamp<=300000&&stamp>(state.batteryStamp||0)&&usable){
+ const reportedBattery=raw?.attributes?.batteryLevel;
+ if(valid&&now-stamp<=300000&&stamp>(state.batteryStamp||0)&&Number.isFinite(reportedBattery)&&reportedBattery>=0&&reportedBattery<=100){
   state.batteryStamp=stamp;
-  state.lastBattery=battery;
-  if(config.lowBattery&&battery<=config.batteryThreshold&&!state.low)events.push('battery');
+  state.batteryReading=advanceBattery(state.batteryReading,reportedBattery,stamp);
+  const battery=state.batteryReading.level;
+  if(state.batteryReading.timestamp===stamp&&config.lowBattery&&battery<=config.batteryThreshold&&!state.low)events.push('battery');
   if(battery<=config.batteryThreshold)state.low=true;
   else if(battery>=config.batteryThreshold+5)state.low=false;
  }
