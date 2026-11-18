@@ -263,7 +263,7 @@ function updateAge(){
  const text=seconds<60?seconds+' sek. siden':seconds<3600?Math.floor(seconds/60)+' min. siden':Math.floor(seconds/3600)+' timer siden';
  $('#age').textContent=text;
  $('#freshness').textContent=live&&d.gpsProvisional?'Ubekræftet position':live&&d.gpsUncertain?(seconds>180?'Usikkert GPS-signal':'Afventer stabilt signal'):live?(seconds>300?'Gammel position':'Seneste registrering'):(seconds>300?'Gammel eksempelposition':'Eksempel');
- $('#search-age').textContent=(d.gpsProvisional?'Afventer bekræftelse af første GPS-position. ':d.gpsUncertain?(seconds>180?'Usikkert GPS-signal. Viser seneste troværdige position. ':'Nyere GPS-data er ustabile. Viser seneste troværdige position. ':'')+(seconds>300?'OBS: gammel position. ':'')+(live?'Seneste registrering fra ':'Målet er en eksempelposition fra ')+text+'.';
+ $('#search-age').textContent=(d.gpsProvisional?'Afventer bekræftelse af første GPS-position. ':d.gpsUncertain?(seconds>180?'Usikkert GPS-signal. Viser seneste troværdige position. ':'Nyere GPS-data er ustabile. Viser seneste troværdige position. '):'')+(seconds>300?'OBS: gammel position. ':'')+(live?'Seneste registrering fra ':'Målet er en eksempelposition fra ')+text+'.';
 }
 function updateSearch(){
   if(!selected())return;
