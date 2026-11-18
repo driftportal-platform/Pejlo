@@ -28,8 +28,11 @@ export function advanceAlerts(config,raw,previous={},now=Date.now()){
  if(config.missing&&missing&&!state.missing)events.push('missing');
  state.missing=missing;
  const battery=raw?.attributes?.batteryLevel;
- if(valid&&now-stamp<=300000&&stamp>(state.batteryStamp||0)&&typeof battery==='number'&&battery>=0&&battery<=100){
+ // Ignore the common garbage 0 % reading many trackers send while they still have power.
+ const usable=typeof battery==='number'&&battery>=0&&battery<=100&&!(battery===0&&(state.lastBattery??0)>15);
+ if(valid&&now-stamp<=300000&&stamp>(state.batteryStamp||0)&&usable){
   state.batteryStamp=stamp;
+  state.lastBattery=battery;
   if(config.lowBattery&&battery<=config.batteryThreshold&&!state.low)events.push('battery');
   if(battery<=config.batteryThreshold)state.low=true;
   else if(battery>=config.batteryThreshold+5)state.low=false;

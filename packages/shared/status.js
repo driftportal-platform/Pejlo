@@ -19,3 +19,30 @@ export function recentMovement(route,position,now=Date.now()){
 export function ageText(stamp,now=Date.now()){
  if(!Number.isFinite(stamp))return 'Ikke oplyst';const seconds=Math.max(0,Math.floor((now-stamp)/1000));return seconds<60?seconds+' sek. siden':seconds<3600?Math.floor(seconds/60)+' min. siden':seconds<86400?Math.floor(seconds/3600)+' timer siden':Math.floor(seconds/86400)+' dage siden';
 }
+/**
+ * Stable connection view for JT808 trackers that briefly flap offline in Traccar.
+ * Prefer lastContact over the raw online/offline flag when the contact is recent.
+ *
+ * Returns {state, label, detail}
+ *  state: 'online' | 'recent' | 'offline' | 'unknown'
+ */
+export function connectionStatus(device,now=Date.now()){
+ const raw=device?.status;
+ const contact=Number.isFinite(device?.lastContact)?device.lastContact:null;
+ const age=contact!=null?Math.max(0,now-contact):null;
+ // Traccar often marks a device offline within a minute of a missed heartbeat.
+ // Treat a recent contact as still connected so the UI does not flicker.
+ if(age!=null&&age<=5*60*1000){
+  return {state:'online',label:'Online',detail:age<60*1000?'Aktiv nu':'Senest set '+ageText(contact,now)};
+ }
+ if(age!=null&&age<=30*60*1000){
+  return {state:'recent',label:'Senest set '+ageText(contact,now),detail:'Ingen frisk kontakt · seneste position kan stadig vises'};
+ }
+ if(raw==='online'&&age==null){
+  return {state:'online',label:'Online',detail:'Aktiv nu'};
+ }
+ if(raw==='offline'||(age!=null&&age>30*60*1000)){
+  return {state:'offline',label:'Offline',detail:contact!=null?'Senest set '+ageText(contact,now):'Ingen kontakt registreret'};
+ }
+ return {state:'unknown',label:'Ukendt',detail:contact!=null?'Senest set '+ageText(contact,now):'Ingen kontaktoplysning'};
+}
