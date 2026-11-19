@@ -7,6 +7,7 @@ function isMirrored(point,reference){
 // State contains only the trusted fix and one unconfirmed relocation candidate.
 export function advanceGps(previous,point,type='object',home=null){
  const state=structuredClone(previous||{});
+ if(state.trusted?.lat===0&&state.trusted?.lon===0){state.trusted=null;state.pending=null;state.seen=null;state.uncertain=true;}
  // Old states did not record whether a second fix corroborated their anchor.
  if(state.trusted&&state.provisional===undefined){
   state.provisional=true;state.pending=null;state.uncertain=true;

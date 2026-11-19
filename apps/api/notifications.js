@@ -1,3 +1,4 @@
+import {resolveTraccarEnv} from './server-config.js';
 import {currentHandoff,pruneHandoffs} from './handoffs.js';
 import {trustedGps,gpsPoint} from './gps.js';
 import {ensureOperations} from './operations.js';
@@ -40,9 +41,9 @@ export async function runNotifications(env,fetcher=fetch){
  await ensureOperations(env.DB);const id=crypto.randomUUID(),started=Date.now(),stats={checked:0,errors:0,requests:0,upstreamErrors:0};
  await env.DB.prepare("INSERT INTO pejlo_runs(id,started_at,status) VALUES(?,?,'running')").bind(id,started).run();
  let status=env.TRACCAR_TOKEN?'completed':'missing-token';
- const base=traccarOrigin(env);
+ let base=null;
  const tracked=async(url,options)=>{const upstream=!!base&&url.startsWith(base+'/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
- try{await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
+ try{env=await resolveTraccarEnv(env);base=traccarOrigin(env);status=env.TRACCAR_TOKEN?'completed':'missing-token';await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
  catch{status='failed';stats.errors++;}
  finally{
   await env.DB.prepare('UPDATE pejlo_runs SET finished_at=?,status=?,checked=?,errors=?,upstream_requests=?,upstream_errors=? WHERE id=?').bind(Date.now(),status,stats.checked,stats.errors,stats.requests,stats.upstreamErrors,id).run();
@@ -71,7 +72,7 @@ async function processNotifications(env,fetcher,stats,base){
     if(Array.isArray(report))samples=report.filter(p=>p.deviceId===device.id).map(gpsPoint).filter(p=>p&&p.timestamp>=now-300000&&p.timestamp<=now);
    }catch{/* Persistent state still filters the latest fix when reports are unavailable. */}
    const current=gpsPoint(raw);if(current)samples.push(current);
-   const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object',profile.homeConfirmed===true?profile.home:null);
+   const gps=await trustedGps(env.DB,row.identifier,row.owner_uid,samples,profile.type||'object',profile.homeConfirmed===true?profile.home:null,undefined,env.TRACCAR_SOURCE);
    const fenceRaw=current&&gps.trusted?.timestamp===current.timestamp&&!gps.uncertain?raw:null;
    const home=row.config?JSON.parse(row.config):null,areaId=home?.areaId??profile.activeFenceId??null;
    let transition;

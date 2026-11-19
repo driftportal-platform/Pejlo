@@ -13,6 +13,21 @@
 <div class="app admin-page" hidden>
  <main>
   <header><div><h1>Systemadmin</h1></div><a class="outline-button" href="/">Til Pejlo</a></header>
+<article class="panel" id="traccar-server-panel" hidden>
+<span class="eyebrow">SERVER</span><h2>Traccar-forbindelse</h2>
+<p id="server-current"></p>
+<p class="hint">Servervalget gælder hele Pejlo, også alarmer. Trackere skal findes på den nye server med samme unikke tracker-ID. HTTPS skal være sat op; trackerport 5015 bruges ikke her.</p>
+<form id="server-form">
+<label>Traccar-serverens HTTPS-adresse<input id="server-url" type="url" required placeholder="https://pejlo.duckdns.org" autocomplete="off"></label>
+<label>API-token fra denne server<input id="server-token" type="password" required autocomplete="new-password" maxlength="4096"></label>
+<p class="hint">Tokenet vises aldrig igen. Indsæt tokenet fra den ønskede server ved hver ændring.</p>
+<button id="server-test" type="submit" class="outline-button">Test forbindelse</button>
+<button id="server-activate" type="button" disabled>Aktivér testet server</button>
+<button id="server-reload" type="button" class="outline-button">Hent serverstatus</button>
+</form>
+<p id="server-message" role="status"></p>
+<ul id="server-devices"></ul>
+</article>
 <article class="panel" id="system-admin-panel">
 <span class="eyebrow">SYSTEMADMIN</span><h2>Kunder og abonnementer</h2>
 <p>Se kundernes aftalte priser, betalingsperioder og tid til udløb.</p>

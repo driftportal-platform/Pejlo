@@ -1,3 +1,4 @@
+import {serverConfigAPI,resolveTraccarEnv} from './server-config.js';
 import {traccarOrigin} from './traccar-url.js';
 import {commandWasRejected,configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
 import {billingWebhook,startBilling} from './billing.js';
@@ -40,7 +41,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(request.method!=='POST')return json({error:'Metoden er ikke tilladt.'},405);
    return json(await billingWebhook(env,request,fetcher));
   }
-  const routes={'/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -61,6 +62,10 @@ export async function handleAPI(request,env,fetcher=fetch){
    return json(await adminUsage(env,fetcher));
   }
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
+  if(path==='/api/admin/server'){
+   if(!isAdmin)throw new Failure(403,'Kun systemadmin kan ændre Traccar-server.');
+   return json(await serverConfigAPI(env,request.method==='GET'?null:await body(request),fetcher));
+  }
   if(path==='/api/billing'){
    await ensureSubscriptions(env.DB);
    return json(await startBilling(env,fetcher,account,url.origin,await body(request)));
@@ -80,7 +85,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   }
   if(path==='/api/admin/status'){
    if(!isAdmin)throw new Failure(403,'Kun administratoren kan se driftsstatus.');
-   await ensureNotifications(env.DB);return json(await adminStatus(env));
+   await ensureNotifications(env.DB);return json(await adminStatus(await resolveTraccarEnv(env)));
   }
   if(path==='/api/handoff'){
    const input=request.method==='POST'?(await body(request))??{}:null;
@@ -202,6 +207,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    return json({tracker:result});
   }
   if(path==='/api/admin/trackers'&&!isAdmin)throw new Failure(403,'Kun administratoren kan oprette parringskoder.');
+  env=await resolveTraccarEnv(env);
   if(!env.TRACCAR_TOKEN)throw new Failure(503,'Traccar-adgangsnøglen mangler i Cloudflare.');
   const base=traccarOrigin(env);
   if(!base)throw new Failure(503,'TRACCAR_URL skal være Traccar-serverens HTTPS-adresse uden sti.');
@@ -287,7 +293,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   const telemetry=trackerTelemetry(raw);
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home,{
    level:telemetry.battery,timestamp:telemetry.receivedAt??latestPosition?.timestamp
-  });
+  },env.TRACCAR_SOURCE);
   const battery=gps.batteryReading;
   if(telemetry.battery!=null&&battery){
    telemetry.battery=battery.level;
@@ -297,7 +303,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    telemetry.batteryMeasuredAt=battery.timestamp;
   }
   const position=gps.trusted||null;route=filtered.points;
-  return json({source:'traccar',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 }
 export default {scheduled(event,env,ctx){ctx.waitUntil(runNotifications(env));},fetch(request,env){return new URL(request.url).pathname.startsWith('/api/')?handleAPI(request,env):env.ASSETS.fetch(request);}};

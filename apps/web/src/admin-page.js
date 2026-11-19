@@ -1,3 +1,4 @@
+import {createServerConfig} from './features/server-config.js';
 import {startAuthentication} from './features/auth.js';
 import {createAdmin} from './features/admin.js';
 import {createSubscriptionQueue} from './features/subscription.js';
@@ -21,6 +22,7 @@ async function request(path,body){
  return result;
 }
 
+const serverConfig=createServerConfig({request});
 const admin=createAdmin({request});
 const platform=createPlatformAdmin({request});
 const subscriptionQueue=createSubscriptionQueue({request,openCustomer(email){
@@ -38,7 +40,7 @@ $('#auth-shell .auth-card').append(back);
 startAuthentication(async user=>{
  const current=++generation;
  session=user?.emailVerified?user:null;
- admin.clear();platform.enable(false);subscriptionQueue.enable(false);
+ serverConfig.enable(false);admin.clear();platform.enable(false);subscriptionQueue.enable(false);
  $('#tracker-admin').hidden=true;
  $('#provision-tracker').reset();
  $('#provision-tracker button').disabled=false;
@@ -52,7 +54,7 @@ startAuthentication(async user=>{
  try{
   await request('admin/access');
   if(current!==generation)return;
-  admin.enable(true);platform.enable(true);subscriptionQueue.enable(true);
+  serverConfig.enable(true);admin.enable(true);platform.enable(true);subscriptionQueue.enable(true);
   $('#tracker-admin').hidden=false;
   $('#auth-shell').hidden=true;
   $('.admin-page').hidden=false;

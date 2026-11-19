@@ -17,6 +17,7 @@ export function gpsStatus(data, now = Date.now()) {
   detail: 'Første GPS-position afventer en ny måling som bekræftelse.',
   waiting: true
  };
+ if (!position) return {label:'GPS-position mangler',detail:'Afventer en gyldig GPS-position fra trackeren.',waiting:true};
  if (data?.gpsUncertain) return {
   label: age != null && age <= 180 ? 'Afventer stabil position' : 'Usikker GPS-position',
   detail: 'Nyere GPS-data kunne ikke godkendes af positionsfilteret.',
