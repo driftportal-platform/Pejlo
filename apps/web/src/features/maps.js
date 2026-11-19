@@ -1,3 +1,4 @@
+import {approximateText} from '../shared/location-display.js';
 import {routeAnalysis} from '../shared/history.js';
 import {icon} from '../components/icons.js';
 import {distance,searchZoom,formatDistance} from '../shared/geo.js';
@@ -34,8 +35,12 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
     },
     profile(p,data,{showRoute=true,showHome=true,history=false,showDistanceLine=false,showRings=false}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();
+      if(data.position?.approximate){
+        const estimate=L.circle([data.position.lat,data.position.lon],{radius:data.position.accuracy,color:'#a56b10',weight:2,dashArray:'5 5',fillColor:'#d9a641',fillOpacity:.16}).addTo(markers);
+        estimate.bindTooltip(approximateText(data.position));
+      }
       if(data.position){
-        const title=p.name+(history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition');
+        const title=p.name+(data.position.approximate?' · omtrentlig mobilplacering':history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition');
         const marker=L.marker([data.position.lat,data.position.lon],{
           icon:p.photo?photoIcon(p.photo):markerIcon(types[p.type].icon),
           title:onTracker?'Vis oplysninger om '+p.name:title
@@ -71,7 +76,8 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
     clear(){draft.clearLayers();markers.clearLayers();path.clearLayers();homeLayer.clearLayers();phone.clearLayers();},
     draft(points){draft.clearLayers();if(points.length){L.polyline(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',weight:3}).addTo(draft);points.forEach((v,i)=>L.circleMarker([v.lat,v.lon],{radius:7,color:'#a4564b'}).addTo(draft).bindTooltip(String(i+1)));if(points.length>=3)L.polygon(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',fillOpacity:.1}).addTo(draft);}},
     draftHome(home){draft.clearLayers();if(home.shape==='polygon'){this.draft(home.points||[]);}else L.circle([home.lat,home.lon],{radius:home.radius,color:'#183e35',weight:2,fillOpacity:.14}).addTo(draft);},
-    center(point){if(point){map.invalidateSize();map.setView([point.lat,point.lon],18);}},
+    follow(point){if(point){map.invalidateSize();map.panTo([point.lat,point.lon],{animate:false});}},
+    center(point){if(point){map.invalidateSize();if(point.approximate){map.fitBounds(L.circle([point.lat,point.lon],{radius:point.accuracy}).getBounds(),{padding:[35,35],maxZoom:16});}else map.setView([point.lat,point.lon],18);}},
     clearPhone(){phone.clearLayers();},
     invalidate(){map.invalidateSize();}
   };

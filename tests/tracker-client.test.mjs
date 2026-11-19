@@ -14,3 +14,25 @@ test('API errors remain errors and do not become example positions',async()=>{
 test('profile normalization preserves its linked tracker across devices',async()=>{
  const {newProfile,cleanProfile}=await import('../dist/src/features/profiles.js');const profile=newProfile('Min cykel','bicycle');profile.trackerId='080608317309';assert.equal(cleanProfile(profile).trackerId,'080608317309');assert.equal(cleanProfile({...profile,trackerId:null}).trackerId,'');
 });
+test('normal polling uses 15 seconds with lightweight fixes between full routes every minute',async()=>{
+ const now=Date.now;let clock=100000,timerId=0;const pending=new Map(),urls=[],updates=[];
+ Date.now=()=>clock;
+ const client=createTrackerClient({fetcher:async url=>{urls.push(url);return Response.json({source:'traccar',device:{identifier:'abc'}});},setTimer:(callback,delay)=>{const id=++timerId;pending.set(id,{callback,delay});return id;},clearTimer:id=>pending.delete(id)});
+ try{
+  client.start({getIdToken:async()=> 'token'},'abc',(data,live)=>updates.push(live),error=>assert.fail(error));await flush();
+  for(let i=0;i<4;i++){
+   const [id,timer]=[...pending.entries()][0];assert.equal(timer.delay,15000);pending.delete(id);clock+=timer.delay;await timer.callback();
+  }
+  assert.deepEqual(updates,[false,true,true,true,false]);
+  assert.equal(urls.filter(url=>url.includes('&live=1')).length,3);
+ }finally{client.stop();Date.now=now;}
+});
+test('Find polls every 10 seconds until its faster polling window ends',async()=>{
+ const now=Date.now;let clock=100000,timerId=0;const pending=new Map();Date.now=()=>clock;
+ const client=createTrackerClient({fetcher:async()=>Response.json({source:'traccar',device:{identifier:'abc'}}),setTimer:(callback,delay)=>{const id=++timerId;pending.set(id,{callback,delay});return id;},clearTimer:id=>pending.delete(id)});
+ try{
+  client.start({getIdToken:async()=> 'token'},'abc',()=>{},error=>assert.fail(error),clock+10000);await flush();
+  const [id,timer]=[...pending.entries()][0];assert.equal(timer.delay,10000);pending.delete(id);clock+=10000;await timer.callback();
+  assert.equal([...pending.values()][0].delay,15000);
+ }finally{client.stop();Date.now=now;}
+});

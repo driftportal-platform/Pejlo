@@ -206,3 +206,14 @@ test('standard Pejlo prices separate the first and additional trackers',async()=
  assert.equal(standardSubscriptionPrice('annual',1.5),null);
  assert.equal(standardSubscriptionPrice('annual',0),null);
 });
+
+test('only systemadmin can grant mobile location, defaults off and strict boolean required',async()=>{
+ const {request}=setup();
+ let result=await request();assert.equal(result.body.users[0].mobileLocationEnabled,false);
+ assert.equal((await request('',{action:'location',uid:member,enabled:'true'})).status,400);
+ assert.equal((await request('',{action:'location',uid:'missing',enabled:true})).status,404);
+ result=await request('',{action:'location',uid:member,enabled:true});assert.equal(result.status,200);assert.equal(result.body.mobileLocationEnabled,true);
+ assert.equal((await request()).body.users[0].mobileLocationEnabled,true);
+ await request('',{action:'location',uid:member,enabled:false});assert.equal((await request()).body.users[0].mobileLocationEnabled,false);
+ const ordinary=setup(member);assert.equal((await ordinary.request('',{action:'location',uid:member,enabled:true})).status,403);
+});

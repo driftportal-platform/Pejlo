@@ -1,3 +1,4 @@
+import {locationEnabled,setLocationAccess} from './location-access.js';
 import {subscriptionRates} from '../../packages/shared/pricing.js';
 import {ensureBilling,effectiveSubscription,stripeOwnsSubscription} from './billing.js';
 import {firebaseConfig} from '../web/src/config/firebase.js';
@@ -100,7 +101,7 @@ async function withSubscriptions(db, users, adminUid) {
   const billing = await db.prepare('SELECT uid,snapshot FROM pejlo_billing WHERE uid IN (' + placeholders + ')')
     .bind(...users.map(user => user.localId)).all();
   for (const row of billing.results) byUid.set(row.uid, effectiveSubscription(byUid.get(row.uid), row));
-  return users.map(user => publicUser(user, adminUid, byUid.get(user.localId)));
+  return Promise.all(users.map(async user => ({...publicUser(user, adminUid, byUid.get(user.localId)),mobileLocationEnabled:await locationEnabled(db,user.localId)})));
 }
 
 export async function adminUsers(env, adminUid, query, input, fetcher) {
@@ -131,8 +132,16 @@ export async function adminUsers(env, adminUid, query, input, fetcher) {
     if (!created.localId) fail(502, 'Oprettelsen kunne ikke bekræftes. Søg efter e-mailen.');
     return {user: publicUser({...created, email, displayName}, adminUid)};
   }
-  if (!['account', 'subscription', 'delete'].includes(input?.action) ||
+  if (!['account', 'subscription', 'delete', 'location'].includes(input?.action) ||
       typeof input.uid !== 'string' || !input.uid || input.uid.length > 128) fail(400, 'Vælg en gyldig bruger.');
+  if(input.action==='location'){
+    if(typeof input.enabled!=='boolean')fail(400,'Vælg til eller fra for mobilplacering.');
+    const identity=await identityClient(env.GCP_FIREBASE_AUTH_SERVICE_ACCOUNT,fetcher);
+    const found=await identity(':lookup',{localId:[input.uid]});
+    if(!found.users?.some(user=>user.localId===input.uid))fail(404,'Brugeren findes ikke længere.');
+    await setLocationAccess(env.DB,input.uid,input.enabled);
+    return {mobileLocationEnabled:input.enabled};
+  }
   if (input.action === 'account') {
     const displayName = inputText(input.name, 100);
     if (typeof input.disabled !== 'boolean') fail(400, 'Vælg kontoens adgang.');

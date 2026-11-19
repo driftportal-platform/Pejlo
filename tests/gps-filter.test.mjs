@@ -70,7 +70,7 @@ test('a legacy mirrored anchor recovers across separate live polls without a hom
  const db=database(),mirrored=p(0,0,{lat:-56,lon:-8}),first=p(0,60),second=p(1,120);
  await trustedGps(db,'1234','a',[],'cat');
  db.raw.prepare('UPDATE pejlo_gps_filter SET state=? WHERE identifier=? AND owner_uid=?')
-  .run(JSON.stringify({trusted:mirrored,seen:mirrored.timestamp,uncertain:false}),'1234','a');
+  .run(JSON.stringify({trusted:mirrored,seen:mirrored.timestamp,uncertain:false}),'gps-only-v1:1234','a');
  const waiting=await trustedGps(db,'1234','a',[first],'cat');
  assert.equal(waiting.provisional,true);
  assert.equal(waiting.uncertain,true);

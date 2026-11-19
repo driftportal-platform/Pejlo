@@ -10,6 +10,7 @@ import {ensureHandoffs} from '../apps/api/handoffs.js';
 import {ensureGps} from '../apps/api/gps.js';
 import {ensureBilling} from '../apps/api/billing.js';
 import {ensureSubscriptions} from '../apps/api/subscriptions.js';
+import {ensureLocationAccess} from '../apps/api/location-access.js';
 import {ensureMail} from '../apps/api/mail.js';
 import {deleteUserData,deleteFirestoreState} from '../apps/api/user-data.js';
 import {firebaseConfig} from '../apps/web/src/config/firebase.js';
@@ -19,7 +20,7 @@ function database(){
  return {raw,prepare(sql){const stmt=raw.prepare(sql);let args=[];return {bind(...v){args=v;return this;},async run(){return stmt.run(...args);},async first(){return stmt.get(...args)||null;},async all(){return {results:stmt.all(...args)};}};}};
 }
 // Every table that holds data about an account, with the column(s) that identify the account.
-const owners={pejlo_push:['owner_uid'],pejlo_push_queue:['owner_uid'],pejlo_alerts:['uid'],pejlo_snooze:['uid'],pejlo_alarm_history:['uid'],pejlo_events:['uid'],pejlo_mail_limits:['uid'],pejlo_mail_log:['uid'],pejlo_handoffs:['actor_uid'],pejlo_gps_filter:['owner_uid'],pejlo_fences:['owner_uid'],pejlo_profiles:['owner_uid'],pejlo_members:['uid'],pejlo_invites:['owner_uid'],pejlo_subscription_requests:['uid'],pejlo_subscriptions:['uid'],pejlo_billing:['uid']};
+const owners={pejlo_location_access:['uid'],pejlo_push:['owner_uid'],pejlo_push_queue:['owner_uid'],pejlo_alerts:['uid'],pejlo_snooze:['uid'],pejlo_alarm_history:['uid'],pejlo_events:['uid'],pejlo_mail_limits:['uid'],pejlo_mail_log:['uid'],pejlo_handoffs:['actor_uid'],pejlo_gps_filter:['owner_uid'],pejlo_fences:['owner_uid'],pejlo_profiles:['owner_uid'],pejlo_members:['uid'],pejlo_invites:['owner_uid'],pejlo_subscription_requests:['uid'],pejlo_subscriptions:['uid'],pejlo_billing:['uid']};
 let counter=0;
 function insert(raw,table,column,value,extra={}){
  const columns=raw.prepare('PRAGMA table_info('+table+')').all();
@@ -29,7 +30,7 @@ function insert(raw,table,column,value,extra={}){
 }
 async function populated(){
  const db=database();
- for(const ensure of [ensureFamily,ensureNotifications,ensureArchive,ensureSnooze,ensureHandoffs,ensureGps,ensureBilling,ensureSubscriptions,ensureMail])await ensure(db);
+ for(const ensure of [ensureFamily,ensureNotifications,ensureArchive,ensureSnooze,ensureHandoffs,ensureGps,ensureBilling,ensureSubscriptions,ensureMail,ensureLocationAccess])await ensure(db);
  db.raw.exec('CREATE TABLE IF NOT EXISTS pejlo_subscription_requests(uid TEXT PRIMARY KEY,id TEXT NOT NULL,email TEXT NOT NULL,kind TEXT NOT NULL,created_at INTEGER NOT NULL,handled_at INTEGER)');
  for(const [table,[column]] of Object.entries(owners))for(const uid of ['gone','stays'])insert(db.raw,table,column,uid,table==='pejlo_billing'?{customer_id:'cus_'+uid}:{});
  return db;

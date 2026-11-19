@@ -57,7 +57,7 @@ export function createPlatformAdmin({request}){
   if(value)return;
   generation++;
   users.clear();selected=null;cursor=null;email='';busy=false;
-  for(const id of ['search','create','account','subscription','delete'])$(id).reset();
+  for(const id of ['search','create','account','subscription','delete','location'])$(id).reset();
   $('create-panel').open=false;
   $('message').textContent='';
   render();
@@ -71,6 +71,7 @@ export function createPlatformAdmin({request}){
   $('user-title').textContent=user.email||user.uid;
   $('user-meta').textContent=(user.isAdmin?'Systemadmin':'Almindelig bruger')+
     ' · '+(user.verified?'E-mail bekræftet':'E-mail afventer bekræftelse');
+  $('location-enabled').checked=user.mobileLocationEnabled===true;
   $('user-name').value=user.name;
   $('user-access').value=user.disabled?'disabled':'enabled';
   $('user-access').disabled=user.isAdmin;
@@ -172,6 +173,14 @@ export function createPlatformAdmin({request}){
   render();
   if(selected===uid)$('user-name').value=result.name;
   $('message').textContent='Konto gemt.';
+ });};
+ $('location').onsubmit=event=>{event.preventDefault();run(async active=>{
+  const uid=selected;
+  const result=await request('admin/users',{action:'location',uid,enabled:$('location-enabled').checked});
+  if(!active())return;
+  Object.assign(users.get(uid),result);
+  if(selected===uid)$('location-enabled').checked=result.mobileLocationEnabled;
+  $('message').textContent='Mobilplacering gemt. Valget gælder ved brugerens næste dataopdatering.';
  });};
  $('delete').onsubmit=event=>{event.preventDefault();run(async active=>{
   const uid=selected;

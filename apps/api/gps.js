@@ -4,7 +4,7 @@ import {once} from './schema.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 export function ensureGps(db){return once(db,'gps-filter',()=>db.prepare('CREATE TABLE IF NOT EXISTS pejlo_gps_filter(identifier TEXT NOT NULL,owner_uid TEXT NOT NULL,state TEXT NOT NULL,PRIMARY KEY(identifier,owner_uid))').run());}
 export async function trustedGps(db,identifier,owner,points,type,home,batteryReport,source){
- if(source)identifier=source+':'+identifier;
+ identifier='gps-only-v1:'+(source?source+':':'')+identifier;
  await ensureGps(db);
  await db.prepare("INSERT OR IGNORE INTO pejlo_gps_filter(identifier,owner_uid,state) VALUES(?,?,'{}')").bind(identifier,owner).run();
  for(let n=0;n<4;n++){
@@ -51,6 +51,17 @@ export function trackerTelemetry(raw,now=Date.now()){
 }
 export function gpsPoint(raw){
  const timestamp=Date.parse(raw?.fixTime);
+ if(raw?.attributes?.approximate===true||raw?.outdated===true)return null;
  if((raw?.latitude===0&&raw?.longitude===0)||raw?.valid!==true||!validPoint({lat:raw.latitude,lon:raw.longitude})||!Number.isFinite(timestamp)||timestamp>Date.now()+60000)return null;
  return {lat:raw.latitude,lon:raw.longitude,timestamp,accuracy:Number.isFinite(raw.accuracy)&&raw.accuracy>0?raw.accuracy:null,battery:batteryLevel(raw),valid:true};
+}
+
+export function approximatePoint(raw,now=Date.now()){
+ const timestamp=Date.parse(raw?.fixTime),receivedAt=Date.parse(raw?.serverTime);
+ if(raw?.attributes?.approximate!==true||raw?.valid!==true||
+    !validPoint({lat:raw.latitude,lon:raw.longitude})||(raw.latitude===0&&raw.longitude===0)||
+    !Number.isFinite(raw.accuracy)||raw.accuracy<=0||raw.accuracy>200000||
+    !Number.isFinite(timestamp)||timestamp>now+60000||now-timestamp>300000||
+    !Number.isFinite(receivedAt)||receivedAt>now+60000||now-receivedAt>300000)return null;
+ return {lat:raw.latitude,lon:raw.longitude,timestamp,receivedAt,accuracy:raw.accuracy,approximate:true};
 }

@@ -60,6 +60,10 @@
 <form id="platform-account"><label>Navn<input id="platform-user-name" maxlength="100"></label>
 <label>Loginadgang<select id="platform-user-access"><option value="enabled">Åben</option><option value="disabled">Sat på pause</option></select></label>
 <button class="outline-button">Gem konto</button></form>
+<form id="platform-location"><h4>Mobilplacering</h4>
+<label><input id="platform-location-enabled" type="checkbox"> Tillad omtrentlig mobil-/Wi-Fi-placering for denne bruger</label>
+<p class="hint">Fra som standard. Styrer brugerens adgang i Pejlo, også til delte trackere. Traccars Google-opslag styres separat på serveren og stoppes ikke af dette valg. Mobilplacering bruges ikke til GPS-ruter eller områdealarmer.</p>
+<button class="outline-button">Gem mobilplacering</button></form>
 <details id="platform-delete-panel" hidden>
 <summary>Slet kundens login</summary>
 <p>Sætter du først login på pause, kan du bagefter slette det permanent. Abonnementsoplysninger og kundedata bevares.</p>
