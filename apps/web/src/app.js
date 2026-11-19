@@ -1,4 +1,5 @@
 import {gpsStatus} from './shared/gps-status.js';
+import {renderSignalBar} from './features/signal-bar.js';
 import {createHandoff,directionsURL} from './features/handoff.js';
 import {createMySubscription} from './features/subscription.js';
 import {initPageScroll} from './features/page-scroll.js';
@@ -133,6 +134,7 @@ function updatePositionRequest(){
  if(telemetry?.battery!=null&&batteryTime!=null)batteryInfo.push('Batteri målt '+ageText(batteryTime));
  if(telemetry?.battery==null&&telemetry?.charging!=null&&telemetry.receivedAt!=null)batteryInfo.push(ageText(telemetry.receivedAt));
  $('#tracker-details-battery').textContent=identifier?batteryInfo.join(' · '):(position?.battery!=null?position.battery+' % · eksempel':'Ikke oplyst');
+ renderSignalBar(identifier?d:null,ageText);
  const signalTelemetry=identifier?telemetry:null;
  $('#tracker-details-satellites').textContent=signalTelemetry?.satellites!=null?signalTelemetry.satellites+' rapporteret':'Ikke oplyst';
  $('#tracker-details-signal').textContent=signalTelemetry?.rssi!=null?'RSSI '+signalTelemetry.rssi:'Ikke oplyst';

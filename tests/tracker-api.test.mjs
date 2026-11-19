@@ -68,11 +68,11 @@ test('an invalid latest fix preserves the last trusted position with its origina
 test('battery and charge are reported independently of a future GPS fix',async()=>{
  const localEnv={...env,DB:database()};
  const serverTime=new Date().toISOString();
- const future={...position,serverTime,fixTime:new Date(Date.now()+8*3600000).toISOString(),attributes:{batteryLevel:100,charge:true,secret:'never expose'}};
+ const future={...position,protocol:'jt808',serverTime,fixTime:new Date(Date.now()+8*3600000).toISOString(),attributes:{batteryLevel:100,charge:true,secret:'never expose'}};
  const f=fixture({positionValue:future,history:false});
  const result=await (await handleAPI(req(),localEnv,f.fetcher)).json();
  assert.equal(result.position,null);
- assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,cellTowers:[],gpsClockAhead:true});
+ assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,rssiMax:31,cellTowers:[],gpsClockAhead:true});
  const absent=fixture({positionValue:{...future,attributes:{batteryLevel:101,charge:'true'}},history:false});
  const unknown=await (await handleAPI(req(),localEnv,absent.fetcher)).json();
  assert.equal(unknown.telemetry.battery,null);

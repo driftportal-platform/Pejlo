@@ -43,6 +43,7 @@ export function trackerTelemetry(raw,now=Date.now()){
   receivedAt,
   satellites:signalInteger(raw?.attributes?.sat),
   rssi:signalInteger(raw?.attributes?.rssi),
+  rssiMax:raw?.protocol==='jt808'?31:null,
   cellTowers:cellTowers(raw),
   gpsClockAhead:Number.isFinite(fixTime)&&fixTime>(receivedAt??now)+60000
  };
