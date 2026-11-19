@@ -1,80 +1,26 @@
-# Nyt i 0.6.0
-Cirkel eller område tegnet med punkter direkte i Pejlo. Push ved udgang og tilbagekomst er implementeret og kræver tre runtime-værdier én gang i Cloudflare. Se [opsætning og test](docs/geofence.md).
+# Start her med Pejlo 0.8.51
 
-# Pejlo 0.5.1 – samlet GitHub-udgave
+Dette er den gældende startvejledning. Ældre versionsnoter beskriver historiske forhold og kan nævne demo-server, langsommere polling og tidligere begrænsninger.
 
-Denne udgave tilføjer Traccar-forbindelsen og tilknytning med **tracker-ID + parringskode**. Brugerne foretager tilknytningen i Pejlo. Kun administratoren skal sætte infrastrukturen op.
+## Eksisterende installation
 
-**Denne pakke er tilrettet din eksisterende database.** Database-ID `88356335-2caf-41d5-9a45-99c31eaea836` er allerede indsat i `wrangler.jsonc`. Tabellen og indekset er oprettet. Du kan springe trin 1 over og uploade pakken; kontrollér fortsat de to runtime-secrets. Udgaven er ikke allerede udgivet.
+1. Upload de udpakkede filer til roden af driftportal-platform/Pejlo med samme mapper. Erstat kun filer med samme navn.
+2. Behold Cloudflare Worker pejlo, D1-binding DB, eksisterende secrets, Cron Trigger hvert minut og MAPTILER_API_KEY under Builds.
+3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.51 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
+4. Aktivér mobilplacering for din egen bruger i Systemadmin → Kunder og abonnementer, hvis den skal prøves. Test derefter fysisk GPS, mobilestimat, kortfølgning og push.
 
-Version 0.5.1 retter en Cloudflare-kompatibilitetsfejl: serverens udgående HTTP-kald bruger nu `redirect: manual`, og viderestillinger afvises ud fra HTTP-status. Version 0.5.0 brugte `redirect: error`, som Workers afviser, før netværkskaldet sendes.
+Der er ingen nye nøgler eller databasekommandoer alene for dokumentationspakken. Den er ikke en fuld appinstallation og indeholder ikke funktionerne fra kodepakken 0.8.51, hvis den endnu ikke er uploadet.
 
-## 1. Opret trackerregisteret én gang
+## Før du ændrer driften
 
-I Cloudflare: Storage & databases → D1 SQL database → Create Database. Navn: `pejlo-trackers`.
+- [Teknisk oversigt og alle indstillingsnavne](docs/teknisk-drift.md)
+- [Ny offentlig IP, demo-server eller anden pc](docs/ip-og-serverskift.md)
+- [Brug af appen](docs/brugervejledning.md)
 
-Kopiér databasens ID. Åbn `wrangler.jsonc` i denne pakke, og erstat `INDSAET_DATABASE_ID` med det kopierede ID. Behold bindingens navn `DB`.
+Ved ny offentlig IP skal DuckDNS og Google Geolocation-nøglens tilladte IP kontrolleres. Ved ny LAN-IP skal routerens portmål rettes. Ved serverskift skal trackeren sende til den nye server, og den server skal testes og aktiveres i Pejlo. Ændring af Cloudflare-fallback alene tilsidesætter ikke et aktivt adminvalg.
 
-Åbn D1-databasens Console, og kør indholdet af `apps/api/migrations/0001_trackers.sql`. Filen opretter tabellen og ejerindekset; den sletter ingen eksisterende data.
+## Ny installation eller gendannelse
 
-Alternativ med terminal, fra projektmappen:
+Følg den tekniske vejledning. Gendan D1 og Firestore samt nødvendige secrets; en GitHub-kopi alene gendanner ikke kundedata. Opret trackerregisteret fra apps/api/migrations ved en helt ny database. Arbejd ikke på en eksisterende database som om den var tom. Opdatér firestore.rules efter projektets gældende regler.
 
-```sh
-npx wrangler d1 create pejlo-trackers
-# Indsæt database-ID'et i wrangler.jsonc, behold binding DB.
-npx wrangler d1 migrations apply pejlo-trackers --remote
-```
-
-## 2. Sæt to runtime-secrets på Workeren
-
-Cloudflare → Workers & Pages → pejlo → Settings → Variables and Secrets, **uden for Builds**:
-
-| Type | Navn | Værdi |
-| --- | --- | --- |
-| Secret | `TRACCAR_TOKEN` | Token fra den nye Traccar-konto |
-| Secret | `TRACCAR_ADMIN_UID` | Dit Pejlo Firebase-bruger-ID (UID) |
-
-Find UID i Firebase → Authentication → Users → vælg den bruger, du logger på **Pejlo** med. UID er ikke Traccar-ID og ikke din e-mailadresse. Kun den konto får knappen til at klargøre trackere.
-
-Token skal kun indtastes i Cloudflare, aldrig i GitHub eller et profilfelt. Der er intet token indbygget i pakken.
-
-Den delte kortnøgle `MAPTILER_API_KEY` bliver stående under **Builds → Variables and secrets** som før. Den bruges under build til kortene.
-
-Standardserveren er `https://demo3.traccar.org`. Ved egen Traccar-server sættes `TRACCAR_URL` til serverens HTTPS-adresse uden sti, og `TRACCAR_TOKEN` til tokenet fra samme server. Begge værdier sættes i Cloudflare. Trackeren skal registreres med samme enheds-ID på den nye server og sende direkte til dens trackerport. Bekræft en ny position i Traccar, før Pejlo skiftes over.
-
-## 3. Upload og deploy
-
-Upload de udpakkede filer med deres mappestruktur til roden af det eksisterende GitHub-repository `driftportal-platform/Pejlo`. Erstat filer ved samme navn. Behold den rettede `wrangler.jsonc`.
-
-Cloudflare bygger med `npm run build` og udgiver med `npx wrangler deploy` som hidtil. Databasen bindes som `DB` gennem konfigurationen.
-
-Eksisterende profiler og login bevares. Firestore-reglerne er de samme som før. D1-registeret er serverens autoritative ejerregister; en ændring af et profilfelt giver aldrig adgang til en anden brugers tracker.
-
-## 4. Klargør jeres første tracker i Pejlo
-
-Log på Pejlo med administratorkontoen. Opret en profil, hvis kontoen er tom. Gå til **Indstillinger → Trackerforbindelse → Administrator: klargør tracker**.
-
-Indtast tracker-ID `080608317309` (behold det første nul) og fx navnet `Pejlo`. Tryk **Opret tracker og parringskode**.
-
-Den eksisterende enhed findes på den nye Traccar-konto; den genbruges. For nye ID'er oprettes en enhed på Traccar-kontoen automatisk. Hvis ID allerede er registreret på en anden Traccar-konto, skal det frigøres dér først.
-
-Gem den viste parringskode med det samme. Den vises kun én gang og lagres kun som SHA-256-hash. Giv ID og kode til trackerens ejer.
-
-## 5. Brugerens forløb
-
-1. Opret konto i Pejlo og bekræft e-mailen.
-2. Opret en profil med eget navn og dyre-/genstandstype.
-3. Under **Indstillinger → Trackerforbindelse**: indtast ID og parringskode.
-4. Tryk **Tilføj tracker til denne profil**.
-
-Trackeren knyttes nu til brugerens konto og profilen. Brugeren skal ikke ind i Cloudflare, Firebase eller Traccar. Koden kan ikke overtage en tracker, der allerede tilhører en anden konto. Ejeren kan genvælge en allerede tilknyttet tracker i profilens rullemenu.
-
-## Hardware og test
-
-Trackeren skal være sat til den fælles server og den rigtige protokol/port. ID + parringskode ændrer ikke trackerens mobilnet- eller serverindstillinger. Jeres Q8_H har allerede accepteret `demo3.traccar.org`, port `5015` via SMS. Registreret protokol: jt808.
-
-Appen henter seneste gyldige GPS-position, batteriprocent hvis oplyst og dagens punkter siden midnat UTC. Opdatering cirka hvert minut. En offline-enhed kan stadig have en gammel position; appen viser positionens alder. Manglende GPS vises som afventende, aldrig som en opdigtet position. Profiler uden tilknyttet tracker har stadig tydeligt mærkede eksempeldata.
-
-Familiedeling, overdragelse mellem konti og generel understøttelse/automatisk konfiguration af alle trackermodeller er ikke med endnu. En mistet parringskode kræver administrativ håndtering; denne udgave har ikke en knap til at nulstille den.
-
-Se `docs/validation.md` for præcis teststatus og begrænsninger.
+Tag en konsistent Traccar-backup og bevar TRACCAR_CONFIG_SECRET før flytning. Udfyld kun nøgleregistret i en privat kopi.
