@@ -1,3 +1,4 @@
+import {gpsStatus} from './shared/gps-status.js';
 import {createHandoff,directionsURL} from './features/handoff.js';
 import {createMySubscription} from './features/subscription.js';
 import {initPageScroll} from './features/page-scroll.js';
@@ -118,9 +119,11 @@ function updatePositionRequest(){
  $('#tracker-details-name').textContent=profile.name;
  $('#tracker-details-connection').textContent=identifier?({online:'Online',offline:'Offline'}[d.device?.status]||'Ukendt'):'Eksempeldata';
  $('#tracker-details-contact').textContent=identifier?ageText(d.device?.lastContact):'—';
- $('#tracker-details-gps').textContent=position?ageText(position.timestamp)+(d.gpsProvisional?' · afventer bekræftelse':d.gpsUncertain?' · usikkert GPS-signal, viser senest kendte':''):'Ingen gyldig position';
- if(d.positionLookupFailed)$('#tracker-details-gps').textContent+=' · positionsopslaget fejlede';
- if(d.telemetry?.gpsClockAhead)$('#tracker-details-gps').textContent+=' · trackeren melder GPS-tid i fremtiden';
+ const gpsInfo=gpsStatus(d);
+ $('#tracker-details-gps').textContent=position
+  ? ageText(position.timestamp)+(gpsInfo.waiting?' · '+gpsInfo.label.toLowerCase()+' · viser senest godkendte position':'')
+  : gpsInfo.label;
+ $('#tracker-details-gps').title=gpsInfo.detail;
  const telemetry=d.telemetry;
  const batteryInfo=[telemetry?.battery!=null?telemetry.battery+' %':'Ikke oplyst'];
  if(telemetry?.charging===true)batteryInfo.push('Oplader');
@@ -310,12 +313,18 @@ function updateAge(){
  const d=data(),p=d.position,live=isLinked();
  $('#home-observation').textContent=live?(d.gpsProvisional?'Afventer bekræftet position':homeStatus(selected(),p)):'Eksempeldata · ikke en rigtig hjemmestatus';
  const contact=d.device?.lastContact;$('#last-contact').textContent=live?ageText(contact):'Eksempeldata';$('#last-contact').title=Number.isFinite(contact)?new Date(contact).toLocaleString('da-DK',{timeZone:'Europe/Copenhagen'}):'Kontaktoplysningen kommer fra Traccar, særskilt fra GPS-positionen.';
- if(!p){$('#age').textContent='Ingen position';$('#freshness').textContent=d.positionLookupFailed?'Positionsopslag fejlede':d.gpsUncertain?'Usikkert GPS-signal':'Afventer GPS';$('#search-age').textContent='Der er endnu ingen gyldig position fra trackeren.';return;}
- const seconds=Math.max(0,Math.floor((Date.now()-p.timestamp)/1000));
- const text=seconds<60?seconds+' sek. siden':seconds<3600?Math.floor(seconds/60)+' min. siden':Math.floor(seconds/3600)+' timer siden';
+ const gpsInfo=gpsStatus(d);
+ $('#freshness').textContent=live?gpsInfo.label:'Eksempel';
+ if(!p){
+  $('#age').textContent='Ingen position';
+  $('#search-age').textContent=live?gpsInfo.detail:'Der er endnu ingen eksempelposition.';
+  return;
+ }
+ const text=ageText(p.timestamp);
  $('#age').textContent=text;
- $('#freshness').textContent=live&&d.gpsProvisional?'Ubekræftet position':live&&d.positionLookupFailed?'Senest kendte position':live&&d.gpsUncertain?(seconds>180?'Usikkert GPS-signal':'Afventer stabilt GPS-signal'):live?(seconds>300?'Gammel position':'Seneste registrering'):(seconds>300?'Gammel eksempelposition':'Eksempel');
- $('#search-age').textContent=(d.gpsProvisional?'Afventer bekræftelse af første GPS-position. ':d.positionLookupFailed?'Ny position kunne ikke hentes. Viser senest gemte position. ':d.gpsUncertain?(seconds>180?'Usikkert GPS-signal. ':'Nyere GPS-data er ustabile. ')+'Viser seneste troværdige position. ':'')+(seconds>300?'OBS: gammel position. ':'')+(live?'Seneste registrering fra ':'Målet er en eksempelposition fra ')+text+'.';
+ $('#search-age').textContent=(live&&gpsInfo.waiting?gpsInfo.detail+' Viser senest godkendte position. ':'')+
+  (Date.now()-p.timestamp>300000?'OBS: gammel position. ':'')+
+  (live?'Position registreret ':'Eksempelposition registreret ')+text+'.';
 }
 function updateSearch(){
   if(!selected())return;
