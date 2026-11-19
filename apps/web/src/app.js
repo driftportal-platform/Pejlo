@@ -133,6 +133,13 @@ function updatePositionRequest(){
  if(telemetry?.battery!=null&&batteryTime!=null)batteryInfo.push('Batteri målt '+ageText(batteryTime));
  if(telemetry?.battery==null&&telemetry?.charging!=null&&telemetry.receivedAt!=null)batteryInfo.push(ageText(telemetry.receivedAt));
  $('#tracker-details-battery').textContent=identifier?batteryInfo.join(' · '):(position?.battery!=null?position.battery+' % · eksempel':'Ikke oplyst');
+ const signalTelemetry=identifier?telemetry:null;
+ $('#tracker-details-satellites').textContent=signalTelemetry?.satellites!=null?signalTelemetry.satellites+' rapporteret':'Ikke oplyst';
+ $('#tracker-details-signal').textContent=signalTelemetry?.rssi!=null?'RSSI '+signalTelemetry.rssi:'Ikke oplyst';
+ $('#tracker-details-signal-age').textContent=signalTelemetry?.receivedAt!=null?'Signaldata modtaget '+ageText(signalTelemetry.receivedAt)+'.':'Tidspunkt for signaldata er ikke oplyst.';
+ const cells=signalTelemetry?.cellTowers??[];
+ $('#tracker-details-network').textContent=cells.length?cells.map(c=>String(c.mcc).padStart(3,'0')+' / '+String(c.mnc).padStart(2,'0')).join(' · '):'Ikke oplyst';
+ $('#tracker-details-cell').textContent=cells.length?cells.map(c=>c.lac+' / '+c.cid).join(' · '):'Ikke oplyst';
  $('#tracker-details-home').textContent=identifier?homeStatus(profile,position):'Eksempelposition';
  const directions=$('#tracker-directions'),url=identifier&&directionsURL(position);
  directions.hidden=!url;

@@ -72,7 +72,7 @@ test('battery and charge are reported independently of a future GPS fix',async()
  const f=fixture({positionValue:future,history:false});
  const result=await (await handleAPI(req(),localEnv,f.fetcher)).json();
  assert.equal(result.position,null);
- assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),gpsClockAhead:true});
+ assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,cellTowers:[],gpsClockAhead:true});
  const absent=fixture({positionValue:{...future,attributes:{batteryLevel:101,charge:'true'}},history:false});
  const unknown=await (await handleAPI(req(),localEnv,absent.fetcher)).json();
  assert.equal(unknown.telemetry.battery,null);

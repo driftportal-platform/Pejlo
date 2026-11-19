@@ -23,6 +23,15 @@ function batteryLevel(raw){
  const level=raw?.attributes?.batteryLevel;
  return Number.isFinite(level)&&level>=0&&level<=100?level:null;
 }
+function signalInteger(value,max=255){return Number.isInteger(value)&&value>=0&&value<=max?value:null;}
+function cellTowers(raw){
+ const towers=raw?.network?.cellTowers;
+ if(!Array.isArray(towers))return [];
+ return towers.slice(0,8).map(t=>({
+  mcc:signalInteger(t?.mobileCountryCode,999),mnc:signalInteger(t?.mobileNetworkCode,999),
+  lac:signalInteger(t?.locationAreaCode,16777215),cid:signalInteger(t?.cellId,68719476735)
+ })).filter(t=>Object.values(t).every(v=>v!==null));
+}
 export function trackerTelemetry(raw,now=Date.now()){
  const serverTime=Date.parse(raw?.serverTime);
  const fixTime=Date.parse(raw?.fixTime);
@@ -32,6 +41,9 @@ export function trackerTelemetry(raw,now=Date.now()){
   battery:batteryLevel(raw),
   charging:typeof charge==='boolean'?charge:null,
   receivedAt,
+  satellites:signalInteger(raw?.attributes?.sat),
+  rssi:signalInteger(raw?.attributes?.rssi),
+  cellTowers:cellTowers(raw),
   gpsClockAhead:Number.isFinite(fixTime)&&fixTime>(receivedAt??now)+60000
  };
 }
