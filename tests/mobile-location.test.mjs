@@ -13,6 +13,22 @@ function database(){
 }
 const rawPoint=(now=Date.now())=>({id:7,deviceId:1,valid:true,latitude:56.5,longitude:8.3,accuracy:1200,fixTime:new Date(now).toISOString(),serverTime:new Date(now).toISOString(),attributes:{approximate:true,batteryLevel:90}});
 
+test('a signed-in account can read its own mobile permission without a tracker and cannot select another account',async()=>{
+ const DB=database();DB.raw.exec("ALTER TABLE trackers ADD COLUMN name TEXT; DELETE FROM trackers");
+ const fetcher=async url=>{
+  assert.ok(url.includes('accounts:lookup'),'permission status must not depend on a Traccar connection');
+  return Response.json({users:[{localId:'viewer',emailVerified:true}]});
+ };
+ await setLocationAccess(DB,'owner',true);
+ const request=()=>handleAPI(new Request('https://pejlo.example/api/trackers?uid=owner',{headers:{Authorization:'Bearer user'}}),{DB},fetcher);
+ let response=await request();assert.equal(response.status,200);let data=await response.json();
+ assert.equal(data.uid,'viewer');assert.equal(data.mobileLocationEnabled,false);assert.deepEqual(data.trackers,[]);
+ await setLocationAccess(DB,'viewer',true);
+ data=await (await request()).json();assert.equal(data.mobileLocationEnabled,true);
+ await setLocationAccess(DB,'viewer',false);
+ data=await (await request()).json();assert.equal(data.mobileLocationEnabled,false);
+});
+
 test('mobile estimates never enter trusted GPS or GPS routes, even with tiny accuracy',()=>{
  assert.equal(gpsPoint(rawPoint()),null);
  assert.equal(gpsPoint({...rawPoint(),accuracy:1}),null);

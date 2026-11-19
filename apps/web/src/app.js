@@ -1,3 +1,4 @@
+import {mobileAccessText} from './features/mobile-access-status.js';
 import {gpsStatus} from './shared/gps-status.js';
 import {renderSignalBar} from './features/signal-bar.js';
 import {createHandoff,directionsURL} from './features/handoff.js';
@@ -57,6 +58,7 @@ let overviewFocusKey=null;
 let overviewOptionsKey=null;
 let currentPage='kort', overviewMap, searchMap, chosenLayer='demo', choosingHome=false, user=null, heading=null, headingTime=0, watching=false, simulation=false, demoStep=0, toastTimer;
 const selected=()=>state.profiles.find(p=>p.id===state.activeId);
+let accountMobile={enabled:null,checkedAt:null,error:false};
 let trackerData=null,trackerError='',trackerUser=null,ownedTrackers=[],pollingId=null;
 const positionRequests=new Map();
 const trackerActions=new Map();
@@ -191,17 +193,18 @@ $('#tracker-sound').onclick=()=>startTrackerAction('sound');
 async function loadTrackers(){
  const gen=sessionGeneration;
  try{const result=await trackerRequest('trackers');if(gen!==sessionGeneration)return;
- ownedTrackers=result.trackers;$('#system-admin-link').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;if(!pollingId)trackerError='';updateTrackerStatus();
- }catch(error){if(gen===sessionGeneration){trackerError=error.message;updateTrackerStatus();}}
+ accountMobile={enabled:typeof result.mobileLocationEnabled==='boolean'?result.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};ownedTrackers=result.trackers;$('#system-admin-link').hidden=!result.isAdmin;$('#my-uid').textContent=result.uid;if(!pollingId)trackerError='';updateTrackerStatus();
+ }catch(error){if(gen===sessionGeneration){trackerError=error.message;accountMobile.error=true;updateTrackerStatus();}}
 }
 function connectTracker(){
  trackerClient.stop();pollingId=null;
  if(!trackerUser||!selected()?.trackerId){trackerData=null;updateTrackerStatus();return;}
  const id=selected().trackerId;pollingId=id;const gen=sessionGeneration;
  trackerError='Henter trackerdata…';updateTrackerStatus();
- trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;updateTrackerStatus();},trackerActions.get(id)?.until);
+ trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;accountMobile={enabled:typeof value.mobileLocationEnabled==='boolean'?value.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;accountMobile.error=true;updateTrackerStatus();},trackerActions.get(id)?.until);
 }
 function updateTrackerStatus(){
+ $('#account-mobile-status').textContent=mobileAccessText(accountMobile);
  const d=data(),live=isLinked();
  $('.demo-banner b').textContent=live?'Traccar':'Eksempeldata';
  $('.demo-banner span:last-child').textContent=live?(trackerError||(!d.position?'Venter på første gyldige GPS-position':d.device?.status==='online'?'Tracker online':'Tracker offline / ukendt · senest kendte position')):'Ingen tracker tilknyttet denne profil';
@@ -451,6 +454,7 @@ const importLocal=()=>{
  const ids=new Set(state.profiles.map(p=>p.id));state.profiles.push(...old.profiles.filter(p=>!ids.has(p.id)).slice(0,50-state.profiles.length));state.activeId=state.profiles[0]?.id??null;persist();refresh();
 };
 $('#import-local').onclick=importLocal;$('#import-first').onclick=importLocal;
+$('#account-mobile-refresh').onclick=()=>loadTrackers();
 $('#tracker-retry').onclick=()=>{
  if(selected()?.trackerId){connectTracker();return;}
  trackerError='Henter dine tilknyttede trackere…';
@@ -465,7 +469,7 @@ $('#claim-tracker').onsubmit=async event=>{
 };
 let slowTimer;
 startAuthentication(async(user,{db,dbSDK,auth})=>{
- fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();handoff.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;trackerActions.clear();ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();handoff.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;trackerActions.clear();accountMobile={enabled:null,checkedAt:null,error:false};ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
  positionRequests.clear();trackerDetails.close();photoEditor.close();
  const gen=++sessionGeneration;clearTimeout(slowTimer);cloud?.close();saveCloud=null;stopLocation(false);overviewMap?.clear();searchMap?.clear();choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';labelLayer();$('#new-profile').close();Object.assign(state,emptyState());refresh();
  if(!user?.emailVerified)return;

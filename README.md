@@ -1,3 +1,7 @@
+# Pejlo 0.8.52
+
+Brugeren kan se sin kontos adgang til mobilplacering under Indstillinger → Tracker. Kun administratoren kan ændre valget. Se [ændringer i 0.8.52](docs/version-0.8.52.md).
+
 # Pejlo 0.8.51
 
 Pejlo er en PWA til GPS-trackere med personligt login, profiler, kort, historik, familiedeling og områdebeskeder.

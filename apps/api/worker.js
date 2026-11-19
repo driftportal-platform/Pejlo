@@ -196,7 +196,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(path==='/api/trackers'){
    await ensureFamily(env.DB);
    const rows=await env.DB.prepare('SELECT t.identifier,t.name,CASE WHEN t.owner_uid=? THEN 1 ELSE 0 END AS is_owner FROM trackers t WHERE t.owner_uid=? OR EXISTS(SELECT 1 FROM pejlo_members m JOIN pejlo_profiles p ON p.identifier=m.identifier AND p.owner_uid=t.owner_uid WHERE m.identifier=t.identifier AND m.uid=?) ORDER BY t.name').bind(uid,uid,uid).all();
-   return json({trackers:rows.results,isAdmin,uid});
+   return json({trackers:rows.results,isAdmin,uid,mobileLocationEnabled:await locationEnabled(env.DB,uid)});
   }
   // Claiming is atomic: the database assigns one tracker to exactly one account.
   if(path==='/api/trackers/claim'){
