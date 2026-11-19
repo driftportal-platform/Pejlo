@@ -29,6 +29,7 @@ import {loadState} from './features/storage.js';
 import {createTrackerClient} from './features/tracker.js';
 import {demoFor} from './features/demo.js';
 import {createMap,layers} from './features/maps.js';
+import {loadMapLayer,saveMapLayer} from './features/map-preferences.js';
 import {createLocation} from './features/location.js';
 import {distance,formatDistance,bearing,relativeBearing,directionName} from './shared/geo.js';
 const $=s=>document.querySelector(s);
@@ -360,7 +361,7 @@ async function selectLayer(name){
  document.querySelectorAll('.layer-select').forEach(s=>s.disabled=true);
  const ok=await overviewMap?.layer(name,mapConfig.apiKey);
  if(request!==layerRequest)return;
- if(ok){chosenLayer=name;await searchMap?.layer(name,mapConfig.apiKey);}
+ if(ok){chosenLayer=name;saveMapLayer(name);await searchMap?.layer(name,mapConfig.apiKey);}
  if(request!==layerRequest)return;
  labelLayer();document.querySelectorAll('.layer-select').forEach(s=>s.disabled=false);
 }
@@ -417,7 +418,7 @@ if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('messag
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(watching||simulation||heading!==null))stopLocation(false);});
 window.addEventListener('pagehide',()=>{location.stop();trackerClient.stop();});
 window.addEventListener('pageshow',event=>{if(event.persisted&&trackerUser)connectTracker();});
-refresh();showPage(window.location.hash.slice(1));selectLayer(mapConfig.defaultLayer);setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
+refresh();showPage(window.location.hash.slice(1));selectLayer(loadMapLayer(mapConfig.defaultLayer));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
 
 const importLocal=()=>{
  const old=loadState();if(!old.profiles.length)return toast('Der er ingen gamle lokale profiler at importere.');

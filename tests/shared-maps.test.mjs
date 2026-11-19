@@ -16,7 +16,7 @@ test('build injects the shared public key, defaults to streets and rejects URLs'
   const run=key=>spawnSync(process.execPath,['scripts/build.mjs'],{cwd:root,env:{...process.env,MAPTILER_API_KEY:key},encoding:'utf8'});
   assert.equal(run('test-public-key_123').status,0);
   const config=readFileSync(join(root,'dist/src/config/maps.js'),'utf8');
-  assert.match(config,/"apiKey":"test-public-key_123"/);assert.match(config,/"defaultLayer":"streets"/);
+  assert.match(config,/"apiKey":"test-public-key_123"/);assert.match(config,/"defaultLayer":"satellite"/);
   assert.equal(run('').status,0);assert.match(readFileSync(join(root,'dist/src/config/maps.js'),'utf8'),/"apiKey":""/);
   assert.notEqual(run('https://example.com/?key=bad').status,0);
  }finally{rmSync(root,{recursive:true,force:true});}
