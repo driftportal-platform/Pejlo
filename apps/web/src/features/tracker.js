@@ -10,7 +10,7 @@ export function createTrackerClient({fetcher=fetch,setTimer=setTimeout,clearTime
    const timeout=setTimer(()=>active.abort(),40000);
    try{
     const token=await user.getIdToken();if(gen!==generation)return;
-    const live=Date.now()<findUntil&&Date.now()<nextRouteAt;
+    const live=Date.now()<nextRouteAt;
     const response=await fetcher('/api/tracker?identifier='+encodeURIComponent(identifier)+(live?'&live=1':''),{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:active.signal});
     const value=await response.json();if(gen!==generation)return;
     if(!response.ok)throw new Error(value.error||'Trackerdata kunne ikke hentes.');
@@ -18,7 +18,7 @@ export function createTrackerClient({fetcher=fetch,setTimer=setTimeout,clearTime
     if(!live)nextRouteAt=Date.now()+60000;
     onData(value,live);
    }catch(error){if(gen===generation)onError(error.name==='AbortError'?'Forbindelsen tog for lang tid. Prøv igen.':error.message);}
-   finally{clearTimer(timeout);if(gen===generation)timer=setTimer(poll,Date.now()<findUntil?10000:60000);}
+   finally{clearTimer(timeout);if(gen===generation)timer=setTimer(poll,Date.now()<findUntil?10000:15000);}
   }
   poll();
  }
