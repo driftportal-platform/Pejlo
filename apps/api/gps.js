@@ -1,3 +1,4 @@
+import {cleanAccessPoints} from '../../packages/shared/home-wifi.js';
 import {validPoint} from '../../packages/shared/geo.js';
 import {advanceBattery} from '../../packages/shared/battery.js';
 import {once} from './schema.js';
@@ -38,6 +39,9 @@ export function trackerTelemetry(raw,now=Date.now()){
  const fixTime=Date.parse(raw?.fixTime);
  const receivedAt=Number.isFinite(serverTime)&&serverTime<=now+60000?serverTime:null;
  const charge=raw?.attributes?.charge;
+ const wifiAccessPoints=cleanAccessPoints(raw?.network?.wifiAccessPoints);
+ const deviceTime=Date.parse(raw?.deviceTime);
+ const wifiMeasuredAt=!wifiAccessPoints.length||receivedAt==null||deviceTime>now+10000?null:(Number.isFinite(deviceTime)?Math.min(receivedAt,deviceTime):receivedAt);
  return {
   battery:batteryLevel(raw),
   charging:typeof charge==='boolean'?charge:null,
@@ -46,6 +50,8 @@ export function trackerTelemetry(raw,now=Date.now()){
   rssi:signalInteger(raw?.attributes?.rssi),
   rssiMax:raw?.protocol==='jt808'?31:null,
   cellTowers:cellTowers(raw),
+  wifiAccessPoints,
+  wifiMeasuredAt,
   gpsClockAhead:Number.isFinite(fixTime)&&fixTime>(receivedAt??now)+60000
  };
 }

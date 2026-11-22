@@ -72,7 +72,7 @@ test('battery and charge are reported independently of a future GPS fix',async()
  const f=fixture({positionValue:future,history:false});
  const result=await (await handleAPI(req(),localEnv,f.fetcher)).json();
  assert.equal(result.position,null);
- assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,rssiMax:31,cellTowers:[],gpsClockAhead:true});
+ assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,rssiMax:31,cellTowers:[],wifiAccessPoints:[],wifiMeasuredAt:null,gpsClockAhead:true});
  const absent=fixture({positionValue:{...future,attributes:{batteryLevel:101,charge:'true'}},history:false});
  const unknown=await (await handleAPI(req(),localEnv,absent.fetcher)).json();
  assert.equal(unknown.telemetry.battery,null);
@@ -254,4 +254,12 @@ test('a battery spike stays pending until a distinct report confirms it',async()
  assert.equal(pending.batteryMeasuredAt,start);
  assert.equal((await read(0,start+1000)).battery,90);
  assert.equal((await read(0,start+2000)).battery,0);
+});
+
+test('authorized tracker API carries sanitized Wi-Fi scans independently of GPS',async()=>{
+ const at=new Date().toISOString(),raw={...position,serverTime:at,deviceTime:at,valid:false,network:{wifiAccessPoints:[{macAddress:'28:bd:89:05:5c:10',signalStrength:-49,ssid:'private-name',password:'secret'},{macAddress:'bad',signalStrength:5}]}};
+ const f=fixture({positionValue:raw,history:false});
+ const response=await handleAPI(req(),{...env,DB:database()},f.fetcher);
+ assert.equal(response.status,200);const result=await response.json();
+ assert.deepEqual(result.telemetry.wifiAccessPoints,[{mac:'28:BD:89:05:5C:10',rssi:-49}]);assert.equal(result.telemetry.wifiMeasuredAt,Date.parse(at));assert.equal(JSON.stringify(result).includes('private-name'),false);
 });

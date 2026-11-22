@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 327 108" role="img" aria-labelledby="title">
+  <title id="title">Pejlo</title>
+  <rect width="108" height="108" rx="27" fill="#183e35"/>
+  <path fill="#fafbf7" d="M52 23c-15.5 0-28 12.5-28 28 0 19.6 22.5 35.3 26.5 38.1a2.6 2.6 0 0 0 3 0C57.5 86.3 80 70.6 80 51c0-15.5-12.5-28-28-28Z"/>
+  <path fill="#183e35" d="m66 38-26.8 11a2 2 0 0 0 .2 3.8l9.3 2.5 2.5 9.3a2 2 0 0 0 3.8.2L66 38Z"/>
+  <path fill="none" stroke="#c9d9b6" stroke-width="4.8" stroke-linecap="round" d="M79 23a22 22 0 0 1 10 12"/>
+  <g transform="translate(139 10)" fill="none" stroke="#183e35" stroke-width="7.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 67V20h16.5c9 0 14.5 5.7 14.5 13.5S30.5 47 21.5 47H5"/>
+    <path d="M51 52h29c0-9.5-6-16-14.2-16C56.6 36 50 43 50 52c0 9.5 6.8 16 16.7 16 4.8 0 8.5-1.4 11.5-4.2"/>
+    <path d="M100 37v34c0 8-4.1 12.5-10.8 12.5"/>
+    <path d="M122 20v39c0 5.5 2.6 8 7.3 8"/>
+    <circle cx="156.5" cy="52" r="16"/>
+    <circle cx="100" cy="24" r="4.4" fill="#183e35" stroke="none"/>
+  </g>
+</svg>

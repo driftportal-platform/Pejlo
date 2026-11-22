@@ -1,4 +1,5 @@
 import {validPolygon} from './fence.js';
+import {cleanWifiConfig} from './home-wifi.js';
 import {validPoint} from './geo.js';
 export const types = {
   cat: {label: 'Kat', icon: 'cat', category: 'dyr', noun: 'Hjemmeområde'},
@@ -25,7 +26,7 @@ export function cleanProfile(p) {
  }):p.homeConfirmed?[{id:'original',name:'Hjemme',home:structuredClone(home)}]:[];
  const unique=presets.filter((f,i)=>presets.findIndex(x=>x.id===f.id)===i);
  const active=unique.find(f=>f.id===p.activeFenceId)||(!Array.isArray(p.fencePresets)?unique[0]:null);
- return {id:p.id.slice(0,100),name:p.name.trim(),photo:validPhoto(p.photo)?p.photo:'',type:p.type,deviceLabel:typeof p.deviceLabel==='string'?p.deviceLabel.slice(0,60):'',trackerId:typeof p.trackerId==='string'?p.trackerId.slice(0,100):'',geofenceEnabled:p.geofenceEnabled===true,homeConfirmed:p.homeConfirmed===true,home,fencePresets:unique,activeFenceId:active?.id||null};
+ return {homeWifi:cleanWifiConfig(p.homeWifi),id:p.id.slice(0,100),name:p.name.trim(),photo:validPhoto(p.photo)?p.photo:'',type:p.type,deviceLabel:typeof p.deviceLabel==='string'?p.deviceLabel.slice(0,60):'',trackerId:typeof p.trackerId==='string'?p.trackerId.slice(0,100):'',geofenceEnabled:p.geofenceEnabled===true,homeConfirmed:p.homeConfirmed===true,home,fencePresets:unique,activeFenceId:active?.id||null};
 }
 export const createId=()=>typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
 export function newProfile(name,type,deviceLabel=''){

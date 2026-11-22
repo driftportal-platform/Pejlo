@@ -1,4 +1,6 @@
-# Pejlo 0.8.52
+# Pejlo 0.8.53
+
+Wi-Fi-signalstyrke og indlæring af inde/ude er tilføjet. Se [vejledning til 0.8.53](docs/version-0.8.53.md).
 
 Brugeren kan se sin kontos adgang til mobilplacering under Indstillinger → Tracker. Kun administratoren kan ændre valget. Se [ændringer i 0.8.52](docs/version-0.8.52.md).
 

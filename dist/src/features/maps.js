@@ -1,16 +1,19 @@
+import {approximateText} from '../shared/location-display.js';
+import {routeAnalysis} from '../shared/history.js';
 import {icon} from '../components/icons.js';
-import {distance,searchZoom} from '../shared/geo.js';
+import {distance,searchZoom,formatDistance} from '../shared/geo.js';
 import {types} from './profiles.js';
 export const layers = {demo:'Skematisk eksempel',streets:'Gadekort',satellite:'Satellit / luftfoto',outdoor:'Terræn og stier'};
 const mapIds = {streets:'streets-v4',satellite:'satellite',outdoor:'outdoor-v2'};
-export function createMap(id, {notice, onHome, onManual} = {}) {
+export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
   const root = document.getElementById(id);
   if (!window.L) {root.textContent='Kortet kunne ikke indlæses.';return null;}
-  const map=L.map(root,{zoomControl:false,maxZoom:20}).setView([56.55,8.314],16);
+  const map=L.map(root,{zoomControl:false,maxZoom:20}).setView([56.55,8.314],18);
   L.control.zoom({position:'bottomright'}).addTo(map);
   let base, generation=0, errors=0;
-  const markers=L.layerGroup().addTo(map), path=L.layerGroup().addTo(map), homeLayer=L.layerGroup().addTo(map), phone=L.layerGroup().addTo(map);
-  const markerIcon=(type,cls='')=>L.divIcon({html:`<div class="map-marker ${cls}">${icon(type,24)}</div>`,className:'',iconSize:[42,42],iconAnchor:[21,21]});
+  const markers=L.layerGroup().addTo(map), path=L.layerGroup().addTo(map), homeLayer=L.layerGroup().addTo(map), phone=L.layerGroup().addTo(map), draft=L.layerGroup().addTo(map);
+  const markerIcon=(type,cls='')=>L.divIcon({html:`<div class="map-marker ${cls}">${icon(type,24)}</div>`,className:cls==='home-marker'?'':'tracker-position-marker',iconSize:[42,42],iconAnchor:[21,21]});
+  function photoIcon(src){const el=document.createElement('div'),img=document.createElement('img');el.className='map-marker photo-marker';img.src=src;img.alt='Profilfoto';el.append(img);return L.divIcon({html:el,className:'tracker-position-marker',iconSize:[42,42],iconAnchor:[21,21]});}
   function demo() {if(base)map.removeLayer(base);base=L.imageOverlay('./src/assets/images/demo-map.svg',[[56.544,8.300],[56.557,8.329]]).addTo(map);}
   demo();
   map.on('click',e=>onHome?.({lat:e.latlng.lat,lon:e.latlng.lng}));map.on('dragstart',()=>onManual?.());
@@ -30,13 +33,39 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
         return true;
       } catch {if(current===generation)notice?.('Kortlaget kunne ikke indlæses. Prøv igen senere. Det tidligere lag beholdes.');return false;}
     },
-    profile(p,data,{showRoute=true,showHome=true}={}) {
+    profile(p,data,{showRoute=true,showHome=true,history=false,showDistanceLine=false,showRings=false}={}) {
       markers.clearLayers();path.clearLayers();homeLayer.clearLayers();
-      if(data.position){const label=document.createElement('span');label.textContent=p.name;L.marker([data.position.lat,data.position.lon],{icon:markerIcon(types[p.type].icon),title:p.name+(data.source==='traccar'?' · seneste position':' · eksempelposition')}).addTo(markers).bindTooltip(label,{direction:'top'});}
-      if(showRoute)L.polyline(data.route.map(p=>[p.lat,p.lon]),{color:'#51744e',weight:4,dashArray:'6 7'}).addTo(path);
-      if(showHome){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13}).addTo(homeLayer);}
+      if(data.position?.approximate){
+        const estimate=L.circle([data.position.lat,data.position.lon],{radius:data.position.accuracy,color:'#a56b10',weight:2,dashArray:'5 5',fillColor:'#d9a641',fillOpacity:.16}).addTo(markers);
+        estimate.bindTooltip(approximateText(data.position));
+      }
+      if(data.position){
+        const title=p.name+(data.position.approximate?' · omtrentlig mobilplacering':history?' · historisk punkt':data.source==='traccar'?' · seneste position':' · eksempelposition');
+        const marker=L.marker([data.position.lat,data.position.lon],{
+          icon:p.photo?photoIcon(p.photo):markerIcon(types[p.type].icon),
+          title:onTracker?'Vis oplysninger om '+p.name:title
+        }).addTo(markers);
+        if(onTracker)marker.on('click',e=>{
+          if(!onTracker())onHome?.({lat:e.latlng.lat,lon:e.latlng.lng});
+        });
+        else{
+          const label=document.createElement('span');label.textContent=p.name;
+          marker.bindTooltip(label,{direction:'top'});
+        }
+      }
+      if(showRoute)for(const segment of routeAnalysis(data.route).segments)L.polyline(segment.map(p=>[p.lat,p.lon]),{color:'#ff8000',weight:4,dashArray:'6 7'}).addTo(path);
+      if(p.homeConfirmed&&showDistanceLine&&data.position)L.polyline([[p.home.lat,p.home.lon],[data.position.lat,data.position.lon]],{color:'#477fc1',weight:2,dashArray:'3 7'}).addTo(homeLayer).bindTooltip('Afstand til seneste position: '+formatDistance(distance(p.home,data.position)));
+      if(p.homeConfirmed&&showRings)for(const radius of [100,250,500])L.circle([p.home.lat,p.home.lon],{radius,color:'#7c8792',weight:1,fill:false,dashArray:'2 6'}).addTo(homeLayer).bindTooltip(radius+' m fra hjem');
+      if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
     },
-    fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon]]),{padding:[45,65],maxZoom:17});},
+    fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.homeConfirmed&&p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},
+    fitRoute(route){
+      const points=routeAnalysis(route).segments.flat().map(p=>[p.lat,p.lon]);
+      if(!points.length)return false;
+      map.invalidateSize();
+      map.fitBounds(L.latLngBounds(points),{padding:[24,48],maxZoom:17});
+      return true;
+    },
     search(user,target,auto) {
       phone.clearLayers();if(!user)return;
       L.circleMarker([user.lat,user.lon],{radius:7,color:'white',weight:3,fillColor:'#477fc1',fillOpacity:1}).addTo(phone);
@@ -44,7 +73,11 @@ export function createMap(id, {notice, onHome, onManual} = {}) {
       L.polyline([[user.lat,user.lon],[target.lat,target.lon]],{color:'#477fc1',dashArray:'4 8',weight:2}).addTo(phone);
       if(auto){map.invalidateSize();map.fitBounds(L.latLngBounds([[user.lat,user.lon],[target.lat,target.lon]]).pad(.25),{padding:[45,55],maxZoom:searchZoom(distance(user,target),user.accuracy),animate:false});}
     },
-    clear(){markers.clearLayers();path.clearLayers();homeLayer.clearLayers();phone.clearLayers();},
+    clear(){draft.clearLayers();markers.clearLayers();path.clearLayers();homeLayer.clearLayers();phone.clearLayers();},
+    draft(points){draft.clearLayers();if(points.length){L.polyline(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',weight:3}).addTo(draft);points.forEach((v,i)=>L.circleMarker([v.lat,v.lon],{radius:7,color:'#a4564b'}).addTo(draft).bindTooltip(String(i+1)));if(points.length>=3)L.polygon(points.map(v=>[v.lat,v.lon]),{color:'#a4564b',fillOpacity:.1}).addTo(draft);}},
+    draftHome(home){draft.clearLayers();if(home.shape==='polygon'){this.draft(home.points||[]);}else L.circle([home.lat,home.lon],{radius:home.radius,color:'#183e35',weight:2,fillOpacity:.14}).addTo(draft);},
+    follow(point){if(point){map.invalidateSize();map.panTo([point.lat,point.lon],{animate:false});}},
+    center(point){if(point){map.invalidateSize();if(point.approximate){map.fitBounds(L.circle([point.lat,point.lon],{radius:point.accuracy}).getBounds(),{padding:[35,35],maxZoom:16});}else map.setView([point.lat,point.lon],18);}},
     clearPhone(){phone.clearLayers();},
     invalidate(){map.invalidateSize();}
   };

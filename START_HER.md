@@ -6,7 +6,7 @@ Dette er den gældende startvejledning. Ældre versionsnoter beskriver historisk
 
 1. Upload de udpakkede filer til roden af driftportal-platform/Pejlo med samme mapper. Erstat kun filer med samme navn.
 2. Behold Cloudflare Worker pejlo, D1-binding DB, eksisterende secrets, Cron Trigger hvert minut og MAPTILER_API_KEY under Builds.
-3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.51 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
+3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.53 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
 4. Aktivér mobilplacering for din egen bruger i Systemadmin → Kunder og abonnementer, hvis den skal prøves. Test derefter fysisk GPS, mobilestimat, kortfølgning og push.
 
 Der er ingen nye nøgler eller databasekommandoer alene for dokumentationspakken. Den er ikke en fuld appinstallation og indeholder ikke funktionerne fra kodepakken 0.8.51, hvis den endnu ikke er uploadet.

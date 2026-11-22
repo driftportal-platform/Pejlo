@@ -262,3 +262,7 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .signal-card strong{display:block;font-size:15px;line-height:1.35;margin-top:10px;overflow-wrap:anywhere}
 .signal-card small{display:block;font-size:11px;line-height:1.4;margin-top:4px;color:var(--muted)}
 .signal-updated{font-size:11px;color:var(--muted);margin:6px 0 16px}
+
+.home-wifi-settings{min-width:0;margin:1rem 0;padding:1rem;border:1px solid #cdd8d0;border-radius:12px}.home-wifi-settings legend{font-weight:700}.home-wifi-settings .button-row{flex-wrap:wrap}.home-wifi-settings input{width:100%;box-sizing:border-box}#tracker-details-wifi-signals{overflow-wrap:anywhere}
+
+#signal-wifi{grid-column:1/-1}#signal-wifi small{overflow-wrap:anywhere}
