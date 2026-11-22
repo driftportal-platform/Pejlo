@@ -266,3 +266,11 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .home-wifi-settings{min-width:0;margin:1rem 0;padding:1rem;border:1px solid #cdd8d0;border-radius:12px}.home-wifi-settings legend{font-weight:700}.home-wifi-settings .button-row{flex-wrap:wrap}.home-wifi-settings input{width:100%;box-sizing:border-box}#tracker-details-wifi-signals{overflow-wrap:anywhere}
 
 #signal-wifi{grid-column:1/-1}#signal-wifi small{overflow-wrap:anywhere}
+
+.wifi-candidates{display:grid;gap:8px;max-height:340px;overflow-y:auto;margin:12px 0}
+.home-wifi-settings .wifi-candidate{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:10px;padding:12px;margin:0;min-width:0;cursor:pointer}
+.home-wifi-settings .wifi-candidate input{width:20px;height:20px;flex-shrink:0;margin:2px 0;accent-color:var(--green)}
+.wifi-candidate span{min-width:0}.wifi-candidate strong,.wifi-candidate small{display:block;overflow-wrap:anywhere}
+.wifi-candidate strong{font-size:14px}.wifi-candidate small{font-size:12px;color:var(--muted);margin-top:4px}
+#wifi-discovery button[hidden]{display:none}
+

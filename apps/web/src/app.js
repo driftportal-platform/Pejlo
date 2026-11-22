@@ -1,3 +1,4 @@
+import {createWifiDiscovery} from './features/wifi-discovery.js';
 import {homeWifiStatus,cleanWifiConfig,normalizeMac,addWifiSample} from './shared/home-wifi.js';
 import {mobileAccessText} from './features/mobile-access-status.js';
 import {gpsStatus} from './shared/gps-status.js';
@@ -80,6 +81,11 @@ const fenceEditor=createFenceEditor({selected,layer:()=>chosenLayer,key:()=>mapC
 }});
 const isLinked=()=>!!selected()?.trackerId;
 const data=()=>!selected()?null:!isLinked()?demoFor(selected()):trackerData?.device.identifier===selected().trackerId?trackerData:{source:'traccar',position:null,route:[],historyAvailable:false};
+const wifiDiscovery=createWifiDiscovery({root:$('#wifi-discovery'),selected,data,
+ canEdit:()=>!!trackerUser&&family.get(selected()?.trackerId)?.role!=='viewer',
+ ready:()=>$('#profile-tracker').value===selected()?.trackerId,
+ readMacs:()=>$('#profile-home-wifi').value.split(',').map(v=>v.trim()).filter(Boolean),
+ onUse:macs=>{$('#profile-home-wifi').value=macs.join(', ');settingsDirty=true;},notice:toast});
 const handoff=createHandoff({request:trackerRequest,identifier:()=>trackerUser&&selected()?.trackerId||null,
  position:()=>{const d=data();return d?.gpsProvisional||d?.gpsUncertain?null:d?.position;},notice:toast});
 async function trackerRequest(path,body,timeout=20000){
@@ -294,6 +300,7 @@ function refresh(){
   if(pendingTracker){const found=state.profiles.find(p=>p.trackerId===pendingTracker);if(found){state.activeId=found.id;pendingTracker=null;if(pendingPause){currentPage='indstillinger';settingsTabs?.select('beskeder');$('#pause-action').hidden=false;pendingPause=false;}if(window.location.search)window.history.replaceState(null,'',window.location.pathname+window.location.hash);}}
   $('#pairing-pending').hidden=!pendingPairing;
   const empty=!selected();
+  if(empty)wifiDiscovery.clear();
   if(trackerUser&&(selected()?.trackerId||null)!==pollingId)connectTracker();
   $('.profile-bar').hidden=empty;$('.demo-banner').hidden=empty;$('.pet').hidden=empty;
   document.querySelectorAll('nav button').forEach(b=>b.disabled=empty);
@@ -343,6 +350,7 @@ function updateGeofence(){
  if(result.transition&&!snooze.paused()&&!handoff.paused()&&areaAlerts(alertsConfig,area?.id)[result.transition]&&!isQuiet(alertsConfig))toast(selected().name+' · '+(area?.name||'Hjemmeområde')+(result.transition==='exit'?' har forladt hjemmeområdet.':' er tilbage i hjemmeområdet.'));
 }
 function updateAge(){
+ wifiDiscovery.update();
  updateGeofence();
  snooze.tick();handoff.tick();
  updatePositionRequest();
@@ -417,7 +425,7 @@ overviewMap=createMap('map',{notice:toast,onManual:()=>{$('#follow-tracker').che
  updatePositionRequest();
  return true;
 },onHome:p=>{if(polygonDraft){if(polygonDraft.points.length>=50)return toast('Højst 50 punkter.');polygonDraft.points.push(p);updateDraft();return;}if(!choosingHome)return;choosingHome=false;$('#set-map-home').textContent='Sæt fast udgangspunkt';if(confirm('Gem dette som hjemmeområdets midtpunkt for '+selected().name+'?'+(chosenLayer==='demo'?' Eksempelkortets veje er skematiske.':''))){selected().home={...selected().home,...p};selected().homeConfirmed=true;const stored=selected().fencePresets.find(f=>f.id===selected().activeFenceId);if(stored)stored.home=structuredClone(selected().home);persist();refresh();}}});
-$('#profile-select').onchange=e=>{settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
+$('#profile-select').onchange=e=>{wifiDiscovery.clear();settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
 $('#fit-route').onclick=()=>{
  const option=$('#show-route'),d=data();
  if(option.checked){
@@ -449,7 +457,7 @@ $('#wifi-reset').onclick=async()=>{
  wifiSaving=true;p.homeWifi=cleanWifiConfig({...p.homeWifi,samples:[]});
  try{if(await persist()){refresh();toast('Wi-Fi-indlæring nulstillet.');}}finally{wifiSaving=false;}
 };
-$('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();const macValues=$('#profile-home-wifi').value.split(',').map(v=>v.trim()).filter(Boolean);if(macValues.length>16||macValues.some(v=>!normalizeMac(v)))return toast('Skriv gyldige Wi-Fi-adresser adskilt med komma, højst 16.');const nextMacs=[...new Set(macValues.map(normalizeMac))];const previousWifi=cleanWifiConfig(selected().homeWifi);const changedWifi=JSON.stringify([...previousWifi.macs].sort())!==JSON.stringify([...nextMacs].sort())||selected().trackerId!==$('#profile-tracker').value;const nextWifi=cleanWifiConfig({macs:nextMacs,samples:changedWifi?[]:previousWifi.samples});if(!name)return toast('Skriv et navn.');if(family.has(selected().trackerId)&&selected().trackerId!==$('#profile-tracker').value)return toast('Fjern først profilen for at skifte tracker.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{homeWifi:nextWifi,name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});if(await persist()){refresh();toast('Profil gemt. Navn og ikon er opdateret.');}};
+$('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();const macValues=$('#profile-home-wifi').value.split(',').map(v=>v.trim()).filter(Boolean);if(macValues.length>16||macValues.some(v=>!normalizeMac(v)))return toast('Skriv gyldige Wi-Fi-adresser adskilt med komma, højst 16.');const nextMacs=[...new Set(macValues.map(normalizeMac))];const previousWifi=cleanWifiConfig(selected().homeWifi);const changedWifi=JSON.stringify([...previousWifi.macs].sort())!==JSON.stringify([...nextMacs].sort())||selected().trackerId!==$('#profile-tracker').value;const nextWifi=cleanWifiConfig({macs:nextMacs,samples:changedWifi?[]:previousWifi.samples});if(!name)return toast('Skriv et navn.');if(family.has(selected().trackerId)&&selected().trackerId!==$('#profile-tracker').value)return toast('Fjern først profilen for at skifte tracker.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{homeWifi:nextWifi,name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});if(await persist()){refresh();wifiDiscovery.saved();toast('Profil gemt. Navn, ikon og hjemmets Wi-Fi er opdateret.');}};
 $('#home-form').onsubmit=async e=>{
  e.preventDefault();if(!e.target.reportValidity())return;
  const p=selected(),gen=sessionGeneration;
@@ -708,3 +716,4 @@ $('#fit').onclick=$('#center-loui').onclick=()=>{const point=displayPosition(dat
 $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('ture');$('#map-pause').onclick=()=>go('indstillinger','beskeder');
 
 initPageScroll();
+
