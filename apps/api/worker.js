@@ -42,7 +42,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(request.method!=='POST')return json({error:'Metoden er ikke tilladt.'},405);
    return json(await billingWebhook(env,request,fetcher));
   }
-  const routes={'/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
   if(!routes[path])return json({error:'Ikke fundet.'},404);
   if(!(routes[path]==='GETPOST'?['GET','POST'].includes(request.method):request.method===routes[path]))return json({error:'Metoden er ikke tilladt.'},405);
   if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'Adgang afvist.'},403);
@@ -214,6 +214,10 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!base)throw new Failure(503,'TRACCAR_URL skal være Traccar-serverens HTTPS-adresse uden sti.');
   const traccarFetch=(path,options={})=>fetcher(base+path,{...options,headers:{Authorization:`Bearer ${env.TRACCAR_TOKEN}`,Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{})},redirect:'manual',signal:AbortSignal.timeout(12000)});
   const traccar=async(path,options)=>checkedJSON(await traccarFetch(path,options));
+  if(path==='/api/health'){
+   try{const response=await traccarFetch('/api/server');const result=response.ok?await response.json():null;return json({online:!!result&&typeof result==='object'&&!Array.isArray(result),checkedAt:Date.now()});}
+   catch{return json({online:false,checkedAt:Date.now()});}
+  }
   if(path==='/api/admin/trackers'){
    const input=await body(request);
    if(!identifierOK(input.identifier)||typeof input.name!=='string'||!input.name.trim()||input.name.length>60)throw new Failure(400,'Skriv tracker-ID og et navn på højst 60 tegn.');
@@ -294,7 +298,8 @@ export async function handleAPI(request,env,fetcher=fetch){
   const telemetry=trackerTelemetry(raw);
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home,{
    level:telemetry.battery,timestamp:telemetry.receivedAt??latestPosition?.timestamp
-  },env.TRACCAR_SOURCE);
+  },env.TRACCAR_SOURCE,telemetry);
+  telemetry.lastWifi=gps.lastWifi||null;
   const battery=gps.batteryReading;
   if(telemetry.battery!=null&&battery){
    telemetry.battery=battery.level;

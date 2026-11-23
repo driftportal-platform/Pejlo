@@ -4,7 +4,7 @@ import {advanceBattery} from '../../packages/shared/battery.js';
 import {once} from './schema.js';
 import {filterGps} from '../../packages/shared/gps-filter.js';
 export function ensureGps(db){return once(db,'gps-filter',()=>db.prepare('CREATE TABLE IF NOT EXISTS pejlo_gps_filter(identifier TEXT NOT NULL,owner_uid TEXT NOT NULL,state TEXT NOT NULL,PRIMARY KEY(identifier,owner_uid))').run());}
-export async function trustedGps(db,identifier,owner,points,type,home,batteryReport,source){
+export async function trustedGps(db,identifier,owner,points,type,home,batteryReport,source,wifiReport){
  identifier='gps-only-v1:'+(source?source+':':'')+identifier;
  await ensureGps(db);
  await db.prepare("INSERT OR IGNORE INTO pejlo_gps_filter(identifier,owner_uid,state) VALUES(?,?,'{}')").bind(identifier,owner).run();
@@ -12,6 +12,8 @@ export async function trustedGps(db,identifier,owner,points,type,home,batteryRep
   const row=await db.prepare('SELECT state FROM pejlo_gps_filter WHERE identifier=? AND owner_uid=?').bind(identifier,owner).first();
   if(!row)throw Error('GPS-filteret kunne ikke læses.');
   const result=filterGps(points,type,JSON.parse(row.state),home);
+  const lastWifi=rememberWifi(result.state.lastWifi,wifiReport);
+  if(lastWifi)result.state.lastWifi=lastWifi;
   if(batteryReport){
    const reading=advanceBattery(result.state.batteryReading,batteryReport.level,batteryReport.timestamp);
    if(reading)result.state.batteryReading=reading;
@@ -71,3 +73,4 @@ export function approximatePoint(raw,now=Date.now()){
     !Number.isFinite(receivedAt)||receivedAt>now+60000||now-receivedAt>300000)return null;
  return {lat:raw.latitude,lon:raw.longitude,timestamp,receivedAt,accuracy:raw.accuracy,approximate:true};
 }
+import {rememberWifi} from '../../packages/shared/wifi-history.js';
