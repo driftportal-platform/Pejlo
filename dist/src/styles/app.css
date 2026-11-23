@@ -278,3 +278,5 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 #server-status{font-size:12px;display:inline-flex;align-items:center;gap:6px;flex-basis:100%}#server-status::before{content:"";width:8px;height:8px;border-radius:50%;background:#848a87}#server-status[data-state=online]::before{background:#26704d}#server-status[data-state=offline]::before{background:#b83f36}
 
 .admin-document #server-status{display:none}
+
+#battery-controls{margin:1.5rem 0;border-top:1px solid var(--line);padding-top:1rem}#battery-controls fieldset{min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px}#battery-controls [data-battery-history-output]{overflow-x:auto;max-height:600px}.battery-history-table{width:100%;border-collapse:collapse;font-size:12px}.battery-history-table th,.battery-history-table td{padding:8px 5px;text-align:left;border-bottom:1px solid var(--line)}

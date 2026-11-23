@@ -23,3 +23,11 @@ Ejeren inviterer en anden bekræftet e-mail og vælger læse- eller redigeringsr
 ## Administrator
 
 På /admin/ administreres kunder, aftaler og tilladelse til mobilplacering. Under Traccar-forbindelse testes og aktiveres serveren for hele Pejlo. Se den tekniske driftsvejledning før IP- eller serverskift. Gem nøgler i en privat kopi af dens register.
+
+
+## Batteri og opdateringer i 0.8.56
+
+Under Indstillinger → Tracker kan ejeren vælge 30 eller 60 sekunder mellem rapporter og anvende valget på en online tracker. 120 sekunder er særskilt markeret som afprøvning. Der sendes ingen kommando, før Anvend på tracker vælges. Sidst ønsket interval er ikke en bekræftelse på aktiv trackeropsætning. Automatisk intervalskift og dvale er endnu ikke aktive.
+
+Hent batterihistorik for de seneste 24 timer eller 7 dage for at sammenligne rapporteret batteriprocent, opladning og antal gemte positioner pr. periode. Manglende batterital står tomme. Heartbeats og appopslag indgår ikke i antallet. Appens egne intervalændringer vises særskilt fra denne version. Se [Batteristyring og kommandoer](batteri-og-kommandoer.md) for afprøvede funktioner, aktivering og begrænsninger.
+

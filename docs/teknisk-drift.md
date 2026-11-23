@@ -1,6 +1,6 @@
 # Tjenester og ansvar
 
-Pejlo teknisk driftsvejledning. Version 0.8.51, opdateret 19. november 2026. Ansvarlig: Stefan Brun Bjerg.
+Pejlo teknisk driftsvejledning. Version 0.8.56, opdateret 23. november 2026. Ældre driftsoplysninger er bevaret som historik. Ansvarlig: Stefan Brun Bjerg.
 
 Denne vejledning samler installationen og viser, hvor indstillinger ændres ved ny IP eller serverskift. Adresser og værdier nedenfor er den registrerede opsætning. Felter med UDFYLD er til din private kopi. Udgivelse af 0.8.51 og et vellykket Google-mobilopslag skal bekræftes i drift.
 
@@ -11,8 +11,8 @@ Denne vejledning samler installationen og viser, hvor indstillinger ændres ved 
 | Cloudflare D1 | Trackere, rettigheder, alarmer og aftaler | pejlo-trackers; binding DB |
 | Firebase Authentication | Login og bekræftet e-mail | Projekt pejlo-a1fed |
 | Cloud Firestore | Brugerens profiler og synkronisering | Samme Google-projekt |
-| Traccar på Windows | Modtager JT808 og gemmer historik | Egen server med H2-database |
-| Caddy | Offentlig HTTPS foran Traccar | Windows-tjeneste PejloCaddy |
+| Traccar på Ubuntu | Modtager JT808 og gemmer historik | Aktuel pejlo-server; tidligere Windowsopsætning nedenfor |
+| Caddy | Offentlig HTTPS foran Traccar | pejlo.duckdns.org; tidligere Windows-tjeneste er historik |
 | DuckDNS | DNS-navn til skiftende offentlig IP | pejlo.duckdns.org |
 | MapTiler og Leaflet | Kortfliser og kortvisning | Fælles nøgle; satellit som standard |
 | Google Geolocation API | Omtrentlig mobil-/Wi-Fi-position | Konfigureret; rigtigt opslag afventer test |
@@ -76,7 +76,9 @@ Projekt-id: pejlo-a1fed. Firebase authDomain: pejlo-a1fed.firebaseapp.com. Webap
 Budgettet er en alarm og stopper ikke automatisk Maps-forbruget. Døgnkvoten begrænser antal opslag og kan give afviste opslag, når den er brugt. Ændringer af appens polling ændrer ikke i sig selv Traccars globale Google-opslag. [1, 2, 3]
 
 
-# Windows netværk og Traccar
+# Tidligere Windowsopsætning
+
+Dette afsnit beskriver den tidligere installation. Den aktuelle Ubuntu-opsætning står nedenfor.
 
 | Punkt | Registreret værdi eller felt |
 | --- | --- |
@@ -326,3 +328,18 @@ Interne kilder: Pejlo 0.8.51, apps/api, apps/web, packages/shared, wrangler.json
 [4] Traccar configuration: https://www.traccar.org/configuration-file/
 [5] DuckDNS API: https://www.duckdns.org/spec.jsp
 [6] Traccar backup: https://www.traccar.org/backup/
+
+
+# Batteristyring fra 0.8.56
+
+Se [Batteristyring og kommandoer](batteri-og-kommandoer.md) for F115, afprøvningsresultater, batterihistorik og antal gemte positionsrapporter. PEJLO_BATTERY_DEVICES godkender de konkrete id'er på serveren; værdi for Loui er 080608317309. Kun ejeren kan sende kommandoer. Der er ingen automatisk ændring ved upload.
+
+API: GET/POST /api/battery og GET /api/battery/history?identifier=…&days=1 eller 7. Historik kan læses med eksisterende trackeradgang; afsendelse kræver ejerskab og eksplicit aktivering. D1-tabeller: pejlo_battery_controls og pejlo_battery_events; oprettes automatisk. Afsendelsesstatus og ønsket interval er ikke enhedskvittering. Historik er serverkildeopdelt. Ingen nye credentials til klienten.
+
+
+# Aktuel Ubuntuopsætning 23 november 2026
+
+Server: pejlo-server, SSH-bruger stefan. Lokal IP 192.168.86.165. Tailscale-IP 100.111.79.123; mobil SSH er testet med Tailscale og Termius. Port 22, eksisterende Ubuntu-login. Offentlig Traccar-web: https://pejlo.duckdns.org . Trackerport: TCP 5015. Installation: /opt/traccar, konfiguration: /opt/traccar/conf/traccar.xml, log: /opt/traccar/logs/tracker-server.log . Tailscale skal være aktivt på mobilen ved SSH over mobilnet. Traccars tjeneste genstartes med sudo systemctl restart traccar. Kontroller at IP-adresser fortsat er aktuelle ved senere ændringer.
+
+UTC-egenskaben blev fjernet fra enhed 080608317309 efter Future-afvisninger; JT808 anvender standard GMT+8. Serverens ur stod korrekt i dansk vintertid, +01:00. filter.future=120 er bevaret. Nye positioner og Pejlo-opdatering blev bekræftet umiddelbart efter rettelsen. Se kommandooversigten for fejlsøgning og resterende kontrol næste morgen.
+

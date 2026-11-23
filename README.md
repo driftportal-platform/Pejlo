@@ -1,3 +1,9 @@
+# Pejlo 0.8.56
+
+Batteritilstande, batterihistorik og antal gemte positionsrapporter. Se [Batteristyring og kommandoer](docs/batteri-og-kommandoer.md) samt [versionsnoterne](docs/version-0.8.56.md). Godkend konkrete trackere med runtime-variablen PEJLO_BATTERY_DEVICES før intervalstyring.
+
+Ældre versionsbeskrivelser følger nedenfor.
+
 # Pejlo 0.8.53
 
 Wi-Fi-signalstyrke og indlæring af inde/ude er tilføjet. Se [vejledning til 0.8.53](docs/version-0.8.53.md).
@@ -48,3 +54,4 @@ Cloudflare udgiver med `npx wrangler deploy`. MAPTILER_API_KEY skal findes i bui
 ## Private oplysninger
 
 Skabelonerne indeholder tomme felter. Upload aldrig en udfyldt kopi med tokens, adgangskoder, private VAPID-nøgler, Google service account JSON eller private Google Geolocation-nøgler til GitHub.
+
