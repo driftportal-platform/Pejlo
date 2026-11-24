@@ -1,15 +1,15 @@
-# Start her med Pejlo 0.8.51
+# Start her med Pejlo 0.8.57
 
-Dette er den gældende startvejledning. Ældre versionsnoter beskriver historiske forhold og kan nævne demo-server, langsommere polling og tidligere begrænsninger.
+0.8.57 indeholder batteriautomatik og tidsbegrænset Find. Se [versionsnoterne](docs/version-0.8.57.md) for installation og fysisk kontrol. Ældre versionsnoter beskriver historiske forhold og kan nævne demo-server, langsommere polling og tidligere begrænsninger.
 
 ## Eksisterende installation
 
 1. Upload de udpakkede filer til roden af driftportal-platform/Pejlo med samme mapper. Erstat kun filer med samme navn.
 2. Behold Cloudflare Worker pejlo, D1-binding DB, eksisterende secrets, Cron Trigger hvert minut og MAPTILER_API_KEY under Builds.
-3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.53 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
+3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.57 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
 4. Aktivér mobilplacering for din egen bruger i Systemadmin → Kunder og abonnementer, hvis den skal prøves. Test derefter fysisk GPS, mobilestimat, kortfølgning og push.
 
-Der er ingen nye nøgler eller databasekommandoer alene for dokumentationspakken. Den er ikke en fuld appinstallation og indeholder ikke funktionerne fra kodepakken 0.8.51, hvis den endnu ikke er uploadet.
+Ændringspakken forudsætter 0.8.56. Upload filerne med samme mapper og udgiv både API og web. PEJLO_BATTERY_DEVICES skal stadig indeholde 080608317309. Der kræves ingen ny secret eller manuel databasekommando. Automatik aktiveres bagefter af ejeren i appen.
 
 ## Før du ændrer driften
 
@@ -24,3 +24,4 @@ Ved ny offentlig IP skal DuckDNS og Google Geolocation-nøglens tilladte IP kont
 Følg den tekniske vejledning. Gendan D1 og Firestore samt nødvendige secrets; en GitHub-kopi alene gendanner ikke kundedata. Opret trackerregisteret fra apps/api/migrations ved en helt ny database. Arbejd ikke på en eksisterende database som om den var tom. Opdatér firestore.rules efter projektets gældende regler.
 
 Tag en konsistent Traccar-backup og bevar TRACCAR_CONFIG_SECRET før flytning. Udfyld kun nøgleregistret i en privat kopi.
+

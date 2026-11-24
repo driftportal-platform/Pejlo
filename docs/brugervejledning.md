@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.51
+# Pejlo brugervejledning til version 0.8.57
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -25,9 +25,13 @@ Ejeren inviterer en anden bekræftet e-mail og vælger læse- eller redigeringsr
 På /admin/ administreres kunder, aftaler og tilladelse til mobilplacering. Under Traccar-forbindelse testes og aktiveres serveren for hele Pejlo. Se den tekniske driftsvejledning før IP- eller serverskift. Gem nøgler i en privat kopi af dens register.
 
 
-## Batteri og opdateringer i 0.8.56
+## Batteri og opdateringer i 0.8.57
 
-Under Indstillinger → Tracker kan ejeren vælge 30 eller 60 sekunder mellem rapporter og anvende valget på en online tracker. 120 sekunder er særskilt markeret som afprøvning. Der sendes ingen kommando, før Anvend på tracker vælges. Sidst ønsket interval er ikke en bekræftelse på aktiv trackeropsætning. Automatisk intervalskift og dvale er endnu ikke aktive.
+Under Indstillinger → Tracker kan ejeren sende 30, 60 eller 120 sekunder til en online tracker. Et manuelt valg slår automatik og tidsbegrænset Find fra. Sidst ønsket interval er ikke en bekræftelse på aktiv trackeropsætning.
+
+Afprøv automatisk batterisparetilstand hjemme med Gem automatik, efter at mindst tre Wi-Fi-målinger inde og tre ude er gemt under Profil. Automatik vælger 120 sekunder ved et stabilt, friskt hjemmemønster og 60 ved usikkerhed eller et udemønster. Det er vejledende og skal afprøves under opsyn.
+
+Find i batteriafsnittet ønsker 30 sekunder i 5 eller 15 minutter. Serveren vender tilbage til automatik eller det tidligere manuelle interval. Afslut Find nu stopper perioden tidligere. Serveren kontrollerer cirka hvert minut, også med lukket app; offline udsætter tilbagevendingen. Tryk Hent seneste intervalønske for ny status. GPS-dvale er endnu ikke aktiveret. Find kan ikke garantere opvågning eller et nyt GPS-fix.
 
 Hent batterihistorik for de seneste 24 timer eller 7 dage for at sammenligne rapporteret batteriprocent, opladning og antal gemte positioner pr. periode. Manglende batterital står tomme. Heartbeats og appopslag indgår ikke i antallet. Appens egne intervalændringer vises særskilt fra denne version. Se [Batteristyring og kommandoer](batteri-og-kommandoer.md) for afprøvede funktioner, aktivering og begrænsninger.
 

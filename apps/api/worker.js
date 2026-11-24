@@ -1,5 +1,5 @@
 import {getBatteryHistory} from './battery-history.js';
-import {batteryControls} from './battery-controls.js';
+import {managedBattery} from './battery-management.js';
 import {locationEnabled} from './location-access.js';
 
 import {serverConfigAPI,resolveTraccarEnv} from './server-config.js';
@@ -497,7 +497,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   if(!device||!Number.isSafeInteger(device.id))throw new Failure(404,'Trackeren findes ikke på Traccar-kontoen.');
 
   if(batteryHistoryRequest)return json(await getBatteryHistory({env,identifier,device,traccar,days:Number(url.searchParams.get('days')||1)}));
-  if(requestBattery)return json(await batteryControls({env,identifier,device,input,traccar,traccarFetch}));
+  if(requestBattery)return json(await managedBattery({env,identifier,uid,device,input,traccar,traccarFetch}));
   if(requestAction)return json(await sendTrackerAction({db:env.DB,identifier,device,action:input.action,command:actions[input.action],traccar,traccarFetch}));
 
   if(requestPosition){

@@ -1,7 +1,10 @@
+import {createBatteryPolicy} from './battery-policy.js';
 export function createBatteryControls({root,selected,request,notice,canEdit}){
- const q=s=>root.querySelector(s);let key=null,generation=0,busy=false;
- function clear(){key=null;generation++;busy=false;q('[data-battery-status]').textContent='Vælg en tilknyttet tracker.';q('fieldset').disabled=true;q('[data-battery-history-output]').replaceChildren();q('[data-battery-history-status]').textContent='';q('[data-battery-history]').disabled=!selected()?.trackerId;}
+ const q=s=>root.querySelector(s);let key=null,generation=0,busy=false,enabled=false;
+ const policy=createBatteryPolicy({root:q('[data-battery-policy]'),selected,request,canEdit,updated:render});
+ function clear(){policy.clear();enabled=false;key=null;generation++;busy=false;q('[data-battery-status]').textContent='Vælg en tilknyttet tracker.';q('fieldset').disabled=true;q('[data-battery-history-output]').replaceChildren();q('[data-battery-history-status]').textContent='';q('[data-battery-history]').disabled=!selected()?.trackerId;}
  function render(result){
+  enabled=result.enabled===true;policy.render(result);
   q('fieldset').disabled=!result.enabled||!canEdit();
   const last=result.last;
   q('[data-battery-status]').textContent=!result.enabled?'Batteristyring er endnu ikke aktiveret for denne tracker.':last?'Senest ønsket: '+last.seconds+' sek. · '+new Date(last.requested_at).toLocaleString('da-DK')+' · '+(last.status==='sent'?'sendt til Traccar; trackerens interval er ikke læst tilbage.':'afsendelse uafklaret eller afvist.'):'Vælg et interval. Ingen ændring sendes, før du trykker Anvend.';
@@ -15,11 +18,11 @@ export function createBatteryControls({root,selected,request,notice,canEdit}){
  q('[data-battery-apply]').onclick=async()=>{
   const id=selected()?.trackerId;if(busy||!id||id!==key||!canEdit())return;
   const seconds=Number(q('select').value);
-  if(seconds===120&&!confirm('120 sekunder er endnu ikke afprøvet på trackeren. Vil du sende testindstillingen?'))return;
+  if(seconds===120&&!confirm('120 sekunder er afprøvet på Loui-trackeren, men batterigevinsten er ikke målt. Vil du bruge 120 sekunder?'))return;
   const gen=generation;busy=true;q('fieldset').disabled=true;
   try{const result=await request('battery',{identifier:id,seconds,testConfirmed:seconds===120});if(gen===generation&&key===id){render(result);notice('Intervalønsket er sendt. Kontrollér de næste rapporter.');}}
   catch(e){if(gen===generation)q('[data-battery-status]').textContent=e.message;}
-  finally{if(gen===generation){busy=false;q('fieldset').disabled=!canEdit();}}
+  finally{if(gen===generation){busy=false;q('fieldset').disabled=!enabled||!canEdit();}}
  };
  q('[data-battery-refresh]').onclick=()=>{if(!busy)load(true);};
  q('[data-battery-history]').onclick=async()=>{

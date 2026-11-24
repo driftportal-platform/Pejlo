@@ -1,6 +1,6 @@
 # Tjenester og ansvar
 
-Pejlo teknisk driftsvejledning. Version 0.8.56, opdateret 23. november 2026. Ældre driftsoplysninger er bevaret som historik. Ansvarlig: Stefan Brun Bjerg.
+Pejlo teknisk driftsvejledning. Version 0.8.57, opdateret 24. november 2026. Ældre driftsoplysninger er bevaret som historik. Ansvarlig: Stefan Brun Bjerg.
 
 Denne vejledning samler installationen og viser, hvor indstillinger ændres ved ny IP eller serverskift. Adresser og værdier nedenfor er den registrerede opsætning. Felter med UDFYLD er til din private kopi. Udgivelse af 0.8.51 og et vellykket Google-mobilopslag skal bekræftes i drift.
 
@@ -341,5 +341,11 @@ API: GET/POST /api/battery og GET /api/battery/history?identifier=…&days=1 ell
 
 Server: pejlo-server, SSH-bruger stefan. Lokal IP 192.168.86.165. Tailscale-IP 100.111.79.123; mobil SSH er testet med Tailscale og Termius. Port 22, eksisterende Ubuntu-login. Offentlig Traccar-web: https://pejlo.duckdns.org . Trackerport: TCP 5015. Installation: /opt/traccar, konfiguration: /opt/traccar/conf/traccar.xml, log: /opt/traccar/logs/tracker-server.log . Tailscale skal være aktivt på mobilen ved SSH over mobilnet. Traccars tjeneste genstartes med sudo systemctl restart traccar. Kontroller at IP-adresser fortsat er aktuelle ved senere ændringer.
 
-UTC-egenskaben blev fjernet fra enhed 080608317309 efter Future-afvisninger; JT808 anvender standard GMT+8. Serverens ur stod korrekt i dansk vintertid, +01:00. filter.future=120 er bevaret. Nye positioner og Pejlo-opdatering blev bekræftet umiddelbart efter rettelsen. Se kommandooversigten for fejlsøgning og resterende kontrol næste morgen.
+Historisk rettelse 23. november (afløst af UTC-valget den 24., se nedenfor): UTC-egenskaben blev fjernet fra enhed 080608317309 efter Future-afvisninger; JT808 anvender standard GMT+8. Serverens ur stod korrekt i dansk vintertid, +01:00. filter.future=120 er bevaret. Nye positioner og Pejlo-opdatering blev bekræftet umiddelbart efter rettelsen. Se kommandooversigten for fejlsøgning og resterende kontrol næste morgen.
 
+
+## Batteriautomatik i 0.8.57
+
+Den eksisterende Cloudflare-minuttrigger kalder nu også batteristyringen. Op til otte aktiverede trackere behandles pr. kørsel, ældst kontrollerede først. Find-udløb og offline-tilbagevending kræver denne trigger og en fungerende Traccar-forbindelse. D1-tabellen pejlo_battery_policy oprettes automatisk. Politikker adskilles efter aktiv Traccar-kilde, tracker og ejer; de fjernes ved kontosletning og køres kun for nuværende ejer. Et to-minutters låsefelt beskytter samtidige API-/cron-handlinger. Alle intervalkommandoer bruger den eksisterende minutbegrænsning, Ingen kø og samme intervalhistorik. Ved uafklaret afsendelse gentages samme interval ikke automatisk.
+
+Gem automatik kræver særskilt bekræftelse og indlært Wi-Fi. Upload, login og indstillingslæsning aktiverer ingenting. Et manuelt intervalvalg afbryder automatik og Find. Ingen GPS-dvalekommando er tilføjet. Se den opdaterede [batterivejledning](batteri-og-kommandoer.md) for teststatus og den aktuelle UTC-indstilling efter rettelsen 24. november cirka 08:40.

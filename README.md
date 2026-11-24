@@ -1,3 +1,7 @@
+# Pejlo 0.8.57
+
+Automatisk batterisparetilstand ud fra indlært Wi-Fi og tidsbegrænset Find i 5/15 minutter. Serveren håndterer tilbagevending, også med lukket app. Aktiveres kun af ejeren; upload ændrer ingen trackerindstilling. GPS-dvale er fortsat ikke aktiveret. Se [versionsnoter](docs/version-0.8.57.md) og [batteristyring og kommandoer](docs/batteri-og-kommandoer.md).
+
 # Pejlo 0.8.56
 
 Batteritilstande, batterihistorik og antal gemte positionsrapporter. Se [Batteristyring og kommandoer](docs/batteri-og-kommandoer.md) samt [versionsnoterne](docs/version-0.8.56.md). Godkend konkrete trackere med runtime-variablen PEJLO_BATTERY_DEVICES før intervalstyring.
@@ -27,7 +31,7 @@ Senest opdateret 19. november 2026. Dokumentationen beskriver kodeversion 0.8.51
 
 ## Nuværende opsætning
 
-Appen kører i Cloudflare Worker pejlo med D1-binding DB. Firebase Authentication og Firestore bruger projekt pejlo-a1fed. Egen Traccar på Windows er tilgængelig via HTTPS på pejlo.duckdns.org; trackeren sender JT808 til TCP 5015. MapTiler leverer kort, Resend sender invitationer, og VAPID bruges til Web Push.
+Appen kører i Cloudflare Worker pejlo med D1-binding DB. Firebase Authentication og Firestore bruger projekt pejlo-a1fed. Egen Traccar på Ubuntu er tilgængelig via HTTPS på pejlo.duckdns.org; trackeren sender JT808 til TCP 5015. MapTiler leverer kort, Resend sender invitationer, og VAPID bruges til Web Push.
 
 Aktivt servervalg findes i Systemadmin → Traccar-forbindelse. Et aktiveret valg har forrang for Cloudflares TRACCAR_URL/TRACCAR_TOKEN. Den historiske demo3-adresse i wrangler.jsonc er derfor ikke bevis for den aktuelt anvendte server.
 

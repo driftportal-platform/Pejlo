@@ -72,7 +72,7 @@ test('battery and charge are reported independently of a future GPS fix',async()
  const f=fixture({positionValue:future,history:false});
  const result=await (await handleAPI(req(),localEnv,f.fetcher)).json();
  assert.equal(result.position,null);
- assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,rssiMax:31,cellTowers:[],wifiAccessPoints:[],wifiMeasuredAt:null,gpsClockAhead:true});
+ assert.deepEqual(result.telemetry,{battery:100,charging:true,receivedAt:Date.parse(serverTime),satellites:null,rssi:null,rssiMax:31,cellTowers:[],wifiAccessPoints:[],wifiMeasuredAt:null,gpsClockAhead:true,lastWifi:null});
  const absent=fixture({positionValue:{...future,attributes:{batteryLevel:101,charge:'true'}},history:false});
  const unknown=await (await handleAPI(req(),localEnv,absent.fetcher)).json();
  assert.equal(unknown.telemetry.battery,null);
@@ -90,6 +90,14 @@ test('method and route are constrained, external server override fails closed',a
 });
 
 const post=(path,value)=>new Request('https://pejlo.example/api/'+path,{method:'POST',headers:{Authorization:'Bearer firebase-token','Content-Type':'application/json'},body:JSON.stringify(value)});
+
+test('battery automation and timed Find stay owner-only at the authenticated API boundary',async()=>{
+ for(const uid of ['viewer-uid','someone-else'])for(const action of ['auto','find','stop']){
+  const f=fixture({uid,status:'online',commandTypes:[{type:'custom'}]});
+  const r=await handleAPI(post('battery',{identifier,action,enabled:true,testConfirmed:true,minutes:5}),{...env,DB:database(),PEJLO_BATTERY_DEVICES:identifier},f.fetcher);
+  assert.equal(r.status,403);assert.equal(f.calls.length,1);
+ }
+});
 test('position request sends only one fixed data command despite concurrent clicks',async()=>{
  const f=fixture({status:'online'}),localEnv={...env,DB:database()};
  const send=()=>handleAPI(post('tracker/position',{identifier,deviceId:99,type:'rebootDevice',textChannel:true}),localEnv,f.fetcher);
@@ -263,3 +271,4 @@ test('authorized tracker API carries sanitized Wi-Fi scans independently of GPS'
  assert.equal(response.status,200);const result=await response.json();
  assert.deepEqual(result.telemetry.wifiAccessPoints,[{mac:'28:BD:89:05:5C:10',rssi:-49}]);assert.equal(result.telemetry.wifiMeasuredAt,Date.parse(at));assert.equal(JSON.stringify(result).includes('private-name'),false);
 });
+
