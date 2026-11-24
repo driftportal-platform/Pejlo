@@ -1,3 +1,7 @@
+# Pejlo 0.8.68
+
+Kompakte statusikoner i det valgte profilfelt, under navnet ved siden af profilbilledet. Se [versionsnoterne](docs/version-0.8.68.md).
+
 # Pejlo 0.8.67
 
 Automatisk anslået hvile fra dvalerapporter, når trackeren er bekræftet påsat og ikke oplader. Ét samlet dagstal, der kan rettes manuelt. Bruger den allerede installerede statuslæser og eksisterende nøgle. Se [versionsnoterne](docs/version-0.8.67.md).

@@ -419,6 +419,7 @@ function updatePositionRequest(){
 
 
  const profile=selected(),identifier=profile?.trackerId,d=data(),position=d?.position;
+ profileSheet.status(d,profile);
 
 
 

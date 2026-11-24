@@ -1,5 +1,11 @@
 // Fixed first-party SVG set: use the same name for the same action everywhere.
 const paths = {
+  moon:'<path d="M20 15.5A9 9 0 0 1 8.5 4 9 9 0 1 0 20 15.5Z"/>',
+  pulse:'<path d="M2 12h5l3-8 4 16 3-8h5"/>',
+  mobile:'<path d="M4 20v-3M9 20v-7M14 20V9M19 20V4"/>',
+  wifi:'<path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8.5 16a5.5 5.5 0 0 1 7 0"/><circle cx="12" cy="20" r=".7"/>',
+  satellite:'<path d="m4 7 4-4 5 5-4 4zM11 14l4-4 5 5-4 4zM10 10l4 4M4 14a6 6 0 0 1 6 6M4 18a2 2 0 0 1 2 2"/>',
+  charge:'<path d="m14 2-9 12h7l-2 8 9-12h-7z"/>',
   kort:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/>',
   ture:'<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 6h6a4 4 0 0 1 0 8H9a3 3 0 0 0 0 6h6"/>',
   indstillinger:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
@@ -20,3 +26,4 @@ const paths = {
   plus:'<path d="M12 4v16M4 12h16"/>'
 };
 export const icon = (name, size=22) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.object}</svg>`;
+

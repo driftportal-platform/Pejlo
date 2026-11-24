@@ -33,8 +33,10 @@ test('unusable charging fixes still prevent false activity coverage across the c
  const a=await f.api();assert.equal(a.days[0].km,null);assert.equal(a.days[0].observedMinutes,0);assert.equal(a.days[0].quietMinutes,0);
 });
 
-test('tracker history filters pet charging by default, supports inspection and retains live telemetry',async()=>{
- const f=await fixture(),current=Date.now();
+test('tracker history filters pet charging by default, supports inspection and retains live telemetry',async t=>{
+ // Keep this interval within one day, also when the suite runs just after Danish midnight.
+ const current=Date.parse('2026-11-24T12:00:00Z');t.mock.method(Date,'now',()=>current);
+ const f=await fixture();
  const history=[false,true,false,true].map((charge,index)=>({...point(new Date(current-(7-index*2)*60000).toISOString(),56.5+index*0.0001,{attributes:{charge,batteryLevel:100}}),id:index+10,serverTime:new Date(current).toISOString()}));
  const latest=history.at(-1);
  const fetcher=async url=>{

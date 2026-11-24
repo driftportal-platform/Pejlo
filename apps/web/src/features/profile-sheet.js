@@ -1,11 +1,14 @@
 // Replaces the profile drop-down with a button that opens a sheet of profile cards.
 // The original <select> stays in the page as the source of truth for the rest of the app.
+import {renderProfileStatus} from './profile-status.js';
 export function createProfileSheet({select,add}){
  const wrap=select.closest('.profile-switch'),open=document.createElement('button');
  open.type='button';open.id='profile-open';open.className='profile-open';open.setAttribute('aria-haspopup','dialog');
  const label=document.createElement('span');label.className='profile-open-label';
+ const copy=document.createElement('span');copy.className='profile-open-copy';
+ const status=document.createElement('span');status.className='profile-status';status.hidden=true;status.setAttribute('aria-label','Trackerstatus');copy.append(label,status);
  const chevron=document.createElement('span');chevron.className='profile-open-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='⌄';
- open.append(label,chevron);select.classList.add('visually-hidden');select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.after(open);
+ open.append(copy,chevron);select.classList.add('visually-hidden');select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.after(open);
  const dialog=document.createElement('dialog');dialog.className='sheet';dialog.setAttribute('aria-labelledby','profile-sheet-title');
  const head=document.createElement('div');head.className='sheet-head';
  const title=document.createElement('h2');title.id='profile-sheet-title';title.textContent='Vælg profil';
@@ -18,10 +21,11 @@ export function createProfileSheet({select,add}){
  close.addEventListener('click',()=>dialog.close());
  dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
  addButton.addEventListener('click',()=>{dialog.close();add.click();});
- return {update(profiles,activeId){
+ return {status(data,profile){renderProfileStatus(status,data,profile);},update(profiles,activeId){
   if(!profiles.length&&dialog.open)dialog.close();
   const active=profiles.find(p=>p.id===activeId);
   label.textContent=active?active.name:'Ingen profiler endnu';
+  renderProfileStatus(status,null,active);
   list.replaceChildren(...profiles.map(p=>{
    const card=document.createElement('button');card.type='button';card.className='sheet-card';if(p.id===activeId)card.setAttribute('aria-current','true');
    const icon=document.createElement('span');icon.className='sheet-icon';if(p.photo){const img=document.createElement('img');img.src=p.photo;img.alt='';img.className='profile-photo-small';icon.append(img);}else icon.innerHTML=p.icon;
@@ -31,3 +35,4 @@ export function createProfileSheet({select,add}){
    return card;}));
  }};
 }
+

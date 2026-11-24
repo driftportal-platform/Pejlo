@@ -1,3 +1,5 @@
+0.8.68 viser statusikoner i profilfeltet. Upload oven på 0.8.67 med samme mapper og lad Cloudflare bygge som normalt. Ingen serverkommandoer eller nye Firebase-/Cloudflare-indstillinger. Se [versionsnoterne](docs/version-0.8.68.md).
+
 0.8.67 aktiverer automatisk, anslået hvile efter upload oven på 0.8.66. Den eksisterende statuslæser og nøgle genbruges. Vælg Påsat Loui under Indstillinger, og gem profilen; se [vejledningen](docs/version-0.8.67.md). Ingen nye Firebase-indstillinger eller secrets.
 
 0.8.66 tilføjer visning af seneste dvalerapport. Upload oven på 0.8.65. Denne funktion kræver også en statuslæser på Traccar-serveren og Cloudflare Secret PEJLO_STATUS_KEYS. Følg [installationen](docs/version-0.8.66.md); appupload alene aktiverer ikke logforbindelsen.
