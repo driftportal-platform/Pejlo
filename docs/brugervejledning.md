@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.60
+# Pejlo brugervejledning til version 0.8.61
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -67,7 +67,7 @@ Vælg en profil af typen Kat, Hund, Hest eller Andet dyr og åbn Ture. Motion og
 - Vælg et valgfrit dagligt kilometermål og tryk Gem mål. Et tomt mål fjerner det. Målet er dit eget valg og ikke et dyrlægeordineret krav.
 - Registrer Samlet kilometer for dagen, Observeret hvile i timer og eventuelt en note. Tomme talfelter betyder ukendt, mens 0 er en udtrykkeligt registreret nulværdi. Gem dag gemmer en samlet dagspost; gentagen gemning opdaterer dagen og lægger ikke ekstra kilometer til.
 - Vælg en fra-/til-periode på højst 31 dage og tryk Hent motionshistorik. Der kan vælges ældre perioder efter behov. Rediger-knappen på en række åbner den dag. Dagsregistreringer redigeres inden for den hentede periode.
-- Har profilen en tracker, kan Hent GPS-oversigt for perioden tilføje GPS-estimater. En manuel kilometerværdi har forrang i periodens samlede distance og lægges ikke oven i GPS-afstanden.
+- Har profilen en tracker, hentes GPS-estimater automatisk sammen med motionshistorikken. Opdatér GPS-oversigt prøver igen ved fejl. Tom historik og fejl under hentning vises hver for sig. En manuel kilometerværdi har forrang i periodens samlede distance og lægges ikke oven i GPS-afstanden.
 - Hent CSV eksporterer den viste oversigt med separate kolonner for manuelt/GPS, valgt distance, observeret hvile, GPS-ro, dækning, historisk mål og note. CSV bruger semikolon, UTF-8 og decimalkomma.
 
 Mål ved første registrering er det mål, der var valgt, da dagen første gang blev gemt. Senere målændringer ændrer ikke denne historiske værdi. Fremdrift for i dag sammenlignes med det nuværende mål. Tomme historikdage bliver ikke til 0 km eller hvile.

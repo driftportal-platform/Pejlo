@@ -82,11 +82,11 @@ function uiFixture(){
  class E{constructor(){this.children=[];this._value='';}set value(v){this._value=String(v);}get value(){return this._value;}append(...v){this.children.push(...v);}replaceChildren(...v){this.children=[...v];}focus(){}removeAttribute(k){delete this[k];}}
  const keys=['day-fields','goal-fields','gps','load','rows','status','gps-status','summary','progress','km','rest','note','title','advice','source','day','from','to','goal','delete','goal-form','day-form','export'];
  const fields=Object.fromEntries(keys.map(k=>[k,new E()]));const root=new E();root.ownerDocument={createElement:()=>new E()};root.querySelector=k=>fields[k.slice(15,-1)];
- let profile={id:profileId,type:'cat',trackerId:identifier,name:'Loui'},resolve,error=false;const calls=[];
+ let profile={id:profileId,type:'cat',trackerId:identifier,name:'Loui'},resolve,error=false,gpsError=false,gpsDeferred=null,gpsResult={route:[],historyAvailable:true};const calls=[];
  const result=()=>({canEdit:true,from:fields.from.value,to:fields.to.value,settings:{goal_km:2,revision:1},entries:[]});
- const request=async(path,body)=>{calls.push({path,body});if(error)throw Error('Konflikt');if(resolve)return new Promise(r=>resolve(r));if(path.startsWith('tracker?'))return {route:[],historyAvailable:true};return result();};
+ const request=async(path,body)=>{calls.push({path,body});if(error)throw Error('Konflikt');if(resolve)return new Promise(r=>resolve(r));if(path.startsWith('tracker?')){if(gpsError)throw Error('GPS-forbindelsen fejlede');if(gpsDeferred)return new Promise(r=>gpsDeferred(r));return gpsResult;}return result();};
  const ui=createActivity({root,selected:()=>profile,request,notice:()=>{}});
- return {ui,root,fields,calls,setProfile:v=>profile=v,setError:v=>error=v,setDeferred:f=>resolve=f,result};
+ return {ui,root,fields,calls,setProfile:v=>profile=v,setError:v=>error=v,setDeferred:f=>resolve=f,setGps:v=>gpsResult=v,setGpsError:v=>gpsError=v,setGpsDeferred:v=>gpsDeferred=v,result};
 }
 test('animal UI stays hidden for objects and sends no activity request',async()=>{
  const f=uiFixture();f.setProfile({id:'car',type:'car'});await f.ui.load();assert.equal(f.root.hidden,true);assert.equal(f.calls.length,0);
@@ -115,4 +115,32 @@ test('GPS estimates ignore future, approximate, invalid and duplicate positions'
  const t=Date.now()-120000,p={lat:56.5,lon:8.3,timestamp:t,valid:true};
  const a=activityGps([p,{...p},{...p,approximate:true,timestamp:t+1000},{...p,valid:false,timestamp:t+2000},{...p,timestamp:t+3600000}],'cat');
  assert.equal(a.days[0].points,1);assert.equal(a.days[0].km,null);
+});
+
+test('motion history automatically fetches GPS and displays its distance without a separate click',async()=>{
+ const f=uiFixture(),at=Date.now()-240000;f.setGps({historyAvailable:true,route:[{lat:56.5,lon:8.3,timestamp:at},{lat:56.5005,lon:8.3,timestamp:at+120000}]});
+ await f.ui.load();await new Promise(r=>setImmediate(r));assert.equal(f.calls.filter(c=>c.path.startsWith('tracker?')).length,1);assert.match(f.fields.summary.textContent,/Distance i perioden/);assert.match(f.fields['gps-status'].textContent,/2 GPS-punkter/);
+});
+test('profile renaming updates motion heading without clearing the history or requesting data',async()=>{
+ const f=uiFixture();await f.ui.load();await new Promise(r=>setImmediate(r));const count=f.calls.length;
+ f.setProfile({id:profileId,type:'cat',trackerId:identifier,name:'Misser'});f.ui.sync();assert.equal(f.fields.title.textContent,'Motion og hvile for Misser');assert.equal(f.calls.length,count);assert.equal(f.fields['day-fields'].disabled,false);
+});
+test('GPS failures remain distinct from absent records and do not block manual registration',async()=>{
+ const f=uiFixture();f.setGpsError(true);await f.ui.load();await new Promise(r=>setImmediate(r));assert.match(f.fields.summary.textContent,/GPS-afstand kunne ikke hentes/);assert.match(f.fields['gps-status'].textContent,/GPS-forbindelsen fejlede/);assert.equal(f.fields['day-fields'].disabled,false);
+});
+test('empty and sparse GPS results explain why a distance cannot be computed',async()=>{
+ for(const route of [[],[{lat:56.5,lon:8.3,timestamp:Date.now()-10000}]]){
+  const f=uiFixture();f.setGps({route,historyAvailable:true});await f.ui.load();await new Promise(r=>setImmediate(r));assert.match(f.fields['gps-status'].textContent,route.length?/Ingen sammenhængende/:/Ingen GPS-punkter/);assert.match(f.fields.summary.textContent,/Ingen brugbare/);
+ }
+});
+test('an obsolete automatic GPS response cannot overwrite a new period or another profile',async()=>{
+ const f=uiFixture();let finish;f.setGpsDeferred(r=>finish=r);await f.ui.load();assert.equal(typeof finish,'function');
+ f.setGpsDeferred(null);f.setProfile({id:'new-dog',type:'dog',trackerId:'another',name:'Hund'});await f.ui.load();await new Promise(r=>setImmediate(r));
+ const text=f.fields['gps-status'].textContent;finish({route:[{lat:56.5,lon:8.3,timestamp:Date.now()-20000},{lat:56.5005,lon:8.3,timestamp:Date.now()-10000}],historyAvailable:true});await new Promise(r=>setImmediate(r));assert.equal(f.fields['gps-status'].textContent,text);assert.equal(f.fields.title.textContent,'Motion og hvile for Hund');
+});
+
+test('refreshing a period cancels the pending GPS result from the old period',async()=>{
+ const f=uiFixture();let finish;f.setGpsDeferred(r=>finish=r);await f.ui.load();
+ const yesterday=new Date(Date.parse(danishDate())-86400000).toISOString().slice(0,10);f.fields.from.value=f.fields.to.value=yesterday;f.setGpsDeferred(null);await f.ui.load();await new Promise(r=>setImmediate(r));
+ const text=f.fields['gps-status'].textContent;finish({route:[{lat:56.5,lon:8.3,timestamp:Date.now()-20000},{lat:56.5005,lon:8.3,timestamp:Date.now()-10000}],historyAvailable:true});await new Promise(r=>setImmediate(r));assert.equal(f.fields.rows.children.length,1);assert.equal(f.fields['gps-status'].textContent,text);
 });

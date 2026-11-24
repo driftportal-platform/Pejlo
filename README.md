@@ -1,3 +1,7 @@
+# Pejlo 0.8.61
+
+GPS-estimater hentes automatisk sammen med motionshistorikken. Profilnavnet opdateres ved omdøbning, og tom GPS-historik adskilles fra fejl under hentning. Se [versionsnoterne](docs/version-0.8.61.md).
+
 # Pejlo 0.8.60
 
 Motion og hvile til dyreprofiler under Ture: valgfrit dagligt kilometermål, daglige registreringer, GPS-estimater, observeret hvile, historik og CSV. Vejledning til kat, hund og hest med kildelinks; ingen faste sundhedsmål i kilometer. Se [versionsnoterne](docs/version-0.8.60.md).
