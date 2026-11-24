@@ -27,7 +27,9 @@ test('following pans without resetting zoom; estimates fit their radius and manu
  const events={},calls=[],circles=[];
  const map={setView(point,zoom){calls.push(['view',point,zoom]);return this;},on(name,callback){events[name]=callback;},invalidateSize(){},panTo(point){calls.push(['pan',point]);},fitBounds(bounds,options){calls.push(['bounds',bounds,options]);}};
  const layer=()=>({addTo(){return this;},clearLayers(){},bindTooltip(){return this;}});
- globalThis.L={map:()=>map,control:{zoom:layer},layerGroup:layer,imageOverlay:layer,divIcon:()=>({}),marker:layer,circle:(point,options)=>{circles.push(options);return {...layer(),getBounds:()=>({point,radius:options.radius})};}};
+ globalThis.L={map:()=>map,control:{zoom:layer},layerGroup:layer,imageOverlay:layer,divIcon:()=>({}),marker:layer,
+  latLng:(lat,lon)=>({toBounds:diameter=>({point:[lat,lon],radius:diameter/2})}),
+  circle:(point,options)=>{circles.push(options);let mounted=false;return {...layer(),addTo(){mounted=true;return this;},getBounds(){if(!mounted)throw Error('Leaflet Circle.getBounds requires _map');return {point,radius:options.radius};}};}};
  globalThis.window={L:globalThis.L};globalThis.document={getElementById:()=>({}),createElement:()=>({})};
  try{
   let manual=0;const view=createMap('map',{onManual:()=>manual++});
@@ -37,8 +39,12 @@ test('following pans without resetting zoom; estimates fit their radius and manu
   assert.equal(calls.filter(v=>v[0]==='view').length,before,'new fixes must preserve the chosen zoom');
   events.dragstart();assert.equal(manual,1);
   const point={lat:56,lon:8,approximate:true,accuracy:1200};
-  view.center(point);assert.equal(calls.at(-1)[1].radius,1200);assert.equal(calls.at(-1)[2].maxZoom,16);
+  view.center(point);assert.equal(calls.at(-1)[1].radius,1200);assert.equal(calls.at(-1)[2].maxZoom,18);
+  const circleCount=circles.length;
+  view.center({...point,accuracy:33});assert.deepEqual(calls.at(-1),['bounds',{point:[56,8],radius:33},{padding:[35,35],maxZoom:18,animate:false}]);
+  assert.equal(circles.length,circleCount,'centering must not create a detached Leaflet circle');
   view.profile({name:'Loui',type:'cat',homeConfirmed:false},{position:point,route:[]});
   assert.equal(circles.at(-1).radius,1200);assert.ok(circles.at(-1).dashArray,'estimates have a visibly different uncertainty circle');
  }finally{Object.assign(globalThis,previous);}
 });
+

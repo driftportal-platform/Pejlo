@@ -1,3 +1,7 @@
+# Pejlo 0.8.63
+
+Centrér-knappen virker igen ved omtrentlig mobil-/Wi-Fi-placering. Små usikkerhedsområder kan vises tættere på, mens store områder fortsat tilpasses kortet. Se [versionsnoterne](docs/version-0.8.63.md).
+
 # Pejlo 0.8.62
 
 Profiler og kontoens profilvalg samles i D1 med automatisk engangsoverførsel og kopi af gamle Firestore-data. Firebase bruges fortsat til login. Motionsoversigten bruger gemte GPS-dagstal i D1. Se [installation og versionsnoter](docs/version-0.8.62.md).
