@@ -84,7 +84,7 @@ function uiFixture(){
  const fields=Object.fromEntries(keys.map(k=>[k,new E()]));const root=new E();root.ownerDocument={createElement:()=>new E()};root.querySelector=k=>fields[k.slice(15,-1)];
  let profile={id:profileId,type:'cat',trackerId:identifier,name:'Loui'},resolve,error=false,gpsError=false,gpsDeferred=null,gpsResult={route:[],historyAvailable:true};const calls=[];
  const result=()=>({canEdit:true,from:fields.from.value,to:fields.to.value,settings:{goal_km:2,revision:1},entries:[]});
- const request=async(path,body)=>{calls.push({path,body});if(error)throw Error('Konflikt');if(resolve)return new Promise(r=>resolve(r));if(path.startsWith('tracker?')){if(gpsError)throw Error('GPS-forbindelsen fejlede');if(gpsDeferred)return new Promise(r=>gpsDeferred(r));return gpsResult;}return result();};
+ const request=async(path,body)=>{calls.push({path,body});if(error)throw Error('Konflikt');if(resolve)return new Promise(r=>resolve(r));if(path.startsWith('activity/gps?')){if(gpsError)throw Error('GPS-forbindelsen fejlede');if(gpsDeferred)return new Promise(r=>gpsDeferred(r));return {...gpsResult,days:activityGps(gpsResult.route||[],'cat').days,points:gpsResult.route?.length||0};}return result();};
  const ui=createActivity({root,selected:()=>profile,request,notice:()=>{}});
  return {ui,root,fields,calls,setProfile:v=>profile=v,setError:v=>error=v,setDeferred:f=>resolve=f,setGps:v=>gpsResult=v,setGpsError:v=>gpsError=v,setGpsDeferred:v=>gpsDeferred=v,result};
 }
@@ -119,7 +119,7 @@ test('GPS estimates ignore future, approximate, invalid and duplicate positions'
 
 test('motion history automatically fetches GPS and displays its distance without a separate click',async()=>{
  const f=uiFixture(),at=Date.now()-240000;f.setGps({historyAvailable:true,route:[{lat:56.5,lon:8.3,timestamp:at},{lat:56.5005,lon:8.3,timestamp:at+120000}]});
- await f.ui.load();await new Promise(r=>setImmediate(r));assert.equal(f.calls.filter(c=>c.path.startsWith('tracker?')).length,1);assert.match(f.fields.summary.textContent,/Distance i perioden/);assert.match(f.fields['gps-status'].textContent,/2 GPS-punkter/);
+ await f.ui.load();await new Promise(r=>setImmediate(r));assert.equal(f.calls.filter(c=>c.path.startsWith('activity/gps?')).length,1);assert.match(f.fields.summary.textContent,/Distance i perioden/);assert.match(f.fields['gps-status'].textContent,/2 GPS-punkter/);
 });
 test('profile renaming updates motion heading without clearing the history or requesting data',async()=>{
  const f=uiFixture();await f.ui.load();await new Promise(r=>setImmediate(r));const count=f.calls.length;

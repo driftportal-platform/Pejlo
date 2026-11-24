@@ -1,6 +1,6 @@
 # Tjenester og ansvar
 
-Pejlo teknisk driftsvejledning. Version 0.8.57, opdateret 24. november 2026. Ældre driftsoplysninger er bevaret som historik. Ansvarlig: Stefan Brun Bjerg.
+Pejlo teknisk driftsvejledning. Version 0.8.62, opdateret 24. november 2026. Ældre driftsoplysninger er bevaret som historik. Ansvarlig: Stefan Brun Bjerg.
 
 Denne vejledning samler installationen og viser, hvor indstillinger ændres ved ny IP eller serverskift. Adresser og værdier nedenfor er den registrerede opsætning. Felter med UDFYLD er til din private kopi. Udgivelse af 0.8.51 og et vellykket Google-mobilopslag skal bekræftes i drift.
 
@@ -8,9 +8,9 @@ Denne vejledning samler installationen og viser, hvor indstillinger ændres ved 
 | --- | --- | --- |
 | GitHub | Kildekode og dokumentation | driftportal-platform/Pejlo |
 | Cloudflare Workers | App, API og baggrundsalarmer | Worker: pejlo |
-| Cloudflare D1 | Trackere, rettigheder, alarmer og aftaler | pejlo-trackers; binding DB |
+| Cloudflare D1 | Profiler, små profilbilleder, profilvalg, trackere, rettigheder, alarmer, aftaler og motionsdagstal | pejlo-trackers; binding DB |
 | Firebase Authentication | Login og bekræftet e-mail | Projekt pejlo-a1fed |
-| Cloud Firestore | Brugerens profiler og synkronisering | Samme Google-projekt |
+| Cloud Firestore | Gamle profildata; læses kun ved kontoens engangsoverførsel til D1 | Samme Google-projekt |
 | Traccar på Ubuntu | Modtager JT808 og gemmer historik | Aktuel pejlo-server; tidligere Windowsopsætning nedenfor |
 | Caddy | Offentlig HTTPS foran Traccar | pejlo.duckdns.org; tidligere Windows-tjeneste er historik |
 | DuckDNS | DNS-navn til skiftende offentlig IP | pejlo.duckdns.org |
@@ -56,7 +56,7 @@ Projekt-id: pejlo-a1fed. Firebase authDomain: pejlo-a1fed.firebaseapp.com. Webap
 ## Login og profildata
 
 - Firebase Authentication bruges til e-mail og adgangskode. Brugeren skal bekræfte sin e-mail. Bevar appens domæne i Authentication → Settings → Authorized domains.
-- Cloud Firestore gemmer users/{uid}/private/state. firestore.rules afgrænser adgang til kontoens egne data og kræver bekræftet e-mail. D1 afgør ejerskab og delingsrettigheder til trackere.
+- Fra 0.8.62 ligger den aktuelle profillagring i D1. users/{uid}/private/state i Firestore læses kun, hvis kontoen endnu ikke findes i pejlo_account_state. Brugerens verificerede Firebase ID-token bruges til læsningen; eksisterende firestore.rules skal derfor bevares. Et importøjebliksbillede gemmes i pejlo_state_imports. Fælles trackerprofiler læses direkte fra pejlo_profiles; kontoens private række indeholder ikke ekstra kopier af dem. Se version-0.8.62.md om backup og rollback.
 - GCP_FIREBASE_AUTH_SERVICE_ACCOUNT skal høre til samme projekt. Kundeadministration kræver Firebase Authentication Admin. Automatisk sletning af profildata kræver desuden Firestore-adgang, fx Cloud Datastore User. Kontrollér den faktisk tildelte konto i IAM.
 - Browser key oprettet af Firebase er særskilt fra Geolocation-nøglen. Den skal ikke IP-begrænses til Traccar-pc’en, da kundernes telefoner også bruger den. Bevar passende Firebase-API-begrænsninger. API-nøglen erstatter ikke rettighedskontrol.
 

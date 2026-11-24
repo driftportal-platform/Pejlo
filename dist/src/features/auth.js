@@ -23,11 +23,11 @@ export function createAuth(authSDK,app){
 }
 export const authError=e=>messages[e?.code]??'Handlingen kunne ikke gennemføres. Prøv igen.';
 export async function startAuthentication(onSession,{administration=false}={}){
- let appSDK,authSDK,dbSDK;
+ let appSDK,authSDK;
  const message=t=>{$('#auth-message').textContent=t;};
- try{[appSDK,authSDK,dbSDK]=await Promise.all((administration?['app','auth']:['app','auth','firestore']).map(name=>import(`https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}.js`)));}
+ try{[appSDK,authSDK]=await Promise.all(['app','auth'].map(name=>import(`https://www.gstatic.com/firebasejs/${SDK_VERSION}/firebase-${name}.js`)));}
  catch{message('Login kunne ikke indlæses. Kontrollér internetforbindelsen, og genindlæs siden.');$('#auth-retry').hidden=false;return;}
- const app=appSDK.initializeApp(firebaseConfig),auth=createAuth(authSDK,app),db=dbSDK?.getFirestore(app);
+ const app=appSDK.initializeApp(firebaseConfig),auth=createAuth(authSDK,app);
  auth.languageCode='da';let mode='login';
  const actionSettings={url:window.location.origin+'/',handleCodeInApp:false};
  function setMode(m){mode=m;$('#auth-password-wrap').hidden=m==='reset';$('#auth-confirm-wrap').hidden=m!=='signup';$('#auth-remember-wrap').hidden=m==='reset';$('#auth-password').required=m!=='reset';$('#auth-confirm').required=m==='signup';$('#auth-password').minLength=m==='signup'?10:1;$('#auth-password').autocomplete=m==='signup'?'new-password':'current-password';$('#auth-title').textContent={login:'Velkommen til Pejlo',signup:'Opret din konto',reset:'Glemt adgangskode?'}[m];$('#auth-submit').textContent={login:'Log ind',signup:'Opret konto',reset:'Send nulstillingsmail'}[m];$('#auth-password').value='';$('#auth-confirm').value='';message('');document.querySelectorAll('[data-auth-mode]').forEach(b=>b.classList.toggle('active',b.dataset.authMode===m));}
@@ -50,9 +50,10 @@ export async function startAuthentication(onSession,{administration=false}={}){
   $('.app').hidden=true;$('#auth-shell').hidden=false;$('#account-toolbar').hidden=!user;$('#auth-form-area').hidden=!!user;$('#verify-panel').hidden=!user||user.emailVerified;$('#auth-loading').hidden=!user||!user.emailVerified;
   $('#account-email').textContent=user?.email??'';$('#verify-email').textContent=user?.email??'';message('');
   if(!user){$('#auth-password').value='';$('#auth-confirm').value='';setMode('login');}
-  await onSession(user,{db,dbSDK,auth});
+  await onSession(user,{auth});
  }
  $('#cloud-retry').onclick=()=>changed(auth.currentUser);
  authSDK.onAuthStateChanged(auth,user=>changed(user).catch(()=>message('Kontoen kunne ikke indlæses. Prøv igen.')),e=>message(authError(e)));
  $('#auth-boot').hidden=true;setMode('login');
 }
+

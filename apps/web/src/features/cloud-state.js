@@ -15,7 +15,7 @@ export function createCloudState(api){
    const raw=snap.data??{};
    session.last={state:normalizeAccountState(raw),revision:raw.revision??0};session.ready=true;
    session.online=true;handlers.connection(!session.busy);
-   if(!session.busy){session.revision=session.last.revision;handlers.state(session.last.state);}
+   if(!session.busy){session.revision=session.last.revision;if(!snap.unchanged)handlers.state(session.last.state);}
   },error=>{if(gen===generation){session.ready=false;handlers.error(error);}});
   return async value=>{
    if(gen!==generation||!session.ready||!session.online||session.busy)throw new Error('Kontoen er ikke klar til at gemme.');
@@ -35,3 +35,4 @@ export function createCloudState(api){
  }
  return {open,close};
 }
+

@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.61
+# Pejlo brugervejledning til version 0.8.62
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -77,3 +77,16 @@ Observeret hvile er noget, du selv registrerer. Ro ved GPS-sted er kun et estima
 Ejere og delte redaktører kan registrere data. Læsebrugere kan se og eksportere den fælles historik. Ændringer beskyttes med revisioner; ved en konflikt skal historikken hentes igen, før der gemmes. Hvis en redaktør forlader en delt profil, beholdes historikken hos ejeren. Når ejeren fjerner profilen, slettes motionshistorikken også. Kontosletning sletter ejerens motionsdata.
 
 Vejledningen følger dyretypen. For katte anbefales korte lege med pauser uden ét fast kilometermål for alle katte. Hundes behov afhænger blandt andet af race, alder og helbred. Heste har behov for bevægelsesmuligheder, fold og social kontakt. Andet dyr dækker mange arter og får derfor ingen numerisk standard. Brug dyrlægens råd ved individuelle helbredsbehov. Kildelink vises i appen.
+
+
+## Profillagring og dagstal fra 0.8.62
+
+Firebase bruges fortsat til login. Profiler, små profilbilleder, kontoens aktive profilvalg, deling og motionsregistreringer ligger nu i Cloudflare D1. Fælles trackerprofiler har én autoritativ profil, så en gammel privat kopi ikke ændrer navn eller område tilbage. GPS-ruter gemmes fortsat hos Traccar.
+
+Ved første login overføres de gamle Firestore-profiler én gang. En kopi af det gamle profildokument gemmes i D1, og Firestore-dokumentet slettes ikke. Hentefejl stopper overførslen, så gamle profiler ikke erstattes med en tom konto. En overført konto læser og skriver derefter sine profiler i D1. Genåbn appen på alle dine enheder efter opdateringen; en gammel, åben udgave bruger fortsat det tidligere lager.
+
+Profiler kontrolleres hvert minut, mens appen er synlig. Uændrede profiler overføres ikke igen. Ved manglende forbindelse sættes redigering på pause. Samtidig gemning på flere enheder giver en konfliktbesked frem for at overskrive den andens ændringer.
+
+GPS-oversigten under Motion og hvile bruger dagstal beregnet på serveren. Tallene gemmes i D1 og genbruges; selve ruten behøver ikke blive sendt til telefonen. I dag opdateres efter højst cirka to minutters genbrug, afsluttede dage efter et døgn ved næste hentning. Ved dansk midnat genberegnes den afsluttede dag, selv om seneste hentning var kort før midnat. Ændring af server, dyretype eller hjemmeområde gør de gamle beregninger forældede. Der beregnes ved åbning/hentning af motionsoversigten, ikke via en ny baggrundsplan.
+
+Afstand, brugbar GPS-dækning og GPS-ro er forskellige tal. Manglende punkter er ukendte, ikke nul motion eller hvile. Observeret hvile registreres fortsat manuelt. Automatisk normalniveau og adfærdsadvarsler er ikke aktiveret i denne version.

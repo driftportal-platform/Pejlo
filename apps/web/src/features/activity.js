@@ -1,4 +1,4 @@
-import {animalType,activityAdvice,activityDates,activityGps,mergeActivity,activityCsv} from '../shared/activity.js';
+import {animalType,activityAdvice,activityDates,mergeActivity,activityCsv} from '../shared/activity.js';
 import {danishDate} from '../shared/history.js';
 
 export function createActivity({root,selected,request,notice,scope=()=>''}){
@@ -74,12 +74,12 @@ export function createActivity({root,selected,request,notice,scope=()=>''}){
   const gen=generation,gpsGen=++gpsGeneration,id=key,identifier=selected().trackerId,type=selected().type,from=model.from,to=model.to;
   gpsBusy=true;gpsState='loading';q('gps-status').textContent='Henter automatisk GPS-punkter for perioden…';render(false);disabled();
   try{
-   const result=await request('tracker?'+new URLSearchParams({identifier,from,to}),undefined,55000);
+   const result=await request('activity/gps?'+new URLSearchParams({...identity(),identifier,from,to}),undefined,55000);
    if(gen!==generation||gpsGen!==gpsGeneration||context()!==id)return;
-   if(result.historyAvailable===false||!Array.isArray(result.route))throw Error('GPS-historikken kunne ikke hentes.');
-   const analysis=activityGps(result.route,type);gps=analysis.days;gpsState='ready';render(false);
+   if(result.historyAvailable===false||!Array.isArray(result.days))throw Error('GPS-historikken kunne ikke hentes.');
+   gps=result.days;gpsState='ready';render(false);
    const coverage=gps.reduce((sum,d)=>sum+d.observedMinutes,0);
-   q('gps-status').textContent=(result.route.length?result.route.length+' GPS-punkter hentet. '+(coverage>0?num(coverage)+' minutters brugbar GPS-dækning.':'Ingen sammenhængende måleperioder med brugbare punkter; afstanden kan ikke beregnes.'):'Ingen GPS-punkter fundet i den valgte periode.')+' '+analysis.rejected+' forbindelser mellem punkter blev udeladt.'+(result.historyTruncated?' Ufuldstændigt: Traccars grænse på 10.000 punkter er nået.':'')+' Observeret hvile skal registreres manuelt; GPS-ro er ikke målt søvn.';
+   q('gps-status').textContent=(result.points?result.points+' GPS-punkter behandlet. '+(coverage>0?num(coverage)+' minutters brugbar GPS-dækning.':'Ingen sammenhængende måleperioder med brugbare punkter; afstanden kan ikke beregnes.'):'Ingen GPS-punkter fundet i den valgte periode.')+' '+(result.cachedDays||0)+' dage genbrugt fra gemte dagstal.'+(result.historyTruncated?' Ufuldstændigt: Traccars grænse på 10.000 punkter er nået.':'')+' Observeret hvile skal registreres manuelt; GPS-ro er ikke målt søvn.';
   }catch(e){if(gen===generation&&gpsGen===gpsGeneration&&context()===id){gps=[];gpsState='failed';render(false);q('gps-status').textContent=e.message+' Manuelle registreringer er stadig tilgængelige. Tryk Opdatér GPS-oversigt for at prøve igen.';}}
   finally{if(gen===generation&&gpsGen===gpsGeneration){gpsBusy=false;disabled();}}
  }

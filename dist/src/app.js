@@ -1,3 +1,4 @@
+import {createD1StateAdapter} from './features/d1-state.js';
 import {createActivity} from './features/activity.js';
 import {createBatteryControls} from './features/battery-controls.js';
 import {wifiDisplay,wifiCardText} from './shared/wifi-history.js';
@@ -2072,7 +2073,7 @@ let slowTimer;
 
 
 
-startAuthentication(async(user,{db,dbSDK,auth})=>{
+startAuthentication(async(user,{auth})=>{
 
 
 
@@ -2100,39 +2101,29 @@ startAuthentication(async(user,{db,dbSDK,auth})=>{
 
 
 
- const fail=()=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);$('.app').hidden=true;$('#auth-shell').hidden=false;$('#cloud-help').textContent='Profillagring kunne ikke åbnes. Kontrollér, at Firestore-databasen og reglerne fra pakken er oprettet. Derefter: Prøv forbindelsen igen.';$('#sync-state').textContent='Ingen forbindelse';};
+ const fail=()=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);$('.app').hidden=true;$('#auth-shell').hidden=false;$('#cloud-help').textContent='Profillagring kunne ikke åbnes. Kontrollér forbindelsen og Cloudflare D1-bindingen DB. Derefter: Prøv forbindelsen igen.';$('#sync-state').textContent='Ingen forbindelse';};
 
 
 
- slowTimer=setTimeout(fail,15000);
+ slowTimer=setTimeout(fail,30000);
 
 
 
- cloud=createCloudState({
-
-
-
-  ref:uid=>dbSDK.doc(db,'users',uid,'private','state'),
-
-
-
-  listen:(ref,ok,error)=>dbSDK.onSnapshot(ref,{includeMetadataChanges:true},snap=>ok({fromCache:snap.metadata.fromCache,pending:snap.metadata.hasPendingWrites,data:snap.exists()?snap.data():null}),error),
-
-
-
-  transaction:(ref,update)=>dbSDK.runTransaction(db,async transaction=>{if(auth.currentUser?.uid!==user.uid)throw new Error('Konto skiftet');const snapshot=await transaction.get(ref);const value=update(snapshot.exists()?snapshot.data():null);transaction.set(ref,{...value,updatedAt:dbSDK.serverTimestamp()});})
-
-
-
- });
-
-
+ let accountETag=null,accountData=null;
+ cloud=createCloudState(createD1StateAdapter({request:async(input)=>{
+  if(gen!==sessionGeneration||auth.currentUser?.uid!==user.uid)throw Error('Konto skiftet');
+  const token=await user.getIdToken();
+  if(gen!==sessionGeneration||auth.currentUser?.uid!==user.uid)throw Error('Konto skiftet');
+  const response=await fetch('/api/account/state',{method:input?'POST':'GET',headers:{Authorization:'Bearer '+token,...(input?{'Content-Type':'application/json'}:accountETag?{'If-None-Match':accountETag}:{})},...(input?{body:JSON.stringify(input)}:{}),cache:'no-store',signal:AbortSignal.timeout(25000)});
+  if(response.status===304&&accountData)return accountData;
+  const result=await response.json();if(!response.ok)throw Object.assign(Error(result.error||'Profilerne kunne ikke hentes.'),{status:response.status});accountETag=response.headers.get('ETag');accountData=result;return result;
+ }}));
 
  saveCloud=cloud.open(user,{
 
 
 
-  state:value=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);Object.assign(state,normalizeAccountState(value));mergeFamily();refresh();if(!familyReady)loadFamily();const invitation=sessionStorage.getItem('pejlo-invitation');if(invitation&&!invitationPresented){invitationPresented=true;$('#family-code').value=invitation;$('#join-result').textContent='Invitationen er klar. Tryk Tilføj delt profil, når du er logget ind med den inviterede e-mail.';go('indstillinger');}$('#auth-shell').hidden=true;$('.app').hidden=false;$('.app').inert=false;$('#sync-state').textContent='Profiler synkroniseret';},
+  state:value=>{if(gen!==sessionGeneration)return;clearTimeout(slowTimer);Object.assign(state,normalizeAccountState(value));refresh();loadFamily();const invitation=sessionStorage.getItem('pejlo-invitation');if(invitation&&!invitationPresented){invitationPresented=true;$('#family-code').value=invitation;$('#join-result').textContent='Invitationen er klar. Tryk Tilføj delt profil, når du er logget ind med den inviterede e-mail.';go('indstillinger');}$('#auth-shell').hidden=true;$('.app').hidden=false;$('.app').inert=false;$('#sync-state').textContent='Profiler synkroniseret';},
 
 
 

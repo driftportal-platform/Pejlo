@@ -1,3 +1,5 @@
+import {accountStateAPI,legacyAccount} from './account-state.js';
+import {activityGpsAPI} from './activity-gps.js';
 import {activityAPI} from './activity.js';
 import {sendPositionRequest} from './position-request.js';
 import {positionRefreshAPI} from './position-refresh.js';
@@ -90,7 +92,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   }
 
-  const routes={'/api/activity':'GETPOST','/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/account/state':'GETPOST','/api/activity/gps':'GET','/api/activity':'GETPOST','/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
 
   if(!routes[path])return json({error:'Ikke fundet.'},404);
 
@@ -131,6 +133,13 @@ export async function handleAPI(request,env,fetcher=fetch){
   }
 
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
+  if(path==='/api/account/state'){
+   const value=await accountStateAPI({db:env.DB,uid,input:request.method==='POST'?await body(request,2000000):null,loadLegacy:()=>legacyAccount({uid,token,projectId:firebaseConfig.projectId,fetcher})});
+   const serialized=JSON.stringify(value),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(serialized))),b=>b.toString(16).padStart(2,'0')).join('');
+   const etag='"'+hash+'"',headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','ETag':etag};
+   if(request.method==='GET'&&request.headers.get('If-None-Match')===etag)return new Response(null,{status:304,headers});
+   return new Response(serialized,{headers:{...headers,'Content-Type':'application/json'}});
+  }
   if(path==='/api/activity')return json(await activityAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
 
   if(path==='/api/admin/server'){
@@ -500,6 +509,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   if(!device||!Number.isSafeInteger(device.id))throw new Failure(404,'Trackeren findes ikke på Traccar-kontoen.');
 
+  if(path==='/api/activity/gps')return json(await activityGpsAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),device,traccar,source:(env.TRACCAR_SOURCE||'environment')+':'+base,now:Date.now()}));
   if(positionRefreshRequest)return json(await positionRefreshAPI({env,identifier,uid,input}));
   if(batteryHistoryRequest)return json(await getBatteryHistory({env,identifier,device,traccar,days:Number(url.searchParams.get('days')||1)}));
   if(requestBattery)return json(await managedBattery({env,identifier,uid,device,input,traccar,traccarFetch}));
