@@ -1,8 +1,10 @@
+import {createPositionRefresh} from './position-refresh.js';
 import {createBatteryPolicy} from './battery-policy.js';
 export function createBatteryControls({root,selected,request,notice,canEdit}){
  const q=s=>root.querySelector(s);let key=null,generation=0,busy=false,enabled=false;
+ const recovery=createPositionRefresh({root:q('[data-position-refresh]'),selected,request,canEdit});
  const policy=createBatteryPolicy({root:q('[data-battery-policy]'),selected,request,canEdit,updated:render});
- function clear(){policy.clear();enabled=false;key=null;generation++;busy=false;q('[data-battery-status]').textContent='Vælg en tilknyttet tracker.';q('fieldset').disabled=true;q('[data-battery-history-output]').replaceChildren();q('[data-battery-history-status]').textContent='';q('[data-battery-history]').disabled=!selected()?.trackerId;}
+ function clear(){recovery.clear();policy.clear();enabled=false;key=null;generation++;busy=false;q('[data-battery-status]').textContent='Vælg en tilknyttet tracker.';q('fieldset').disabled=true;q('[data-battery-history-output]').replaceChildren();q('[data-battery-history-status]').textContent='';q('[data-battery-history]').disabled=!selected()?.trackerId;}
  function render(result){
   enabled=result.enabled===true;policy.render(result);
   q('fieldset').disabled=!result.enabled||!canEdit();
@@ -10,7 +12,7 @@ export function createBatteryControls({root,selected,request,notice,canEdit}){
   q('[data-battery-status]').textContent=!result.enabled?'Batteristyring er endnu ikke aktiveret for denne tracker.':last?'Senest ønsket: '+last.seconds+' sek. · '+new Date(last.requested_at).toLocaleString('da-DK')+' · '+(last.status==='sent'?'sendt til Traccar; trackerens interval er ikke læst tilbage.':'afsendelse uafklaret eller afvist.'):'Vælg et interval. Ingen ændring sendes, før du trykker Anvend.';
  }
  async function load(force=false){
-  const id=selected()?.trackerId||null;if(!force&&key===id)return;clear();key=id;if(!id)return;
+  const id=selected()?.trackerId||null;if(!force&&key===id)return;clear();key=id;if(!id)return;void recovery.load();
   const gen=generation;q('[data-battery-status]').textContent='Henter batteriindstillinger…';
   try{const result=await request('battery?identifier='+encodeURIComponent(id));if(gen===generation&&key===id)render(result);}
   catch(e){if(gen===generation){key=null;q('[data-battery-status]').textContent=e.message;}}

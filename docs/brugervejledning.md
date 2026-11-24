@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.58
+# Pejlo brugervejledning til version 0.8.59
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -49,3 +49,13 @@ Find i batteriafsnittet ønsker 30 sekunder i 5 eller 15 minutter. Serveren vend
 
 Hent batterihistorik for de seneste 24 timer eller 7 dage for at sammenligne rapporteret batteriprocent, opladning og antal gemte positioner pr. periode. Manglende batterital står tomme. Heartbeats og appopslag indgår ikke i antallet. Appens egne intervalændringer vises særskilt fra denne version. Se [Batteristyring og kommandoer](batteri-og-kommandoer.md) for afprøvede funktioner, aktivering og begrænsninger.
 
+
+## Automatisk positionsforespørgsel fra 0.8.59
+
+Under Indstillinger → Tracker → Batteri og opdateringer findes Bed automatisk om en ny position. For godkendte trackere med tilknyttet profil er 15 minutter standard. Ejeren kan slå fra eller vælge 10 minutter og trykke Gem positionskontrol. Hent status for positionskontrol viser seneste kontrol og forsøg.
+
+Serveren kontrollerer cirka hvert minut, også når appen er lukket. Gammel godkendt GPS eller gammel kontakt kan udløse en forespørgsel, hvis Traccar viser trackeren online. Offline afventer genforbindelse; der sendes ingen SMS. Manglende signaldata alene udløser ikke en forespørgsel. Nye trackere uden GPS-/kontaktoplysninger venter først den valgte periode.
+
+Der er mindst 15 minutter mellem automatiske forsøg, også hvis grænsen er valgt til 10 minutter. Efter tre forsøg i træk holdes pause. Frisk godkendt GPS og kontakt nulstiller perioden. Fra/til med Gem kan også starte en ny periode. Manuelle positionsforespørgsler og automatiske deler den eksisterende minutbegrænsning.
+
+Forespørgslen bruger Traccars enkeltpositionskommando med ønsket Ingen kø. Afsendelse er ikke bevis for modtagelse, opvågning eller nyt GPS-fix. Hvis Traccar alligevel melder kommandoen i kø, vises dette som uafklaret levering. Funktionen ændrer ikke rapporteringsinterval, tidszone, Wi-Fi-opsætning eller dvaleparametre. Indendørs kan GPS fortsat mangle.

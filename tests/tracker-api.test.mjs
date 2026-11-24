@@ -92,9 +92,9 @@ test('method and route are constrained, external server override fails closed',a
 const post=(path,value)=>new Request('https://pejlo.example/api/'+path,{method:'POST',headers:{Authorization:'Bearer firebase-token','Content-Type':'application/json'},body:JSON.stringify(value)});
 
 test('battery automation and timed Find stay owner-only at the authenticated API boundary',async()=>{
- for(const uid of ['viewer-uid','someone-else'])for(const action of ['auto','find','stop']){
+ for(const uid of ['viewer-uid','someone-else'])for(const action of ['auto','find','stop'])for(const route of ['battery','position-refresh']){
   const f=fixture({uid,status:'online',commandTypes:[{type:'custom'}]});
-  const r=await handleAPI(post('battery',{identifier,action,enabled:true,testConfirmed:true,minutes:5}),{...env,DB:database(),PEJLO_BATTERY_DEVICES:identifier},f.fetcher);
+  const r=await handleAPI(post(route,{identifier,action,enabled:true,testConfirmed:true,minutes:15}),{...env,DB:database(),PEJLO_BATTERY_DEVICES:identifier},f.fetcher);
   assert.equal(r.status,403);assert.equal(f.calls.length,1);
  }
 });

@@ -1,3 +1,5 @@
+import {sendPositionRequest} from './position-request.js';
+import {positionRefreshAPI} from './position-refresh.js';
 import {getBatteryHistory} from './battery-history.js';
 import {managedBattery} from './battery-management.js';
 import {locationEnabled} from './location-access.js';
@@ -6,13 +8,12 @@ import {serverConfigAPI,resolveTraccarEnv} from './server-config.js';
 
 import {traccarOrigin} from './traccar-url.js';
 
-import {commandWasRejected,configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
+import {configuredTrackerActions,sendTrackerAction} from './tracker-actions.js';
 
 import {billingWebhook,startBilling} from './billing.js';
 
 import {ensureSubscriptions} from './subscriptions.js';
 
-import {once} from './schema.js';
 
 import {handoffAPI,handoffHistory} from './handoffs.js';
 
@@ -88,7 +89,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   }
 
-  const routes={'/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
 
   if(!routes[path])return json({error:'Ikke fundet.'},404);
 
@@ -465,7 +466,8 @@ export async function handleAPI(request,env,fetcher=fetch){
   }
 
   const batteryHistoryRequest=path==='/api/battery/history';
-  const requestBattery=path==='/api/battery'||batteryHistoryRequest;
+  const positionRefreshRequest=path==='/api/position-refresh';
+  const requestBattery=path==='/api/battery'||batteryHistoryRequest||positionRefreshRequest;
   const batteryWrite=requestBattery&&request.method==='POST';
   const requestPosition=path==='/api/tracker/position';
 
@@ -496,54 +498,14 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   if(!device||!Number.isSafeInteger(device.id))throw new Failure(404,'Trackeren findes ikke på Traccar-kontoen.');
 
+  if(positionRefreshRequest)return json(await positionRefreshAPI({env,identifier,uid,input}));
   if(batteryHistoryRequest)return json(await getBatteryHistory({env,identifier,device,traccar,days:Number(url.searchParams.get('days')||1)}));
   if(requestBattery)return json(await managedBattery({env,identifier,uid,device,input,traccar,traccarFetch}));
   if(requestAction)return json(await sendTrackerAction({db:env.DB,identifier,device,action:input.action,command:actions[input.action],traccar,traccarFetch}));
 
   if(requestPosition){
 
-   if(device.status!=='online')throw new Failure(409,'Trackeren har ingen aktiv forbindelse. Prøv igen, når den er online.');
-
-   const types=await traccar('/api/commands/types?'+new URLSearchParams({deviceId:String(device.id),textChannel:'false'}));
-
-   if(!Array.isArray(types)||!types.some(command=>command.type==='positionSingle'))throw new Failure(409,'Traccar tilbyder ikke enkelt positionsrapport for denne tracker.');
-
-   await once(env.DB,'positionRequests',()=>env.DB.prepare('CREATE TABLE IF NOT EXISTS pejlo_position_requests (identifier TEXT PRIMARY KEY, requested_at INTEGER NOT NULL)').run());
-
-   const requestedAt=Date.now();
-
-   const reserved=await env.DB.prepare(`INSERT INTO pejlo_position_requests (identifier,requested_at) VALUES (?,?)
-
-    ON CONFLICT(identifier) DO UPDATE SET requested_at=excluded.requested_at
-
-    WHERE pejlo_position_requests.requested_at<=? RETURNING identifier`).bind(identifier,requestedAt,requestedAt-60000).first();
-
-   if(!reserved)throw new Failure(429,'Vent et minut mellem forespørgsler.');
-
-   const response=await traccarFetch('/api/commands/send',{method:'POST',body:JSON.stringify({
-
-    deviceId:device.id,type:'positionSingle',textChannel:false,attributes:{noQueue:true}
-
-   })});
-
-   if(response.status===202)return json({status:'queued',requestedAt});
-
-   if(!response.ok){
-
-    if(commandWasRejected(response.status)){
-
-     await env.DB.prepare('UPDATE pejlo_position_requests SET requested_at=0 WHERE identifier=? AND requested_at=?')
-
-      .bind(identifier,requestedAt).run();
-
-    }
-
-    throw new Failure(502,'Traccar kunne ikke bekræfte positionsforespørgslen. Kontrollér trackerens forbindelse.');
-
-   }
-
-   return json({status:'sent',requestedAt});
-
+   return json(await sendPositionRequest({db:env.DB,identifier,device,traccar,traccarFetch}));
   }
 
   let positions=[],positionLookupFailed=false;

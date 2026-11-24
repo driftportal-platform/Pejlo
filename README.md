@@ -1,3 +1,7 @@
+# Pejlo 0.8.59
+
+Serveren beder automatisk om en position, når GPS eller kontakt er mindst 15 minutter gammel. Kan slås fra eller sættes til 10 minutter under Indstillinger → Tracker. Offline afventer forbindelse. Højst ét automatisk forsøg hvert 15. minut og højst tre i træk. Se [versionsnoterne](docs/version-0.8.59.md).
+
 # Pejlo 0.8.58
 
 Hurtig Wi-Fi-opsætning samler og gemmer tre indemålinger og tre udemålinger automatisk. Allerede valgte hjemmepunkter genbruges. Nye punkter foreslås og bekræftes én gang. Genvej fra Wi-Fi-kortet og tydeligere skelnen mellem gemte punkter og manglende scanning. Se [versionsnoterne](docs/version-0.8.58.md).
