@@ -1,3 +1,4 @@
+import {receiveReportState,readReportState} from './report-state.js';
 import {chargingHistory} from '../../packages/shared/charging-history.js';
 import {accountStateAPI,legacyAccount} from './account-state.js';
 import {activityGpsAPI} from './activity-gps.js';
@@ -84,6 +85,8 @@ export async function handleAPI(request,env,fetcher=fetch){
  try{
 
   const url=new URL(request.url),path=url.pathname;
+
+  if(path==='/api/tracker/report-state')return json(await receiveReportState(request,env));
 
   if(path==='/api/stripe/webhook'){
 
@@ -610,7 +613,8 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const approximatePosition=mobileLocationEnabled?approximatePoint(raw):null;
 
-  return json({source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  const reportState=await readReportState(env,identifier).catch(()=>null);
+  return json({reportState,source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
 
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 

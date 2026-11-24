@@ -1,0 +1,20 @@
+[Unit]
+Description=Pejlo read-only JT808 status reader
+After=network-online.target traccar.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pejlo-status
+Group=pejlo-status
+ExecStart=/usr/bin/python3 /opt/pejlo-status/bridge.py --config /etc/pejlo-status.json
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

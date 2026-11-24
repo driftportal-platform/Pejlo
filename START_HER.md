@@ -1,3 +1,5 @@
+0.8.66 tilføjer visning af seneste dvalerapport. Upload oven på 0.8.65. Denne funktion kræver også en statuslæser på Traccar-serveren og Cloudflare Secret PEJLO_STATUS_KEYS. Følg [installationen](docs/version-0.8.66.md); appupload alene aktiverer ikke logforbindelsen.
+
 0.8.65 giver sammenklappelige historikfelter, motions-/hvileoverblik og grafer. Upload oven på 0.8.64 med samme mapper, og genåbn appen efter det normale build. Ingen nye Firebase- eller Cloudflare-indstillinger kræves. Se [versionsnoterne](docs/version-0.8.65.md).
 
 0.8.64 udelader opladningspunkter for dyreprofiler fra ruter og GPS-kilometer. Upload oven på 0.8.63, udgiv API og web sammen via det normale build, og genåbn appen. Ingen nye Firebase- eller Cloudflare-indstillinger kræves. Se [versionsnoterne](docs/version-0.8.64.md).
@@ -12,7 +14,7 @@
 
 0.8.59 tilføjer automatisk positionsforespørgsel. Se [versionsnoterne](docs/version-0.8.59.md). Efter upload er 15-minutterskontrol slået til for godkendte, tilknyttede trackere, herunder Loui hvis PEJLO_BATTERY_DEVICES stadig indeholder hans ID. Kontrollen kan slås fra i appen.
 
-# Start her med Pejlo 0.8.65
+# Start her med Pejlo 0.8.66
 
 0.8.58 tilføjer Hurtig Wi-Fi-opsætning til batterifunktionerne fra 0.8.57. Se [versionsnoterne](docs/version-0.8.58.md) for installation og fysisk kontrol. Ældre versionsnoter beskriver historiske forhold og kan nævne demo-server, langsommere polling og tidligere begrænsninger.
 
@@ -20,10 +22,10 @@
 
 1. Upload de udpakkede filer til roden af driftportal-platform/Pejlo med samme mapper. Erstat kun filer med samme navn.
 2. Behold Cloudflare Worker pejlo, D1-binding DB, eksisterende secrets, Cron Trigger hvert minut og MAPTILER_API_KEY under Builds.
-3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.65 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
+3. Lad det normale Cloudflare-build køre. Åbn appen og kontrollér version 0.8.66 på loginvisningen. En ren dokumentationsupload ændrer ikke appens version eller funktioner.
 4. Aktivér mobilplacering for din egen bruger i Systemadmin → Kunder og abonnementer, hvis den skal prøves. Test derefter fysisk GPS, mobilestimat, kortfølgning og push.
 
-Ændringspakken forudsætter 0.8.64. Upload filerne med samme mapper og udgiv både API og web. PEJLO_BATTERY_DEVICES skal stadig indeholde 080608317309. Der kræves ingen ny secret eller manuel databasekommando. Automatik aktiveres bagefter af ejeren i appen.
+Ændringspakken forudsætter 0.8.65. Upload filerne med samme mapper og udgiv både API og web. PEJLO_BATTERY_DEVICES skal stadig indeholde 080608317309. Dvalestatus kræver den separate secret og statuslæser fra vejledningen til 0.8.66. Der kræves ingen manuel databasekommando. Intervalautomatik styres fortsat af ejeren i appen.
 
 ## Før du ændrer driften
 

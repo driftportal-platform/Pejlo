@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.65
+# Pejlo brugervejledning til version 0.8.66
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -110,3 +110,9 @@ Batterigrafen findes under Indstillinger → Tracker → Batterigraf, målinger 
 Under Profil kan du markere, om trackeren er påsat dyret/genstanden, taget af eller ukendt. Gem profilen for at bekræfte. Tidspunktet gemmes med trackerens ID, og bekræftelsen nulstilles ved trackerskift. Valget beskriver den aktuelle brug; det er ikke en fuld historik over på- og aftagning og omskriver ikke gamle hviletal.
 
 Hvile redigeres fortsat som dagens samlede tal; en rettelse erstatter den tidligere registrering. Automatisk hvile fra dvalerapporter er ikke aktiv i 0.8.65. Den nuværende Traccar-dekoder gemmer Loui-trackerens korte 0210-pakke som batteri og tid uden særskilt dvalefelt. Online-status, manglende GPS og en bekræftet påsat tracker er derfor ikke i sig selv tilstrækkeligt til automatisk hviletid. Når dvaledata er tilgængelige, er det ønskede princip ét redigerbart dagstal med et automatisk estimat som udgangspunkt og en manuel rettelse som erstatning.
+
+## Seneste dvalerapport fra 0.8.66
+
+Trackeroplysninger viser Dvalerapport modtaget, Sender rapporter eller Dvalestatus ukendt. Kun én overskrift vises ad gangen; dato/tid for seneste dvalerapport står nedenunder. En dvalerapport er frisk i højst 15 minutter. En fuld rapport viser blot rapportering, ikke at dyret er vågent; heartbeats bekræfter kun kontakt. Offline og gamle/ukendte målinger bliver ikke til bekræftet dvale.
+
+Funktionen kræver statuslæseren og Cloudflare-nøglen i [installationsvejledningen](version-0.8.66.md). Appen alene kan ikke læse serverens rå log. Der ændres ikke noget i trackerens indstillinger, og der beregnes endnu ikke automatisk hviletid.

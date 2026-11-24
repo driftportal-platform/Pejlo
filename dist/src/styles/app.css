@@ -299,3 +299,4 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 #battery-controls [data-battery-history-output]{max-height:none;overflow:visible}.history-table-scroll{overflow-x:auto;max-height:420px}.history-table-scroll th{position:sticky;top:0;background:white}.fold-body,.fold-panel,#activity{min-width:0}
 @media(max-width:400px){.activity-status-grid{gap:8px}.activity-status-card{padding:12px}.activity-status-card strong{font-size:19px}.activity-status-card h3{font-size:12px}.fold-panel>summary h2{font-size:18px}}
 .attachment-settings{min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px;margin:16px 0}.attachment-settings legend{font-weight:700;font-size:13px}.attachment-settings .hint{font-size:11px}
+.tracker-mode-status{font-weight:700;color:#55635d;background:#edf0eb;padding:10px 12px;border-radius:10px;font-size:14px}.tracker-mode-status[data-tone=sleep]{color:#183e35;background:#e5efda}#tracker-mode-note{font-size:12px}

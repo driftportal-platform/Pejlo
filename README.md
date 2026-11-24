@@ -1,3 +1,7 @@
+# Pejlo 0.8.66
+
+Seneste dvalerapport kan vises i appen via en separat, læsende statusbro på Traccar-serveren. Kræver én ny Cloudflare-secret og installation af statuslæseren; en almindelig appudgivelse alene giver ikke dvaledata. Se [installation og versionsnoter](docs/version-0.8.66.md).
+
 # Pejlo 0.8.65
 
 Sammenklappelig historik, et hurtigt motions- og hvileoverblik, grafer for kilometer, hvile, batteri og rapporter samt bekræftelse af påsat/taget af på profilen. Se [versionsnoterne](docs/version-0.8.65.md).

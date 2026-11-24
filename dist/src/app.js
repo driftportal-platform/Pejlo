@@ -1,3 +1,4 @@
+import {reportStatus} from './shared/report-status.js';
 import {updateAttachment,attachmentText} from './shared/attachment.js';
 import {createD1StateAdapter} from './features/d1-state.js';
 import {createActivity} from './features/activity.js';
@@ -554,6 +555,7 @@ function updatePositionRequest(){
 
 
  $('#tracker-details-name').textContent=profile.name;
+ const mode=reportStatus(d);$('#tracker-mode-status').textContent=mode.label;$('#tracker-mode-status').dataset.tone=mode.tone;$('#tracker-mode-note').textContent=mode.note;
 
 
 

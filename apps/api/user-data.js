@@ -3,6 +3,7 @@ import {googleAccessToken} from './google-auth.js';
 // Everything Pejlo's own database holds about one account. Tables that do not exist yet hold nothing and are skipped.
 const mailKey = email => String(email ?? '').trim().toLowerCase() || '\u0000none';
 const cleanups = [
+  ['DELETE FROM pejlo_report_state WHERE identifier IN (SELECT identifier FROM trackers WHERE owner_uid=?)', uid => [uid]],
   ['DELETE FROM pejlo_account_state WHERE uid=?', uid => [uid]],
   ['DELETE FROM pejlo_state_imports WHERE uid=?', uid => [uid]],
   ['DELETE FROM pejlo_activity_gps WHERE owner_uid=?', uid => [uid]],
