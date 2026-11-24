@@ -41,12 +41,12 @@ export function activityGps(route,type,now=Date.now()){
  }
  return {days:[...days.values()].map(d=>({...d,km:d.observedMinutes>0?d.meters/1000:null})),rejected};
 }
-export function mergeActivity(days,entries,gps=[]){
- const manual=new Map(entries.map(e=>[e.day,e])),scans=new Map(gps.map(e=>[e.day,e]));
- return days.map(day=>{const e=manual.get(day),g=scans.get(day),manualKm=e?.km??null,gpsKm=g?.km??null;return {day,manualKm,gpsKm,km:manualKm??gpsKm,source:manualKm!==null?'manual':gpsKm!==null?'gps':'unknown',restHours:e?.rest_hours??null,quietMinutes:g?.observedMinutes>0?g.quietMinutes:null,coverageMinutes:g?.observedMinutes??null,note:e?.note||'',revision:e?.revision??0,goalKm:e?.goal_km??null};});
+export function mergeActivity(days,entries,gps=[],rest=[]){
+ const manual=new Map(entries.map(e=>[e.day,e])),scans=new Map(gps.map(e=>[e.day,e])),estimates=new Map(rest.map(e=>[e.day,e]));
+ return days.map(day=>{const e=manual.get(day),g=scans.get(day),manualKm=e?.km??null,gpsKm=g?.km??null,estimatedRestHours=estimates.get(day)?.estimatedRestHours??null,manualRestHours=e?.rest_hours??null;return {day,manualKm,gpsKm,km:manualKm??gpsKm,source:manualKm!==null?'manual':gpsKm!==null?'gps':'unknown',restHours:manualRestHours??estimatedRestHours,estimatedRestHours,restSource:manualRestHours!==null?'manual':estimatedRestHours!==null?'estimated':'unknown',quietMinutes:g?.observedMinutes>0?g.quietMinutes:null,coverageMinutes:g?.observedMinutes??null,note:e?.note||'',revision:e?.revision??0,goalKm:e?.goal_km??null};});
 }
 export function activityCsv(rows){
  const cell=value=>{let s=value==null?'':typeof value==='number'?String(Math.round(value*100)/100).replace('.',','):String(value);if(/^\s*[=+\-@]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
- const values=[['Dato','Manuelt km','GPS km anslaaet','Valgt km','Distancekilde','Observeret hvile timer','Ro ved GPS-sted minutter','GPS-daekning minutter','Maal ved foerste registrering km','Note'],...rows.map(r=>[r.day,r.manualKm,r.gpsKm,r.km,r.source,r.restHours,r.quietMinutes,r.coverageMinutes,r.goalKm,r.note])];
+ const values=[['Dato','Manuelt km','GPS km anslaaet','Valgt km','Distancekilde','Samlet hvile timer','Hvilekilde','Anslået hvile timer','Ro ved GPS-sted minutter','GPS-daekning minutter','Maal ved foerste registrering km','Note'],...rows.map(r=>[r.day,r.manualKm,r.gpsKm,r.km,r.source,r.restHours,r.restSource,r.estimatedRestHours,r.quietMinutes,r.coverageMinutes,r.goalKm,r.note])];
  return '\ufeff'+values.map(row=>row.map(cell).join(';')).join('\r\n');
 }

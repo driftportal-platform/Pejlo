@@ -6,6 +6,8 @@ import hmac
 import hashlib
 import bridge
 import io
+import sys
+import contextlib
 from types import SimpleNamespace
 
 IDENTIFIER = '080608317309'
@@ -37,6 +39,15 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(event['kind'], 'position_report')
         self.assertEqual(event['battery'], 79)
         self.assertIs(event['charging'], False)
+
+    def test_explicit_motion_is_optional_and_never_guessed_from_satellites(self):
+        for value in (0, 1, 2):
+            body = bytes(28)+bytes([0xe5, 1, value])
+            event = bridge.Reader(IDENTIFIER).line(line(frame(0x200, body).hex()))[0]
+            if value in (0, 1):
+                self.assertIs(event['motion'], value == 1)
+            else:
+                self.assertNotIn('motion', event)
 
     def test_ambiguous_dst_hour_is_not_guessed(self):
         self.assertEqual(bridge.Reader(IDENTIFIER).line(line(SLEEP, stamp='2026-10-25 02:30:00')), [])
@@ -88,6 +99,8 @@ class BridgeTest(unittest.TestCase):
             bridge.send(config, [event])
         for req in captured:
             payload = json.loads(req.data)
+            self.assertEqual(req.get_header('User-agent'), 'PejloStatus/0.8.66')
+            self.assertEqual(req.get_header('Accept'), 'application/json')
             self.assertEqual(payload['events'][0]['receivedAt'], 123456)
             self.assertEqual(req.get_header('X-pejlo-signature'), hmac.new(config['key'].encode(), req.data, hashlib.sha256).hexdigest())
         self.assertNotEqual(captured[0].data, captured[1].data)
@@ -109,6 +122,17 @@ class BridgeTest(unittest.TestCase):
                 bridge.follow(config)
         self.assertEqual([e['kind'] for e in captured], ['sleep_report', 'position_report'])
         self.assertEqual(captured[0]['receivedAt'], captured[1]['receivedAt'])
+
+    def test_setup_prints_a_safe_specific_error_instead_of_a_traceback(self):
+        for body, expected in [(b'{"error":"Trackeren er ikke tilknyttet."}', 'Trackeren er ikke tilknyttet'), (b'error code: 1010', 'Cloudflare afviser klienten')]:
+            error = bridge.urllib.error.HTTPError('https://pejlo.example/api/tracker/report-state', 403, 'Forbidden', {}, io.BytesIO(body))
+            output = io.StringIO()
+            with patch.object(sys, 'argv', ['bridge.py', '--configure']), patch('bridge.configure', side_effect=error), contextlib.redirect_stdout(output):
+                with self.assertRaises(SystemExit):
+                    bridge.main()
+            self.assertIn('HTTP 403', output.getvalue())
+            self.assertIn(expected, output.getvalue())
+            self.assertNotIn('Traceback', output.getvalue())
 
 
 if __name__ == '__main__':

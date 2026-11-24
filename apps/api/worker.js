@@ -144,7 +144,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(request.method==='GET'&&request.headers.get('If-None-Match')===etag)return new Response(null,{status:304,headers});
    return new Response(serialized,{headers:{...headers,'Content-Type':'application/json'}});
   }
-  if(path==='/api/activity')return json(await activityAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
+  if(path==='/api/activity')return json(await activityAPI({db:env.DB,uid,source:(await resolveTraccarEnv(env)).TRACCAR_SOURCE,query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
 
   if(path==='/api/admin/server'){
 

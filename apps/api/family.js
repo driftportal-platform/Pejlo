@@ -1,4 +1,5 @@
 import {removeActivityProfile} from './activity-store.js';
+import {ensureRest,wearStatement} from './rest-store.js';
 import {ensureHandoffs} from './handoffs.js';
 import {ensureSnooze} from './snooze.js';
 import {archiveEvent} from './archive.js';
@@ -55,7 +56,10 @@ export async function familyAPI(db,account,input,hashCode){
   const owner=existing?.owner_uid||uid,expected=existing?input.revision:0,serialized=JSON.stringify(profile);
   const mutation=existing?db.prepare('UPDATE pejlo_profiles SET profile=?,revision=revision+1 WHERE identifier=? AND revision=? RETURNING revision').bind(serialized,input.identifier,expected):db.prepare('INSERT OR IGNORE INTO pejlo_profiles(identifier,owner_uid,profile,revision) VALUES(?,?,?,1) RETURNING revision').bind(input.identifier,owner,serialized);
   const fence=db.prepare("INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) SELECT identifier,owner_uid,?,?,? FROM pejlo_profiles WHERE identifier=? AND revision=? AND profile=? ON CONFLICT(identifier) DO UPDATE SET name=excluded.name,config=excluded.config,enabled=excluded.enabled,state=CASE WHEN config=excluded.config AND enabled=excluded.enabled THEN state ELSE '{}' END,checked_at=0").bind(profile.fencePresets.find(f=>f.id===profile.activeFenceId)?.name||profile.name,JSON.stringify({...profile.home,areaId:profile.activeFenceId}),profile.geofenceEnabled&&profile.homeConfirmed?1:0,input.identifier,expected+1,serialized);
-  const results=await db.batch([mutation,fence]);
+  const before=existing?JSON.parse(existing.profile):null;
+  const wearChanged=JSON.stringify(before?.attachment??null)!==JSON.stringify(profile.attachment??null)||before?.type!==profile.type;
+  await ensureRest(db);
+  const results=await db.batch([mutation,fence,...(wearChanged?[wearStatement(db,profile,owner,expected+1,Date.now(),serialized)]:[])]);
   const updated=results[0].results?.[0];if(!updated)fail(409,'En anden har ændret profilen. Den nyeste udgave hentes; prøv igen.');
   if(existing&&!access.owner)await notifyOwnerOfAreaChange(db,input.identifier,existing,profile,account);
   return updated;

@@ -1,0 +1,5 @@
+Pejlo 0.8.67
+Validation: npm test
+325 Node tests passed, 0 failures. Includes 12 Python log-reader tests.
+New coverage: rest evidence, missing data, charging, motion, worn changes, Danish midnight/DST, manual overrides including zero, signed archive replay/source isolation, feature toggle and conflicting saves.
+No deployment or live device command was performed.

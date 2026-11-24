@@ -72,6 +72,8 @@ def decode(frame, identifier, received_at):
             return None
         value = body[at:at+length]
         at += length
+        if tag == 0xe5 and length == 1 and value[0] in (0, 1):
+            event['motion'] = value[0] == 1
         if tag == 0xe4 and length == 2:
             if value[0] in (0, 1):
                 event['charging'] = value[0] == 0
@@ -143,7 +145,7 @@ def send(config, events):
     data = {'identifier': config['identifier'], 'serverUrl': config['serverUrl'], 'sentAt': int(time.time()*1000), 'events': events}
     raw = json.dumps(data, separators=(',', ':')).encode('utf-8')
     signature = hmac.new(config['key'].encode(), raw, hashlib.sha256).hexdigest()
-    request = urllib.request.Request(config['endpoint'], data=raw, method='POST', headers={'Content-Type': 'application/json', 'X-Pejlo-Signature': signature})
+    request = urllib.request.Request(config['endpoint'], data=raw, method='POST', headers={'Content-Type': 'application/json', 'User-Agent': 'PejloStatus/0.8.66', 'Accept': 'application/json', 'X-Pejlo-Signature': signature})
     with urllib.request.build_opener(NoRedirect).open(request, timeout=15) as response:
         if response.status != 200 or json.loads(response.read(4096)).get('ok') is not True:
             raise ValueError('Statusmodtageren afviste svaret.')
@@ -243,7 +245,16 @@ def main():
             parser.error('Tracker-ID skal have 12 eller 20 cifre.')
         print(json.dumps({args.make_key: secrets.token_hex(32)}))
     elif args.configure:
-        configure(args.config)
+        try:
+            configure(args.config)
+        except urllib.error.HTTPError as error:
+            raw = error.read(4096).decode('utf-8', errors='replace')
+            try:
+                message = str(json.loads(raw).get('error', 'Forbindelsen blev afvist.'))[:200]
+            except (ValueError, AttributeError):
+                message = 'Cloudflare afviser klienten (1010).' if '1010' in raw else 'Serveren afviste forbindelsen.'
+            print('Forbindelsestest: HTTP '+str(error.code)+' · '+' '.join(message.split()))
+            raise SystemExit(1)
     else:
         logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
         config = json.loads(Path(args.config).read_text())

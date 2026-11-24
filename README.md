@@ -1,3 +1,7 @@
+# Pejlo 0.8.67
+
+Automatisk anslået hvile fra dvalerapporter, når trackeren er bekræftet påsat og ikke oplader. Ét samlet dagstal, der kan rettes manuelt. Bruger den allerede installerede statuslæser og eksisterende nøgle. Se [versionsnoterne](docs/version-0.8.67.md).
+
 # Pejlo 0.8.66
 
 Seneste dvalerapport kan vises i appen via en separat, læsende statusbro på Traccar-serveren. Kræver én ny Cloudflare-secret og installation af statuslæseren; en almindelig appudgivelse alene giver ikke dvaledata. Se [installation og versionsnoter](docs/version-0.8.66.md).

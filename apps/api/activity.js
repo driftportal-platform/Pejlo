@@ -1,12 +1,13 @@
 import {ensureActivity,removeActivityProfile} from './activity-store.js';
 export {ensureActivity} from './activity-store.js';
 import {activityAccess} from './activity-access.js';
+import {ensureRest,automaticRest} from './rest-store.js';
 import {animalType,activityDates,activityNumber} from '../../packages/shared/activity.js';
 import {danishDate} from '../../packages/shared/history.js';
 
 const fail=(status,message)=>{throw Object.assign(new Error(message),{status});};
-export async function activityAPI({db,uid,query,input,now=Date.now()}){
- const v=input||query,{owner,scope,editable}=await activityAccess(db,uid,v,input);
+export async function activityAPI({db,uid,query,input,source,now=Date.now()}){
+ const v=input||query,{owner,scope,editable,profile}=await activityAccess(db,uid,v,input);
  await ensureActivity(db);
  if(input){
   if(!editable)fail(403,'Du har kun læseadgang til motionshistorikken.');
@@ -14,6 +15,7 @@ export async function activityAPI({db,uid,query,input,now=Date.now()}){
   if(!Number.isSafeInteger(input.revision)||input.revision<0)fail(400,'Hent motionshistorikken igen før gemning.');
   const rev=input.revision;let changed;
   if(input.action==='goal'){
+   if(input.autoRestEnabled!==undefined&&typeof input.autoRestEnabled!=='boolean')fail(400,'Vælg om automatisk hvile skal være slået til.');
    let goal;try{goal=activityNumber(input.goalKm,200,'Kilometermål');}catch(e){fail(400,e.message);}
    if(goal===0)fail(400,'Vælg et mål over 0 km, eller lad feltet være tomt.');
    if(rev===0)changed=await db.prepare('INSERT OR IGNORE INTO pejlo_activity_settings(owner_uid,scope,goal_km,revision) VALUES(?,?,?,1) RETURNING revision').bind(owner,scope,goal).first();
@@ -31,11 +33,15 @@ export async function activityAPI({db,uid,query,input,now=Date.now()}){
    }
   }else fail(400,'Vælg en gyldig motionshandling.');
   if(!changed)fail(409,'Motionsdata er ændret på en anden enhed. Hent historikken igen før du gemmer.');
+  if(input.action==='goal'&&input.autoRestEnabled!==undefined){
+   await ensureRest(db);
+   await db.prepare('INSERT INTO pejlo_rest_settings(owner_uid,scope,enabled) SELECT owner_uid,scope,? FROM pejlo_activity_settings WHERE owner_uid=? AND scope=? AND revision=? ON CONFLICT(owner_uid,scope) DO UPDATE SET enabled=excluded.enabled').bind(input.autoRestEnabled?1:0,owner,scope,changed.revision).run();
+  }
   return {saved:true,revision:changed.revision??0};
  }
  const from=query.from||danishDate(now),to=query.to||from;
  try{activityDates(from,to,now);}catch(e){fail(400,e.message);}
  const settings=await db.prepare('SELECT goal_km,revision FROM pejlo_activity_settings WHERE owner_uid=? AND scope=?').bind(owner,scope).first();
  const entries=await db.prepare('SELECT day,km,rest_hours,note,goal_km,revision,updated_at FROM pejlo_activity_days WHERE owner_uid=? AND scope=? AND day>=? AND day<=? ORDER BY day').bind(owner,scope,from,to).all();
- return {canEdit:editable,settings:settings||{goal_km:null,revision:0},entries:entries.results,from,to};
+ return {canEdit:editable,settings:settings||{goal_km:null,revision:0},entries:entries.results,from,to,...await automaticRest(db,owner,scope,profile,source,from,to,now)};
 }

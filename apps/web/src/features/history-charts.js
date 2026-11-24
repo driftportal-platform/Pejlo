@@ -52,7 +52,7 @@ export function renderActivityOverview(root,rows,goal,today){
  const grid=doc.createElement('div');grid.className='activity-status-grid';root.append(grid);
  for(const item of [
   {title:'Kilometer',value:row?.km,unit:'km',max:target,note:row?.km==null?'Afventer brugbare data':row.source==='manual'?'Manuelt registreret':'GPS-estimat',tail:target==null?'Intet dagligt mål valgt':(row?.day===today?'Dagligt mål: ':'Mål ved registrering: ')+chartNumber(target)+' km',tone:'green'},
-  {title:'Observeret hvile',value:row?.restHours,unit:'timer',max:24,note:'Registreres manuelt · ikke målt søvn',tail:row?.restHours==null?'Ingen hvile registreret':chartNumber(row.restHours)+' af døgnets 24 timer registreret som hvile',tone:'blue'}
+  {title:'Samlet hvile',value:row?.restHours,unit:'timer',max:24,note:'Registreres manuelt · ikke målt søvn',tail:row?.restHours==null?'Ingen hvile registreret':chartNumber(row.restHours)+' af døgnets 24 timer registreret som hvile',tone:'blue'}
  ]){
   const card=doc.createElement('section');card.className='activity-status-card '+item.tone;
   for(const [tag,text] of [['h3',item.title],['strong',known(item.value)?chartNumber(item.value)+' '+item.unit:'Ukendt'],['small',item.note]]){const e=doc.createElement(tag);e.textContent=text;card.append(e);}

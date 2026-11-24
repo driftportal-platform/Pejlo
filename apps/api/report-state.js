@@ -1,4 +1,6 @@
 import {once} from './schema.js';
+import {ensureFamily} from './family.js';
+import {archiveRestReports} from './rest-store.js';
 import {resolveTraccarEnv} from './server-config.js';
 import {traccarOrigin} from './traccar-url.js';
 const kinds=new Set(['sleep_report','position_report','query_report','heartbeat']);
@@ -31,13 +33,16 @@ export async function receiveReportState(request,env,now=Date.now()){
   const battery=e.battery??null,charging=e.charging??null;
   if(battery!==null&&(!Number.isInteger(battery)||battery<0||battery>100))fail(400,'Ugyldigt batteriniveau.');
   if(charging!==null&&typeof charging!=='boolean')fail(400,'Ugyldig strømstatus.');
-  return {kind:e.kind,at:e.receivedAt,battery,charging:charging===null?null:charging?1:0};
+  if(e.motion!=null&&typeof e.motion!=='boolean')fail(400,'Ugyldig bevægelsesstatus.');
+  return {kind:e.kind,at:e.receivedAt,battery,charging:charging===null?null:charging?1:0,motion:e.motion==null?null:e.motion?1:0};
  });
  const active=await resolveTraccarEnv(env);
  if(typeof data.serverUrl!=='string'||data.serverUrl!==traccarOrigin(active))fail(409,'Statuslæseren hører ikke til den aktive Traccar-server.');
  if(!await env.DB.prepare('SELECT identifier FROM trackers WHERE identifier=? AND owner_uid IS NOT NULL').bind(id).first())fail(403,'Trackeren er ikke tilknyttet.');
  await schema(env.DB);
  for(const e of events)await env.DB.prepare('INSERT INTO pejlo_report_state(identifier,source,kind,received_at,battery,charging) VALUES(?,?,?,?,?,?) ON CONFLICT(identifier,source,kind) DO UPDATE SET received_at=excluded.received_at,battery=excluded.battery,charging=excluded.charging WHERE excluded.received_at>received_at').bind(id,active.TRACCAR_SOURCE||'environment',e.kind,e.at,e.battery,e.charging).run();
+ await ensureFamily(env.DB);
+ await archiveRestReports(active,id,events,now);
  return {ok:true};
 }
 
