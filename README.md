@@ -1,3 +1,7 @@
+# Pejlo 0.8.65
+
+Sammenklappelig historik, et hurtigt motions- og hvileoverblik, grafer for kilometer, hvile, batteri og rapporter samt bekræftelse af påsat/taget af på profilen. Se [versionsnoterne](docs/version-0.8.65.md).
+
 # Pejlo 0.8.64
 
 Opladningspunkter for dyreprofiler udelades fra ruter og GPS-kilometer. Originaldata bevares, og Ture har en kontrolvisning med opladningspunkterne. Se [versionsnoterne](docs/version-0.8.64.md).

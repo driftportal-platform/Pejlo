@@ -1,3 +1,4 @@
+import {updateAttachment,attachmentText} from './shared/attachment.js';
 import {createD1StateAdapter} from './features/d1-state.js';
 import {createActivity} from './features/activity.js';
 import {createBatteryControls} from './features/battery-controls.js';
@@ -1339,7 +1340,7 @@ function refresh(){
 
 
 
-  $('#profile-name').value=p.name;$('#profile-type').value=p.type;$('#profile-device').value=p.deviceLabel;updateTrackerStatus();
+  $('#profile-attachment').value=p.attachment?.state||'unknown';$('#profile-attachment-label').textContent='Er trackeren påsat '+p.name+'?';$('#profile-attachment-status').textContent=attachmentText(p);$('#profile-name').value=p.name;$('#profile-type').value=p.type;$('#profile-device').value=p.deviceLabel;updateTrackerStatus();
 
 
 
@@ -1869,7 +1870,7 @@ $('#wifi-reset').onclick=async()=>{
 
 
 
-$('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();const macValues=$('#profile-home-wifi').value.split(',').map(v=>v.trim()).filter(Boolean);if(macValues.length>16||macValues.some(v=>!normalizeMac(v)))return toast('Skriv gyldige Wi-Fi-adresser adskilt med komma, højst 16.');const nextMacs=[...new Set(macValues.map(normalizeMac))];const previousWifi=cleanWifiConfig(selected().homeWifi);const changedWifi=JSON.stringify([...previousWifi.macs].sort())!==JSON.stringify([...nextMacs].sort())||selected().trackerId!==$('#profile-tracker').value;const nextWifi=cleanWifiConfig({macs:nextMacs,samples:changedWifi?[]:previousWifi.samples});if(!name)return toast('Skriv et navn.');if(family.has(selected().trackerId)&&selected().trackerId!==$('#profile-tracker').value)return toast('Fjern først profilen for at skifte tracker.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{homeWifi:nextWifi,name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});if(await persist()){refresh();wifiDiscovery.saved();toast('Profil gemt. Navn, ikon og hjemmets Wi-Fi er opdateret.');}};
+$('#profile-form').onsubmit=async e=>{e.preventDefault();const name=$('#profile-name').value.trim();const macValues=$('#profile-home-wifi').value.split(',').map(v=>v.trim()).filter(Boolean);if(macValues.length>16||macValues.some(v=>!normalizeMac(v)))return toast('Skriv gyldige Wi-Fi-adresser adskilt med komma, højst 16.');const nextMacs=[...new Set(macValues.map(normalizeMac))];const previousWifi=cleanWifiConfig(selected().homeWifi);const changedWifi=JSON.stringify([...previousWifi.macs].sort())!==JSON.stringify([...nextMacs].sort())||selected().trackerId!==$('#profile-tracker').value;const nextWifi=cleanWifiConfig({macs:nextMacs,samples:changedWifi?[]:previousWifi.samples});if(!name)return toast('Skriv et navn.');if(family.has(selected().trackerId)&&selected().trackerId!==$('#profile-tracker').value)return toast('Fjern først profilen for at skifte tracker.');if(selected().trackerId&&selected().trackerId!==$('#profile-tracker').value&&selected().geofenceEnabled){try{await saveFence({...selected(),geofenceEnabled:false});}catch{return;}selected().geofenceEnabled=false;}Object.assign(selected(),{attachment:updateAttachment(selected().type===$('#profile-type').value?selected().attachment:null,$('#profile-attachment').value,$('#profile-tracker').value),homeWifi:nextWifi,name,type:$('#profile-type').value,deviceLabel:$('#profile-device').value.trim(),trackerId:$('#profile-tracker').value});if(await persist()){refresh();wifiDiscovery.saved();toast('Profil gemt. Navn, ikon og hjemmets Wi-Fi er opdateret.');}};
 
 
 

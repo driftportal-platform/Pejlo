@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.64
+# Pejlo brugervejledning til version 0.8.65
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -98,3 +98,15 @@ For kat, hund, hest og andet dyr udelades historiske punkter, hvor trackeren udt
 Under Ture kan du vælge Vis også punkter under opladning (kontrolvisning). Her kan GPS-udsving under opladning igen ses og indgå i den viste rutedistance. Motionsoversigten udelader dem fortsat. Valget nulstilles ved rydning eller profilskift. De oprindelige Traccar-data slettes ikke. Eksisterende GPS-dagstal genberegnes ved næste hentning, fordi beregningsmetoden er opdateret.
 
 Historiske fejl i enhedens tidszone rettes ikke af dette filter. Punkter uden registreret opladning kan derfor stadig ligge på et forkert tidspunkt.
+
+## Hurtigt overblik og grafer fra 0.8.65
+
+Motion og hvile viser to kompakte statusfelter: kilometer mod dit valgte mål og registrerede hviletimer ud af døgnets 24 timer. Uden målinger vises Ukendt; et tomt felt bliver ikke til nul. Ved en historisk periode vises den sidste dag i perioden og dens gemte mål, hvis der findes et. Den valgte profils navn bruges automatisk.
+
+Tryk på en overskrift med plus for at åbne grafer, mål, dagsregistreringer, dagstal, rutehistorik eller alarmarkiv. Tryk igen for at lukke. Registrering og kontrol af dagstal virker stadig, når felterne åbnes. Rediger på en dagsrække åbner automatisk dagsregistreringen. Graferne kan åbnes uden at vise alle dagstabeller; tryk i grafen for at læse den nærmeste værdi. Ukendte dage er markeret med en streg. Tastaturfokus kan også læse datapunkterne.
+
+Batterigrafen findes under Indstillinger → Tracker → Batterigraf, målinger og kommandolog. Historikken hentes, når feltet åbnes. Vælg 24 timer eller syv dage; orange målepunkter viser opladning. Rapportgraf og måletabel samt kommandolog åbnes hver for sig. Huller i batterimålingerne forbindes ikke af grafen. Det er rapporteret batteriniveau, ikke målt strømforbrug.
+
+Under Profil kan du markere, om trackeren er påsat dyret/genstanden, taget af eller ukendt. Gem profilen for at bekræfte. Tidspunktet gemmes med trackerens ID, og bekræftelsen nulstilles ved trackerskift. Valget beskriver den aktuelle brug; det er ikke en fuld historik over på- og aftagning og omskriver ikke gamle hviletal.
+
+Hvile redigeres fortsat som dagens samlede tal; en rettelse erstatter den tidligere registrering. Automatisk hvile fra dvalerapporter er ikke aktiv i 0.8.65. Den nuværende Traccar-dekoder gemmer Loui-trackerens korte 0210-pakke som batteri og tid uden særskilt dvalefelt. Online-status, manglende GPS og en bekræftet påsat tracker er derfor ikke i sig selv tilstrækkeligt til automatisk hviletid. Når dvaledata er tilgængelige, er det ønskede princip ét redigerbart dagstal med et automatisk estimat som udgangspunkt og en manuel rettelse som erstatning.

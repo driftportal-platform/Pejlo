@@ -1,5 +1,7 @@
+import {attachmentText} from '../shared/attachment.js';
 import {animalType,activityAdvice,activityDates,mergeActivity,activityCsv} from '../shared/activity.js';
 import {danishDate} from '../shared/history.js';
+import {renderActivityOverview,renderHistoryChart,shortDay} from './history-charts.js';
 
 export function createActivity({root,selected,request,notice,scope=()=>''}){
  const q=s=>root.querySelector('[data-activity-'+s+']'),doc=root.ownerDocument;
@@ -11,9 +13,10 @@ export function createActivity({root,selected,request,notice,scope=()=>''}){
  const day=()=>q('day').value;
  const range=()=>({from:q('from').value,to:q('to').value});
  function disabled(){for(const s of ['day-fields','goal-fields'])q(s).disabled=!loaded||busy||!model?.canEdit;q('gps').disabled=!loaded||busy||gpsBusy||!selected()?.trackerId;q('load').disabled=busy;q('export').disabled=!loaded||busy||gpsBusy;}
- function clear(){generation++;gpsGeneration++;gpsBusy=false;gpsState='idle';key=null;busy=false;loaded=false;model=null;gps=[];root.hidden=true;q('rows').replaceChildren();q('status').textContent='';q('gps-status').textContent='';q('summary').textContent='';q('progress').textContent='';q('km').value='';q('rest').value='';q('note').value='';disabled();}
+ function clearCharts(){if(q('attachment'))q('attachment').textContent='';for(const s of ['overview','km-chart','rest-chart'])q(s)?.replaceChildren();}
+ function clear(){generation++;gpsGeneration++;gpsBusy=false;gpsState='idle';key=null;busy=false;loaded=false;model=null;gps=[];root.hidden=true;clearCharts();for(const detail of root.querySelectorAll?.('details')||[])detail.open=false;q('rows').replaceChildren();q('status').textContent='';q('gps-status').textContent='';q('summary').textContent='';q('progress').textContent='';q('km').value='';q('rest').value='';q('note').value='';disabled();}
  function sync(){
-  const next=context();if(next)q('title').textContent='Motion og hvile for '+selected().name;if(next===key)return;
+  const next=context();if(next){q('title').textContent='Motion og hvile for '+selected().name;if(q('attachment'))q('attachment').textContent=attachmentText(selected());}if(next===key)return;
   clear();key=next;if(!next)return;root.hidden=false;q('title').textContent='Motion og hvile for '+selected().name;
   const advice=activityAdvice(selected().type);q('advice').textContent=advice.text;q('source').hidden=!advice.url;
   if(advice.url){q('source').href=advice.url;q('source').textContent=advice.label;}else q('source').removeAttribute('href');
@@ -33,16 +36,19 @@ export function createActivity({root,selected,request,notice,scope=()=>''}){
    if(r.km!==null){total+=r.km;known++;}if(r.restHours!==null){rest+=r.restHours;restDays++;}
    const tr=doc.createElement('tr');
    for(const text of [r.day.split('-').reverse().join('.'),num(r.manualKm),num(r.gpsKm),r.restHours===null?'—':num(r.restHours)+' t',r.quietMinutes===null?'—':num(r.quietMinutes)+' min',r.coverageMinutes===null?'—':num(r.coverageMinutes)+' min',num(r.goalKm),r.note]){const td=doc.createElement('td');td.textContent=text;tr.append(td);}
-   const cell=doc.createElement('td'),button=doc.createElement('button');button.type='button';button.className='text-button';button.textContent=model.canEdit?'Rediger':'Vis';button.onclick=()=>{q('day').value=r.day;editDay();q('day').focus();};cell.append(button);tr.append(cell);q('rows').append(tr);
+   const cell=doc.createElement('td'),button=doc.createElement('button');button.type='button';button.className='text-button';button.textContent=model.canEdit?'Rediger':'Vis';button.onclick=()=>{q('day').value=r.day;editDay();if(q('entry-details'))q('entry-details').open=true;q('day').focus();};cell.append(button);tr.append(cell);q('rows').append(tr);
   }
   q('summary').textContent=known?'Distance i perioden: '+num(total)+' km fordelt på '+known+' dage med data. Manuelle dagstotaler har forrang over GPS-estimater.':!selected()?.trackerId?'Ingen manuelle kilometer registreret i perioden.':gpsState==='loading'?'Henter GPS-afstand. Ingen manuelle kilometer registreret.':gpsState==='failed'?'GPS-afstand kunne ikke hentes. Ingen manuelle kilometer registreret.':gpsState==='ready'?'Ingen brugbare GPS-intervaller eller manuelle kilometer i perioden.':'GPS-afstand er endnu ikke hentet. Ingen manuelle kilometer registreret.';
   if(restDays)q('summary').textContent+=' Registreret hvile: '+num(rest)+' timer fordelt på '+restDays+' dage.';
   const goal=model.settings.goal_km,today=rows.find(r=>r.day===danishDate());
+  renderActivityOverview(q('overview'),rows,goal,danishDate());if(q('attachment'))q('attachment').textContent=attachmentText(selected());
+  renderHistoryChart(q('km-chart'),{title:'Kilometer pr. dag',labels:rows.map(r=>shortDay(r.day)),values:rows.map(r=>r.km),unit:'km',notes:rows.map(r=>r.source==='manual'?'Manuelt registreret':r.source==='gps'?'GPS-estimat':'')});
+  renderHistoryChart(q('rest-chart'),{title:'Observeret hvile pr. dag',labels:rows.map(r=>shortDay(r.day)),values:rows.map(r=>r.restHours),unit:'timer',max:24,tone:'blue',notes:rows.map(()=> 'Manuelt registreret · ikke målt søvn')});
   q('progress').textContent=goal==null?'Intet dagligt kilometermål valgt.':today?.km!=null?'I dag: '+num(today.km)+' af '+num(goal)+' km ('+Math.round(today.km/goal*100)+' %). '+(today.source==='gps'?'GPS-estimat.':'Manuelt registreret.'):'Dit nuværende daglige mål er '+num(goal)+' km. Ingen distance for i dag i den viste periode.';
   if(resetForm){q('goal').value=goal??'';editDay();}disabled();
  }
  async function load(){
-  sync();if(!key||busy)return;const gen=generation,id=key;gpsGeneration++;gpsBusy=false;gpsState='idle';busy=true;loaded=false;disabled();q('rows').replaceChildren();q('summary').textContent='';q('progress').textContent='';q('gps-status').textContent='';q('status').textContent='Henter motionshistorik…';
+  sync();if(!key||busy)return;const gen=generation,id=key;gpsGeneration++;gpsBusy=false;gpsState='idle';busy=true;loaded=false;clearCharts();disabled();q('rows').replaceChildren();q('summary').textContent='';q('progress').textContent='';q('gps-status').textContent='';q('status').textContent='Henter motionshistorik…';
   try{
    const {from,to}=range();activityDates(from,to);const result=await request('activity?'+new URLSearchParams({...identity(),from,to}));
    if(gen!==generation||context()!==id)return;

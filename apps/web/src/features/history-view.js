@@ -36,6 +36,7 @@ export function createHistoryView({request,selected,layer,key,notice}){
  $('#history-today').onclick=()=>{$('#history-from').value=$('#history-to').value=danishDate();load();};
  $('#history-yesterday').onclick=()=>{const day=new Date(Date.parse(danishDate())-86400000).toISOString().slice(0,10);$('#history-from').value=$('#history-to').value=day;load();};
  $('#history-charging').onchange=()=>load();
+ $('#route-history')?.addEventListener?.('toggle',()=>{if($('#route-history').open&&value){map?.resize?.();map?.fit(value.profile,{route:value.analysis.points,position:null});}});
  $('#history-slider').oninput=()=>{stop();point();};
  $('#history-play').onclick=()=>{if(timer){stop();return;}if(!value?.analysis.points.length)return notice('Hent først en periode med GPS-punkter.');if(+$('#history-slider').value>=+$('#history-slider').max)$('#history-slider').value=0;$('#history-play').textContent='Pause';timer=setInterval(()=>{const n=+$('#history-slider').value+1;if(n>+$('#history-slider').max){stop();return;}$('#history-slider').value=n;point();},500);};
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});

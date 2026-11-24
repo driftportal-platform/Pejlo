@@ -58,6 +58,7 @@ export function createMap(id, {notice, onHome, onManual, onTracker} = {}) {
       if(p.homeConfirmed&&showRings)for(const radius of [100,250,500])L.circle([p.home.lat,p.home.lon],{radius,color:'#7c8792',weight:1,fill:false,dashArray:'2 6'}).addTo(homeLayer).bindTooltip(radius+' m fra hjem');
       if(showHome&&p.homeConfirmed){L.marker([p.home.lat,p.home.lon],{icon:markerIcon('home','home-marker'),title:'Fast udgangspunkt'}).addTo(homeLayer);(p.home.shape==='polygon'?L.polygon(p.home.points.map(v=>[v.lat,v.lon]),{color:'#8ba16f',weight:2,fillOpacity:.13}):L.circle([p.home.lat,p.home.lon],{radius:p.home.radius,color:'#8ba16f',weight:1,fillOpacity:.13})).addTo(homeLayer);}
     },
+    resize(){map.invalidateSize();},
     fit(p,data) {if(!p||!data)return;map.invalidateSize();map.fitBounds(L.latLngBounds([...data.route.map(p=>[p.lat,p.lon]),...(data.position?[[data.position.lat,data.position.lon]]:[]),[p.home.lat,p.home.lon],...(p.homeConfirmed&&p.home.shape==='polygon'?p.home.points.map(v=>[v.lat,v.lon]):[])]),{padding:[45,65],maxZoom:17});},
     fitRoute(route){
       const points=routeAnalysis(route).segments.flat().map(p=>[p.lat,p.lon]);
