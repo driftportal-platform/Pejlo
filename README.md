@@ -1,3 +1,7 @@
+# Pejlo 0.8.58
+
+Hurtig Wi-Fi-opsætning samler og gemmer tre indemålinger og tre udemålinger automatisk. Allerede valgte hjemmepunkter genbruges. Nye punkter foreslås og bekræftes én gang. Genvej fra Wi-Fi-kortet og tydeligere skelnen mellem gemte punkter og manglende scanning. Se [versionsnoterne](docs/version-0.8.58.md).
+
 # Pejlo 0.8.57
 
 Automatisk batterisparetilstand ud fra indlært Wi-Fi og tidsbegrænset Find i 5/15 minutter. Serveren håndterer tilbagevending, også med lukket app. Aktiveres kun af ejeren; upload ændrer ingen trackerindstilling. GPS-dvale er fortsat ikke aktiveret. Se [versionsnoter](docs/version-0.8.57.md) og [batteristyring og kommandoer](docs/batteri-og-kommandoer.md).

@@ -1,6 +1,6 @@
 # Batteristyring og kommandoer
 
-Pejlo 0.8.57. Opdateret 24. november 2026. Kommandoerne her er knyttet til den afprøvede Q8_H med JT808-id 080608317309. De må ikke kopieres til andre tracker-id'er.
+Pejlo 0.8.58. Opdateret 24. november 2026. Kommandoerne her er knyttet til den afprøvede Q8_H med JT808-id 080608317309. De må ikke kopieres til andre tracker-id'er.
 
 ## Funktioner i appen
 
@@ -8,7 +8,7 @@ Under Indstillinger → Tracker → Batteri og opdateringer kan ejeren vælge De
 
 Knapperne ændrer ikke noget ved åbning af siden. Appen sender F115 som en raw JT808 custom-kommando med Ingen kø og en serverberegnet checksum. Kun ejer og eksplicit godkendte trackere har skriveadgang. Offline trackere afvises, og der skal gå mindst 60 sekunder mellem afsendelser. Traccars HTTP-svar er ikke en kvittering fra trackeren. Sidst ønsket interval og afsendelsesstatus vises; appen hævder ikke at have læst det aktive interval tilbage.
 
-Automatik aktiveres med Gem automatik. Det kræver mindst tre gemte inde- og tre udemålinger af de valgte Wi-Fi-punkter under Profil. Serveren vælger 120 sekunder efter tre forskellige friske indendørsmønstre over mindst to minutter. Målinger må højst være to minutter gamle; en pause på mere end tre minutter nulstiller serien. Ude, manglende eller usikre signaler giver 60 sekunder. Et indendørsmønster beviser ikke, at Loui er inde. Automatik er en afprøvning og starter ikke ved upload.
+Automatik aktiveres med Gem automatik. Det kræver mindst tre gemte inde- og tre udemålinger af de valgte Wi-Fi-punkter under Profil. Fra 0.8.58 samler Hurtig Wi-Fi-opsætning disse automatisk, efter at brugeren har startet hver del. Allerede valgte punkter genbruges; nye punkter bekræftes én gang. Serveren vælger 120 sekunder efter tre forskellige friske indendørsmønstre over mindst to minutter. Målinger må højst være to minutter gamle; en pause på mere end tre minutter nulstiller serien. Ude, manglende eller usikre signaler giver 60 sekunder. Et indendørsmønster beviser ikke, at Loui er inde. Automatik er en afprøvning og starter ikke ved upload.
 
 Find-knappen i batteriafsnittet vælger 30 sekunder i 5 eller 15 minutter. Ved udløb vender serveren tilbage til automatik eller det tidligere manuelle interval (60 hvis intet var registreret). Afslut Find nu fremskynder tilbagevendingen. Serverens minutkontrol virker med lukket app. Offline udsætter tilbagevendingen til forbindelse igen; kø bruges ikke. Mindst ét minut mellem kommandoer gælder også her. Manuelt intervalvalg slår automatik og Find fra. En uafklaret afsendelse gentages ikke blindt: kontrollér log og interval, og vælg derefter manuelt. Udløb af Find kan stadig forsøge det normale interval én gang, selv om Find-afsendelsen var uafklaret. Hent seneste intervalønske opdaterer status.
 

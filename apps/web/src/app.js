@@ -1,5 +1,6 @@
 import {createBatteryControls} from './features/battery-controls.js';
-import {wifiDisplay} from './shared/wifi-history.js';
+import {wifiDisplay,wifiCardText} from './shared/wifi-history.js';
+import {createWifiSetupGuide} from './features/wifi-setup.js';
 
 import {createServerStatus} from './features/server-status.js';
 
@@ -358,6 +359,27 @@ const wifiDiscovery=createWifiDiscovery({root:$('#wifi-discovery'),selected,data
 
 
 
+const wifiSetup=createWifiSetupGuide({root:$('#wifi-setup'),selected,data,
+ canEdit:()=>!!trackerUser&&family.get(selected()?.trackerId)?.role!=='viewer',
+ ready:()=>familyReady&&!familyLoading&&!familySaving&&!wifiSaving&&!settingsDirty&&$('#profile-tracker').value===selected()?.trackerId,
+ scope:()=>sessionGeneration,save:saveWifiSetup,notice:toast});
+
+async function saveWifiSetup(next,expected){
+ const p=selected(),gen=sessionGeneration;
+ if(!p||p.id!==expected.profileId||p.trackerId!==expected.trackerId||settingsDirty||wifiSaving)throw Error('Profilen er ændret. Start Wi-Fi-opsætningen igen.');
+ if(JSON.stringify(cleanWifiConfig(p.homeWifi))!==expected.expected)throw Error('Wi-Fi-indstillingerne er ændret. Start guiden igen.');
+ const candidate=structuredClone(p);candidate.homeWifi=next;wifiSaving=true;
+ try{
+  await saveFamilyProfile(candidate);
+  if(gen!==sessionGeneration||selected()?.id!==expected.profileId||selected()?.trackerId!==expected.trackerId)throw Error('Konto eller profil er skiftet.');
+  const target=state.profiles.find(v=>v.id===expected.profileId&&v.trackerId===expected.trackerId);
+  if(!target)throw Error('Profilen findes ikke længere.');
+  target.homeWifi=cleanWifiConfig(next);
+  // The shared profile is canonical and persists in D1, including across login/device changes.
+  refresh();
+ }finally{if(gen===sessionGeneration)wifiSaving=false;}
+}
+
 const handoff=createHandoff({request:trackerRequest,identifier:()=>trackerUser&&selected()?.trackerId||null,
 
 
@@ -646,13 +668,10 @@ function updatePositionRequest(){
 
 
 
- $('#signal-wifi [data-wifi-value]').textContent=strongest?(wifi.historical?'Sidst målt: ':'')+strongest.rssi+' dBm':'Afventer Wi-Fi-måling';
-
-
-
- $('#signal-wifi [data-wifi-note]').textContent=(!wifi.config.macs.length?'Vælg hjemmets Wi-Fi under Indstillinger':wifi.points.length+' af '+wifi.config.macs.length+' valgte punkter')+(!wifi.fresh?(wifi.historical?' · målt '+ageText(wifi.at)+' · afventer ny måling':' · afventer frisk måling'):' · vejledende signalstyrke');
-
-
+ const wifiText=wifiCardText(wifi,ageText);
+ $('#signal-wifi [data-wifi-value]').textContent=wifiText.value;
+ $('#signal-wifi [data-wifi-note]').textContent=wifiText.note;
+ $('#wifi-setup-open').hidden=!identifier||!trackerUser||family.get(identifier)?.role==='viewer';
 
  $('#signal-wifi').querySelectorAll('.signal-bars i').forEach((bar,i)=>bar.classList.toggle('is-filled',i<wifiLevel));
 
@@ -1215,7 +1234,7 @@ function refresh(){
 
 
 
-  if(empty)wifiDiscovery.clear();
+  if(empty){wifiDiscovery.clear();wifiSetup.clear();}
 
 
 
@@ -1415,7 +1434,7 @@ function updateAge(){
 
 
 
- wifiDiscovery.update();
+ wifiDiscovery.update();wifiSetup.update();
 
 
 
@@ -1715,7 +1734,7 @@ overviewMap=createMap('map',{notice:toast,onManual:()=>{$('#follow-tracker').che
 
 
 
-$('#profile-select').onchange=e=>{wifiDiscovery.clear();settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
+$('#profile-select').onchange=e=>{wifiDiscovery.clear();wifiSetup.clear();settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
 
 
 
@@ -1764,6 +1783,8 @@ $('#fit-route').onclick=()=>{
 
 
 $('#find').onclick=()=>go('soeg');
+
+$('#wifi-setup-open').onclick=()=>{trackerDetails.close();go('indstillinger','profil');$('#wifi-setup').scrollIntoView({behavior:'smooth',block:'start'});};
 
 
 
@@ -2731,7 +2752,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&trackerUs
 
 
 
-for(const form of ['profile-form','home-form'])for(const event of ['input','change'])$('#'+form).addEventListener(event,()=>{settingsDirty=true;});
+for(const form of ['profile-form','home-form'])for(const event of ['input','change'])$('#'+form).addEventListener(event,e=>{if(!e.target.closest('#wifi-setup,#wifi-discovery'))settingsDirty=true;});
 
 
 

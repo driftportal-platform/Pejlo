@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.57
+# Pejlo brugervejledning til version 0.8.58
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -24,6 +24,20 @@ Ejeren inviterer en anden bekræftet e-mail og vælger læse- eller redigeringsr
 
 På /admin/ administreres kunder, aftaler og tilladelse til mobilplacering. Under Traccar-forbindelse testes og aktiveres serveren for hele Pejlo. Se den tekniske driftsvejledning før IP- eller serverskift. Gem nøgler i en privat kopi af dens register.
 
+
+## Hurtig Wi-Fi-opsætning i 0.8.58
+
+Åbn Indstillinger → Profil → Hjemmets Wi-Fi, eller brug Åbn Wi-Fi-opsætning på Wi-Fi-kortet i trackerdetaljerne.
+
+1. Læg trackeren inde og tryk Start – trackeren er inde. Flyt den gerne mellem et par rum, mens appen er åben. Guiden tæller tre nye, forskellige scanninger og gemmer dem automatisk.
+2. Har du allerede valgt hjemmets punkter, genbruges de. Ellers foreslås op til tre punkter, der var med i alle tre scanninger og havde et gennemsnit på mindst -75 dBm. Bekræft hjemmets punkter én gang; fjern eventuelle nabopunkter. Signalstyrken alene kan ikke afgøre ejerskab. Der bruges ingen adgangskode.
+3. Når indemålingerne er gemt, flyttes trackeren udenfor nær huset. Tryk Trackeren er nu ude. Guiden gemmer de næste tre passende scanninger automatisk.
+
+Der er mindst 20 sekunder mellem accepterede målinger. Den faktiske varighed afhænger af, hvornår trackeren sender Wi-Fi-data. GPS- og mobilkontakt kan godt være friske, mens Wi-Fi-scanning mangler. Der sendes ingen ny kommando til at tvinge en scanning. Et enkelt manglende eller gammelt signal bliver ikke tolket som udendørs ophold.
+
+Hold appen åben. En ufærdig måleserie holdes kun i hukommelsen, og indsamlingen standser efter 15 minutter pr. del. Allerede gemte indemålinger bevares, og Fortsæt – trackeren er nu ude kan bruges ved genåbning. Gemmefejl kræver Prøv gemning igen. Hvis de gemte inde/ude-mønstre ligner hinanden, viser guiden det og foreslår at gentage med et andet sted udenfor. Manuel opsætning og ekstra målinger findes i det sammenfoldelige afsnit nedenunder.
+
+Genopsætning erstatter den gamle indlæring: først med den nye inde-del, senere med begge dele. Batteriautomatik vurderer derfor usikkert, indtil begge dele er gemt og et aktuelt signal kan skelnes. Guiden slår ikke batteriautomatik til; det sker særskilt under Tracker.
 
 ## Batteri og opdateringer i 0.8.57
 

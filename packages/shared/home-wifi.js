@@ -31,11 +31,11 @@ export function wifiObservation(data,config,now=Date.now()){
 }
 export function homeWifiStatus(data,config,now=Date.now()){
  const o=wifiObservation(data,config,now),base={...o,label:'Usikkert',kind:'unknown'};
- if(!o.config.macs.length)return {...base,note:'Tilføj hjemmets Wi-Fi-adresser under Indstillinger.'};
+ if(!o.config.macs.length)return {...base,note:'Brug Hurtig Wi-Fi-opsætning under Indstillinger → Profil.'};
  if(!o.fresh)return {...base,note:'Afventer en frisk Wi-Fi-måling fra en online tracker.'};
  if(!o.points.length)return {...base,note:'Hjemmets Wi-Fi er ikke registreret i denne måling. Det beviser ikke, at trackeren er udenfor.'};
  const inside=o.config.samples.filter(s=>s.label==='inside'),outside=o.config.samples.filter(s=>s.label==='outside');
- if(inside.length<3||outside.length<3)return {...base,note:'Hjemmets Wi-Fi registreret. Gem mindst tre målinger inde og tre ude for at lære signalmønstret.'};
+ if(inside.length<3||outside.length<3)return {...base,note:'Hjemmets Wi-Fi registreret. Hurtig Wi-Fi-opsætning samler og gemmer tre målinger inde og tre ude for dig.'};
  // Require comparable fingerprints: missing access points must not imply being outside.
  const score=s=>{
   const shared=o.points.flatMap(p=>{const q=s.points.find(q=>q.mac===p.mac);return q?[Math.abs(p.rssi-q.rssi)]:[];});
@@ -53,3 +53,4 @@ export function addWifiSample(config,data,label,now=Date.now()){
  if(o.config.samples.some(s=>Math.abs(s.at-o.at)<20000))throw Error('Vent på en ny Wi-Fi-måling, mindst 20 sekunder efter den senest gemte.');
  return cleanWifiConfig({...o.config,samples:[...o.config.samples,{label,at:o.at,points:o.points}]});
 }
+
