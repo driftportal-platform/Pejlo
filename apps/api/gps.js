@@ -61,7 +61,7 @@ export function gpsPoint(raw){
  const timestamp=Date.parse(raw?.fixTime);
  if(raw?.attributes?.approximate===true||raw?.outdated===true)return null;
  if((raw?.latitude===0&&raw?.longitude===0)||raw?.valid!==true||!validPoint({lat:raw.latitude,lon:raw.longitude})||!Number.isFinite(timestamp)||timestamp>Date.now()+60000)return null;
- return {lat:raw.latitude,lon:raw.longitude,timestamp,accuracy:Number.isFinite(raw.accuracy)&&raw.accuracy>0?raw.accuracy:null,battery:batteryLevel(raw),valid:true};
+  return {lat:raw.latitude,lon:raw.longitude,timestamp,accuracy:Number.isFinite(raw.accuracy)&&raw.accuracy>0?raw.accuracy:null,battery:batteryLevel(raw),valid:true,charging:typeof raw.attributes?.charge==='boolean'?raw.attributes.charge:null};
 }
 
 export function approximatePoint(raw,now=Date.now()){

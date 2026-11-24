@@ -1,3 +1,4 @@
+import {chargingHistory} from '../../packages/shared/charging-history.js';
 import {accountStateAPI,legacyAccount} from './account-state.js';
 import {activityGpsAPI} from './activity-gps.js';
 import {activityAPI} from './activity.js';
@@ -548,7 +549,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
 
-  let route=[],historyAvailable=true,historyTruncated=false;
+  let route=[],chargingReports=[],historyAvailable=true,historyTruncated=false;
 
   if(url.searchParams.get('live')!=='1')try{
 
@@ -556,6 +557,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
    if(!Array.isArray(points))throw new Error();
 
+   chargingReports=points.filter(p=>p.deviceId===device.id&&p.attributes?.charge===true).map(p=>({timestamp:Date.parse(p.fixTime),charging:true})).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime());
    route=points.filter(p=>p.deviceId===device.id).map(point).filter(p=>p&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime()).sort((a,b)=>a.timestamp-b.timestamp);historyTruncated=route.length>10000;route=route.slice(-10000);
 
   }catch{historyAvailable=false;}
@@ -600,13 +602,15 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   }
 
-  const position=gps.trusted||null;route=filtered.points;
+  const position=gps.trusted||null;
+  const charging=chargingHistory(filtered.points,type,chargingReports),includeCharging=url.searchParams.get('includeCharging')==='1';
+  route=includeCharging?filtered.points:charging.points;
 
   const mobileLocationEnabled=await locationEnabled(env.DB,uid);
 
   const approximatePosition=mobileLocationEnabled?approximatePoint(raw):null;
 
-  return json({source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
 
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 

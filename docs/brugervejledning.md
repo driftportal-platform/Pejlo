@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.62
+# Pejlo brugervejledning til version 0.8.64
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -90,3 +90,11 @@ Profiler kontrolleres hvert minut, mens appen er synlig. Uændrede profiler over
 GPS-oversigten under Motion og hvile bruger dagstal beregnet på serveren. Tallene gemmes i D1 og genbruges; selve ruten behøver ikke blive sendt til telefonen. I dag opdateres efter højst cirka to minutters genbrug, afsluttede dage efter et døgn ved næste hentning. Ved dansk midnat genberegnes den afsluttede dag, selv om seneste hentning var kort før midnat. Ændring af server, dyretype eller hjemmeområde gør de gamle beregninger forældede. Der beregnes ved åbning/hentning af motionsoversigten, ikke via en ny baggrundsplan.
 
 Afstand, brugbar GPS-dækning og GPS-ro er forskellige tal. Manglende punkter er ukendte, ikke nul motion eller hvile. Observeret hvile registreres fortsat manuelt. Automatisk normalniveau og adfærdsadvarsler er ikke aktiveret i denne version.
+
+## Opladning og ruter fra 0.8.64
+
+For kat, hund, hest og andet dyr udelades historiske punkter, hvor trackeren udtrykkeligt rapporterer opladning. Ruten forbindes ikke hen over opladningen, og punkterne tæller ikke som GPS-kilometer, GPS-dækning eller GPS-ro. Opladning er heller ikke målt hvile for dyret. Manglende opladningsstatus eller 100 procent batteri alene er ikke nok til at udelade et punkt. Bil, cykel og genstande beholder deres punkter.
+
+Under Ture kan du vælge Vis også punkter under opladning (kontrolvisning). Her kan GPS-udsving under opladning igen ses og indgå i den viste rutedistance. Motionsoversigten udelader dem fortsat. Valget nulstilles ved rydning eller profilskift. De oprindelige Traccar-data slettes ikke. Eksisterende GPS-dagstal genberegnes ved næste hentning, fordi beregningsmetoden er opdateret.
+
+Historiske fejl i enhedens tidszone rettes ikke af dette filter. Punkter uden registreret opladning kan derfor stadig ligge på et forkert tidspunkt.

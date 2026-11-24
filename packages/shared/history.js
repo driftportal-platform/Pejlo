@@ -24,8 +24,8 @@ export function routeAnalysis(points){
    const dt=(p.timestamp-last.timestamp)/1000,d=distance(last,p);
    if(dt<=0){rejected++;continue;}
    // A broad ceiling fits pets, bicycles and cars. It is not a measured trip distance.
-   if(dt<=600&&d/dt>70){rejected++;continue;}
-   if(dt>600){if(segment.length)segments.push(segment);gaps.push({from:last.timestamp,to:p.timestamp});segment=[];}
+   if(dt<=600&&!p.breakBefore&&d/dt>70){rejected++;continue;}
+   if(dt>600||p.breakBefore){if(segment.length)segments.push(segment);gaps.push({from:last.timestamp,to:p.timestamp,...(p.breakBefore?{reason:'charging'}:{})});segment=[];}
    else if(d>=5)meters+=d;
   }
   segment.push(p);accepted.push(p);
@@ -33,3 +33,4 @@ export function routeAnalysis(points){
  if(segment.length)segments.push(segment);
  return {segments,gaps,points:accepted,meters,rejected};
 }
+

@@ -18,6 +18,39 @@ async function fixture(){
  return {db,raw,profile,query,api,get calls(){return calls;},set points(v){points=v;},set broken(v){broken=v;}};
 }
 const point=(time,latitude=56.5,extra={})=>({deviceId:7,fixTime:time,latitude,longitude:8.3,valid:true,attributes:{},...extra});
+
+test('cached pet summaries recalculate under the charging algorithm and never count charging as rest',async()=>{
+ const f=await fixture();
+ f.points=[point('2026-11-23T10:00:00Z'),point('2026-11-23T10:02:00Z',56.5003,{attributes:{charge:true}}),point('2026-11-23T10:04:00Z',56.5006)];
+ const a=await f.api();assert.equal(a.days[0].km,null);assert.equal(a.days[0].observedMinutes,0);assert.equal(a.days[0].quietMinutes,0);assert.equal(a.chargingExcluded,1);
+ assert.equal((await f.api()).chargingExcluded,1);assert.equal(f.calls,1);
+ f.raw.prepare("UPDATE pejlo_activity_gps SET context=replace(context,'[3,','[2,')").run();
+ const b=await f.api();assert.equal(f.calls,2);assert.equal(b.cachedDays,0);assert.equal(b.chargingExcluded,1);
+});
+
+test('unusable charging fixes still prevent false activity coverage across the charging interval',async()=>{
+ const f=await fixture();f.points=[point('2026-11-23T10:00:00Z'),point('2026-11-23T10:02:00Z',56.5,{valid:false,attributes:{charge:true}}),point('2026-11-23T10:04:00Z')];
+ const a=await f.api();assert.equal(a.days[0].km,null);assert.equal(a.days[0].observedMinutes,0);assert.equal(a.days[0].quietMinutes,0);
+});
+
+test('tracker history filters pet charging by default, supports inspection and retains live telemetry',async()=>{
+ const f=await fixture(),current=Date.now();
+ const history=[false,true,false,true].map((charge,index)=>({...point(new Date(current-(7-index*2)*60000).toISOString(),56.5+index*0.0001,{attributes:{charge,batteryLevel:100}}),id:index+10,serverTime:new Date(current).toISOString()}));
+ const latest=history.at(-1);
+ const fetcher=async url=>{
+  if(url.includes('accounts:lookup'))return Response.json({users:[{localId:'owner',emailVerified:true}]});
+  if(url.includes('/api/devices?'))return Response.json([{id:7,uniqueId:identifier,positionId:latest.id,status:'online'}]);
+  if(url.includes('/api/positions?'))return Response.json([latest]);
+  if(url.includes('/api/reports/route?'))return Response.json(history);
+  throw Error('Unexpected upstream');
+ };
+ const env={DB:f.db,TRACCAR_URL:'https://traccar.example.com',TRACCAR_TOKEN:'private-token'};
+ const read=async extra=>{const r=await handleAPI(new Request('https://pejlo.test/api/tracker?identifier='+identifier+extra,{headers:{Authorization:'Bearer test'}}),env,fetcher);assert.equal(r.status,200);return r.json();};
+ const normal=await read('');assert.equal(normal.route.length,2);assert.equal(normal.chargingExcluded,2);assert.equal(normal.telemetry.charging,true);assert.equal(normal.route[1].breakBefore,true);
+ const inspection=await read('&includeCharging=1');assert.equal(inspection.route.length,4);assert.equal(inspection.chargingIncluded,true);assert.equal(inspection.chargingExcluded,0);assert.deepEqual(inspection.position,normal.position);
+ f.raw.prepare('UPDATE pejlo_profiles SET profile=?').run(JSON.stringify({...f.profile,type:'object'}));
+ const object=await read('');assert.equal(object.route.length,4);assert.equal(object.chargingExcluded,0);
+});
 test('GPS day summaries persist and warm history avoids another Traccar route query',async()=>{
  const f=await fixture();f.points=[point('2026-11-23T10:00:00Z'),point('2026-11-23T10:02:00Z',56.5003)];
  const a=await f.api();assert.ok(a.days[0].km>0);assert.equal(a.days[0].observedMinutes,2);assert.equal(a.days[1].km,null);assert.equal(f.calls,1);

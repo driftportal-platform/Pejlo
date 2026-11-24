@@ -1,3 +1,7 @@
+# Pejlo 0.8.64
+
+Opladningspunkter for dyreprofiler udelades fra ruter og GPS-kilometer. Originaldata bevares, og Ture har en kontrolvisning med opladningspunkterne. Se [versionsnoterne](docs/version-0.8.64.md).
+
 # Pejlo 0.8.63
 
 Centrér-knappen virker igen ved omtrentlig mobil-/Wi-Fi-placering. Små usikkerhedsområder kan vises tættere på, mens store områder fortsat tilpasses kortet. Se [versionsnoterne](docs/version-0.8.63.md).

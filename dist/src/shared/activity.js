@@ -30,7 +30,7 @@ export function activityGps(route,type,now=Date.now()){
   const day=danishDate(p.timestamp);let row=days.get(day);if(!row){row={day,meters:0,observedMinutes:0,quietMinutes:0,points:0};days.set(day,row);}
   if(previous?.timestamp===p.timestamp)continue;
   row.points++;
-  if(previous&&danishDate(previous.timestamp)===day){
+  if(previous&&!p.breakBefore&&danishDate(previous.timestamp)===day){
    const dt=(p.timestamp-previous.timestamp)/1000,d=distance(previous,p);
    if(dt>0&&dt<=300&&d/dt<=gpsSpeedLimit(type)){
     row.observedMinutes+=dt/60;
