@@ -1,3 +1,7 @@
+# Pejlo 0.8.60
+
+Motion og hvile til dyreprofiler under Ture: valgfrit dagligt kilometermål, daglige registreringer, GPS-estimater, observeret hvile, historik og CSV. Vejledning til kat, hund og hest med kildelinks; ingen faste sundhedsmål i kilometer. Se [versionsnoterne](docs/version-0.8.60.md).
+
 # Pejlo 0.8.59
 
 Serveren beder automatisk om en position, når GPS eller kontakt er mindst 15 minutter gammel. Kan slås fra eller sættes til 10 minutter under Indstillinger → Tracker. Offline afventer forbindelse. Højst ét automatisk forsøg hvert 15. minut og højst tre i træk. Se [versionsnoterne](docs/version-0.8.59.md).

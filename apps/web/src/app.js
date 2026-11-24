@@ -1,3 +1,4 @@
+import {createActivity} from './features/activity.js';
 import {createBatteryControls} from './features/battery-controls.js';
 import {wifiDisplay,wifiCardText} from './shared/wifi-history.js';
 import {createWifiSetupGuide} from './features/wifi-setup.js';
@@ -274,6 +275,8 @@ const trackerDetails=$('#tracker-details');
 
 const trackerClient=createTrackerClient();
 const batteryControls=createBatteryControls({root:$('#battery-controls'),selected,request:trackerRequest,notice:toast,canEdit:()=>!!trackerUser&&ownedTrackers.some(t=>t.identifier===selected()?.trackerId&&t.is_owner!==0)});
+
+const activity=createActivity({root:$('#activity'),selected,request:trackerRequest,notice:toast,scope:()=>sessionGeneration});
 
 const serverStatus=createServerStatus({element:$('#server-status'),request:()=>trackerRequest('health')});
 
@@ -1161,7 +1164,7 @@ function showPage(name){
 
 
 
-  if(openingHistory){history.load();alarms.load();}
+  if(openingHistory){activity.load();history.load();alarms.load();}
 
 
 
@@ -1234,7 +1237,7 @@ function refresh(){
 
 
 
-  if(empty){wifiDiscovery.clear();wifiSetup.clear();}
+  if(empty){activity.clear();wifiDiscovery.clear();wifiSetup.clear();}
 
 
 
@@ -1259,10 +1262,11 @@ function refresh(){
 
 
   const p=selected(),d=data(),meta=types[p.type];
+  activity.sync();
 
 
 
-  if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){history.load();alarms.load();}}
+  if(historyProfile!==p.id){historyProfile=p.id;history.clear();alarms.clear();if(currentPage==='ture'){activity.load();history.load();alarms.load();}}
 
 
 
@@ -1936,7 +1940,7 @@ $('#new-profile-form').onsubmit=e=>{e.preventDefault();const p=newProfile($('#ne
 
 
 
-$('#delete-profile').onclick=async()=>{if(!selected())return;if(!confirm(family.get(selected().trackerId)?.owner===false?'Forlad den delte profil '+selected().name+'? Ejeren og andre beholder adgangen.':'Fjern profilen '+selected().name+' for alle delte brugere og stop dens beskeder? Dette sletter ikke den fysiske tracker.'))return;if(selected().trackerId){const p=selected(),entry=family.get(p.trackerId);try{await trackerRequest('family',{action:entry?.owner===false?'leave':'delete',identifier:p.trackerId});family.delete(p.trackerId);}catch(e){return toast(e.message);}}stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0]?.id??null;persist();refresh();};
+$('#delete-profile').onclick=async()=>{if(!selected())return;if(!confirm(family.get(selected().trackerId)?.owner===false?'Forlad den delte profil '+selected().name+'? Ejeren og andre beholder adgangen.':'Fjern profilen '+selected().name+' for alle delte brugere og stop dens beskeder? Motionshistorikken slettes også. Dette sletter ikke den fysiske tracker.'))return;if(!selected().trackerId){try{await trackerRequest('activity',{action:'clear',profileId:selected().id,identifier:'',type:selected().type});}catch(e){return toast(e.message);}}if(selected().trackerId){const p=selected(),entry=family.get(p.trackerId);try{await trackerRequest('family',{action:entry?.owner===false?'leave':'delete',identifier:p.trackerId});family.delete(p.trackerId);}catch(e){return toast(e.message);}}stopLocation(false);state.profiles=state.profiles.filter(p=>p.id!==state.activeId);state.activeId=state.profiles[0]?.id??null;persist();refresh();};
 
 
 

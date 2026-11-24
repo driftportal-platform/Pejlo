@@ -1,4 +1,4 @@
-# Pejlo brugervejledning til version 0.8.59
+# Pejlo brugervejledning til version 0.8.60
 
 Opret en konto og bekræft e-mailen. Opret en profil med navn og eventuelt foto. Under Indstillinger → Trackerforbindelse tilføjes en klargjort tracker med unikt tracker-id og parringskode. En profil uden tracker viser tydeligt mærkede eksempeldata.
 
@@ -59,3 +59,21 @@ Serveren kontrollerer cirka hvert minut, også når appen er lukket. Gammel godk
 Der er mindst 15 minutter mellem automatiske forsøg, også hvis grænsen er valgt til 10 minutter. Efter tre forsøg i træk holdes pause. Frisk godkendt GPS og kontakt nulstiller perioden. Fra/til med Gem kan også starte en ny periode. Manuelle positionsforespørgsler og automatiske deler den eksisterende minutbegrænsning.
 
 Forespørgslen bruger Traccars enkeltpositionskommando med ønsket Ingen kø. Afsendelse er ikke bevis for modtagelse, opvågning eller nyt GPS-fix. Hvis Traccar alligevel melder kommandoen i kø, vises dette som uafklaret levering. Funktionen ændrer ikke rapporteringsinterval, tidszone, Wi-Fi-opsætning eller dvaleparametre. Indendørs kan GPS fortsat mangle.
+
+## Motion og hvile fra 0.8.60
+
+Vælg en profil af typen Kat, Hund, Hest eller Andet dyr og åbn Ture. Motion og hvile vises øverst; den skjules for bil, cykel og andre genstande. Manuel registrering virker med personligt login også uden en tracker.
+
+- Vælg et valgfrit dagligt kilometermål og tryk Gem mål. Et tomt mål fjerner det. Målet er dit eget valg og ikke et dyrlægeordineret krav.
+- Registrer Samlet kilometer for dagen, Observeret hvile i timer og eventuelt en note. Tomme talfelter betyder ukendt, mens 0 er en udtrykkeligt registreret nulværdi. Gem dag gemmer en samlet dagspost; gentagen gemning opdaterer dagen og lægger ikke ekstra kilometer til.
+- Vælg en fra-/til-periode på højst 31 dage og tryk Hent motionshistorik. Der kan vælges ældre perioder efter behov. Rediger-knappen på en række åbner den dag. Dagsregistreringer redigeres inden for den hentede periode.
+- Har profilen en tracker, kan Hent GPS-oversigt for perioden tilføje GPS-estimater. En manuel kilometerværdi har forrang i periodens samlede distance og lægges ikke oven i GPS-afstanden.
+- Hent CSV eksporterer den viste oversigt med separate kolonner for manuelt/GPS, valgt distance, observeret hvile, GPS-ro, dækning, historisk mål og note. CSV bruger semikolon, UTF-8 og decimalkomma.
+
+Mål ved første registrering er det mål, der var valgt, da dagen første gang blev gemt. Senere målændringer ændrer ikke denne historiske værdi. Fremdrift for i dag sammenlignes med det nuværende mål. Tomme historikdage bliver ikke til 0 km eller hvile.
+
+Observeret hvile er noget, du selv registrerer. Ro ved GPS-sted er kun et estimat for korte intervaller med under 10 meters forskel mellem godkendte GPS-punkter. Katten kan stadig bevæge sig på et lille område eller være vågen. Appen måler ikke søvn og beregner ikke hvile som 24 timer minus bevægelse. GPS-dækning er kun tiden mellem brugbare punkter. Huller over fem minutter, usandsynlige hastigheder og forbindelser over dansk midnat medregnes ikke. Afstanden kan både mangle bevægelse og påvirkes af GPS-udsving.
+
+Ejere og delte redaktører kan registrere data. Læsebrugere kan se og eksportere den fælles historik. Ændringer beskyttes med revisioner; ved en konflikt skal historikken hentes igen, før der gemmes. Hvis en redaktør forlader en delt profil, beholdes historikken hos ejeren. Når ejeren fjerner profilen, slettes motionshistorikken også. Kontosletning sletter ejerens motionsdata.
+
+Vejledningen følger dyretypen. For katte anbefales korte lege med pauser uden ét fast kilometermål for alle katte. Hundes behov afhænger blandt andet af race, alder og helbred. Heste har behov for bevægelsesmuligheder, fold og social kontakt. Andet dyr dækker mange arter og får derfor ingen numerisk standard. Brug dyrlægens råd ved individuelle helbredsbehov. Kildelink vises i appen.

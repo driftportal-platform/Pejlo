@@ -280,3 +280,5 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .admin-document #server-status{display:none}
 
 #battery-controls{margin:1.5rem 0;border-top:1px solid var(--line);padding-top:1rem}#battery-controls fieldset{min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px}#battery-controls [data-battery-history-output]{overflow-x:auto;max-height:600px}.battery-history-table{width:100%;border-collapse:collapse;font-size:12px}.battery-history-table th,.battery-history-table td{padding:8px 5px;text-align:left;border-bottom:1px solid var(--line)}
+
+#activity fieldset{min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0}#activity details{margin:16px 0}#activity summary{cursor:pointer;font-weight:700}#activity [data-activity-progress]{font-weight:700}#activity .activity-table-scroll{max-width:100%;overflow-x:auto;margin:16px 0}#activity table{min-width:760px}#activity td:last-child{white-space:nowrap}#activity th{vertical-align:bottom}#activity input[type=number]{max-width:100%}#activity [data-activity-source]{display:inline-block;margin-bottom:8px}

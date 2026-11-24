@@ -1,3 +1,4 @@
+import {removeActivityProfile} from './activity-store.js';
 import {ensureHandoffs} from './handoffs.js';
 import {ensureSnooze} from './snooze.js';
 import {archiveEvent} from './archive.js';
@@ -87,6 +88,8 @@ export async function familyAPI(db,account,input,hashCode){
   await db.prepare('DELETE FROM pejlo_alerts WHERE identifier=? AND uid=?').bind(input.identifier,String(input.uid||'')).run();return {revoked:true};
  }
  if(input.action==='delete'){
+  const activityProfile=await db.prepare('SELECT profile FROM pejlo_profiles WHERE identifier=? AND owner_uid=?').bind(input.identifier,uid).first();
+  if(activityProfile){const p=JSON.parse(activityProfile.profile);await removeActivityProfile(db,uid,p.id);}
   await ensureHandoffs(db);await db.prepare('DELETE FROM pejlo_handoffs WHERE identifier=?').bind(input.identifier).run();
   await ensureSnooze(db);await db.prepare('DELETE FROM pejlo_snooze WHERE identifier=?').bind(input.identifier).run();
   await db.prepare('UPDATE pejlo_fences SET enabled=0 WHERE identifier=?').bind(input.identifier).run();
@@ -110,3 +113,4 @@ async function notifyOwnerOfAreaChange(db,identifier,existing,profile,account){
   await db.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(['fencechange',identifier,now].join(':'),identifier,existing.owner_uid,'fencechange',JSON.stringify(payload),now).run();
  }catch{/* notification tables may not exist yet; the save already succeeded */}
 }
+

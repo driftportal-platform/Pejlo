@@ -1,3 +1,4 @@
+import {activityAPI} from './activity.js';
 import {sendPositionRequest} from './position-request.js';
 import {positionRefreshAPI} from './position-refresh.js';
 import {getBatteryHistory} from './battery-history.js';
@@ -89,7 +90,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   }
 
-  const routes={'/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/activity':'GETPOST','/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
 
   if(!routes[path])return json({error:'Ikke fundet.'},404);
 
@@ -130,6 +131,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   }
 
   if(!env.DB)throw new Failure(503,'Trackerregisteret mangler opsætning i Cloudflare.');
+  if(path==='/api/activity')return json(await activityAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
 
   if(path==='/api/admin/server'){
 
