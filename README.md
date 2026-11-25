@@ -1,3 +1,7 @@
+# Pejlo 0.8.72
+
+Ét automatisk skiftende statusfelt ved siden af profilnavnet: Aktiv, Mulig hvile, Dvale, Oplader, Online eller Offline. Se [versionsnoterne](docs/version-0.8.72.md).
+
 # Pejlo 0.8.71
 
 Bevægelse og mulig hvile vurderes fra friske GPS-målinger og dvalerapporter, når trackeren er påsat. Hvilehistorik og grafer bruger ét samlet estimat med manuelle rettelser. Se [versionsnoterne](docs/version-0.8.71.md).

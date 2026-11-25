@@ -310,3 +310,15 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 
 .tracker-mode-status[data-tone="rest"],.tracker-mode-status[data-tone="moving"]{color:var(--green,#246f52);font-weight:700}
 #tracker-activity-note{margin-bottom:0;font-size:.9rem}
+
+/* One changing state beside the selected profile name. */
+.profile-open-copy>.profile-open{gap:8px;align-items:center}
+.profile-open-label{flex:1;min-width:0;overflow-wrap:anywhere}
+.profile-state{display:inline-flex;align-items:center;gap:5px;flex:none;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:650;line-height:1.3;white-space:nowrap;background:#eef0ec;color:#626e67}
+.profile-state[hidden]{display:none}
+.profile-state::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.profile-state[data-tone=active],.profile-state[data-tone=online]{color:#216d4a;background:#e6f2e9}
+.profile-state[data-tone=offline]{color:#a72f38;background:#fcebed}
+.profile-state[data-tone=sleep]{color:#635084;background:#efeaf7}
+.profile-state[data-tone=rest],.profile-state[data-tone=charging]{color:#285f80;background:#e7f1f8}
+@media(max-width:360px){.profile-state{font-size:10px;padding:4px 6px}.profile-open-copy>.profile-open{gap:5px}}

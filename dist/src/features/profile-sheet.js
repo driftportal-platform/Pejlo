@@ -1,15 +1,17 @@
 // Replaces the profile drop-down with a button that opens a sheet of profile cards.
 // The original <select> stays in the page as the source of truth for the rest of the app.
 import {renderProfileStatus,createProfileStatusHelp} from './profile-status.js';
+import {renderProfileState} from './profile-state.js';
 export function createProfileSheet({select,add}){
  const wrap=select.closest('.profile-switch'),open=document.createElement('button');
  open.type='button';open.id='profile-open';open.className='profile-open';open.setAttribute('aria-haspopup','dialog');
  const label=document.createElement('span');label.className='profile-open-label';
+ const state=document.createElement('span');state.className='profile-state';state.hidden=true;state.setAttribute('role','status');state.setAttribute('aria-live','polite');state.setAttribute('aria-atomic','true');
  const copy=document.createElement('span');copy.className='profile-open-copy';
  const status=document.createElement('span');status.className='profile-status';status.hidden=true;status.setAttribute('role','group');status.setAttribute('aria-label','Trackerstatus — tryk på et ikon for forklaring');
  const help=createProfileStatusHelp(document);let lastActive=null;
  const chevron=document.createElement('span');chevron.className='profile-open-chevron';chevron.setAttribute('aria-hidden','true');chevron.textContent='⌄';
- open.append(label,chevron);copy.append(open,status);select.classList.add('visually-hidden');select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.after(copy);
+ open.append(label,state,chevron);copy.append(open,status);select.classList.add('visually-hidden');select.tabIndex=-1;select.setAttribute('aria-hidden','true');select.after(copy);
  const dialog=document.createElement('dialog');dialog.className='sheet';dialog.setAttribute('aria-labelledby','profile-sheet-title');
  const head=document.createElement('div');head.className='sheet-head';
  const title=document.createElement('h2');title.id='profile-sheet-title';title.textContent='Vælg profil';
@@ -22,11 +24,12 @@ export function createProfileSheet({select,add}){
  close.addEventListener('click',()=>dialog.close());
  dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
  addButton.addEventListener('click',()=>{dialog.close();add.click();});
- return {status(data,profile){renderProfileStatus(status,data,profile,Date.now(),help.show);help.update(data,profile);},update(profiles,activeId){
+ return {status(data,profile){renderProfileState(state,data,profile);renderProfileStatus(status,data,profile,Date.now(),help.show);help.update(data,profile);},update(profiles,activeId){
   if(!profiles.length&&dialog.open)dialog.close();
   const active=profiles.find(p=>p.id===activeId);
   if(active?.id!==lastActive)help.close();lastActive=active?.id;
   label.textContent=active?active.name:'Ingen profiler endnu';
+  renderProfileState(state,null,active);
   renderProfileStatus(status,null,active);
   list.replaceChildren(...profiles.map(p=>{
    const card=document.createElement('button');card.type='button';card.className='sheet-card';if(p.id===activeId)card.setAttribute('aria-current','true');
