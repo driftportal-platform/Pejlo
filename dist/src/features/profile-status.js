@@ -43,11 +43,33 @@ function statusIcon(s){
  if(s.key==='wifi')return svg(['<circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/>','<path d="M8.5 16a5.5 5.5 0 0 1 7 0"/>','<path d="M5 12a11 11 0 0 1 14 0"/>','<path d="M2 8a16 16 0 0 1 20 0"/>'].map((path,i)=>'<g opacity="'+(s.tone!=='unknown'&&i<=(s.level||0)?1:.22)+'">'+path+'</g>').join(''));
  return icon(s.symbol,21);
 }
-export function renderProfileStatus(root,data,profile,now=Date.now()){
+export const statusHelp={
+ sleep:'Månen viser, om der er modtaget en frisk dvalerapport. En grå måne betyder, at den aktuelle dvale er ukendt — ikke at dyret er vågent. Det er trackerens rapport, ikke målt søvn.',
+ active:'Pulsen viser, om trackeren sender positionsrapporter. Grøn betyder en rapport inden for fem minutter fra en online tracker. Rød betyder offline. Rapportering beviser ikke fysisk bevægelse eller at dyret er vågent.',
+ gps:'Satellitten viser, om appen har en frisk, godkendt GPS-position. Grøn er en brugbar position. Rød kan betyde nul satellitter, tidsfejl eller en position, der afventer godkendelse. Antallet af satellitter er ikke i sig selv et mål for præcision.',
+ mobile:'Stregerne viser trackerens mobilnet, ikke telefonens. Grøn betyder et brugbart rapporteret signal, rød et svagt signal. Antallet af streger følger RSSI. Manglende, gammel eller ukendt signalskala vises grå.',
+ wifi:'Buerne viser styrken af hjemmets valgte Wi-Fi-punkter i trackerens seneste scanning. Grøn betyder mindst ét punkt med signal på mindst −75 dBm. Rød betyder svagere signal eller ingen af hjemmets punkter i en frisk scanning. Det beviser ikke, at trackeren er udenfor. Grå betyder manglende opsætning eller en gammel/manglende scanning.',
+ battery:'Batteriets fyld følger den målte procent. Grøn betyder over 20 %, rød betyder 20 % eller derunder. Grå betyder, at målingen mangler, er gammel eller at trackeren er offline.',
+ charging:'Lynet viser opladning. Grøn betyder oplader. Rød betyder oplader ikke — det er normalt, når trackeren er på dyret eller genstanden, og er ikke i sig selv en fejl. Grå betyder ukendt eller gammel oplysning.'
+};
+export function createProfileStatusHelp(doc){
+ const dialog=doc.createElement('dialog');dialog.className='sheet profile-status-help';dialog.setAttribute('aria-labelledby','profile-status-help-title');
+ const head=doc.createElement('div');head.className='sheet-head';
+ const title=doc.createElement('h2');title.id='profile-status-help-title';
+ const close=doc.createElement('button');close.type='button';close.className='icon-button';close.setAttribute('aria-label','Luk forklaring');close.textContent='×';
+ const current=doc.createElement('p');current.className='profile-status-current';current.setAttribute('aria-live','polite');
+ const explanation=doc.createElement('p'),legend=doc.createElement('p');legend.className='hint';legend.textContent='Farven gælder dette symbol. Grå betyder ukendt eller for gammel måling.';
+ head.append(title,close);dialog.append(head,current,explanation,legend);doc.body.append(dialog);
+ close.onclick=()=>dialog.close();dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+ let key=null,profileId=null;
+ function fill(status,profile){title.textContent=profile.name+' · '+status.label;current.textContent='Aktuelt: '+status.detail;current.dataset.tone=status.tone;explanation.textContent=statusHelp[status.key];}
+ return {show(status,profile){key=status.key;profileId=profile.id;fill(status,profile);if(!dialog.open)dialog.showModal();},update(data,profile){if(!dialog.open)return;if(!profile||profile.id!==profileId){dialog.close();return;}const s=profileStatuses(data,profile).find(s=>s.key===key);if(s)fill(s,profile);},close(){if(dialog.open)dialog.close();}};
+}
+export function renderProfileStatus(root,data,profile,now=Date.now(),onExplain=null){
  const statuses=profileStatuses(data,profile,now),doc=root.ownerDocument;
  root.replaceChildren(...statuses.map(s=>{
-  const el=doc.createElement('span');el.className='profile-status-icon';el.dataset.tone=s.tone;
-  el.setAttribute('role','img');el.setAttribute('aria-label',s.label+': '+s.detail);el.title=s.label+': '+s.detail;el.innerHTML=statusIcon(s);return el;
+  const el=doc.createElement('button');el.type='button';el.className='profile-status-icon';el.dataset.tone=s.tone;
+  el.setAttribute('aria-label',s.label+': '+s.detail+'. Vis forklaring');el.setAttribute('aria-haspopup','dialog');el.title=s.label+': '+s.detail;el.innerHTML=statusIcon(s);el.onclick=()=>onExplain?.(s,profile);return el;
  }));
  root.hidden=!profile?.trackerId;
 }

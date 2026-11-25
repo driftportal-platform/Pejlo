@@ -1,3 +1,7 @@
+# Pejlo 0.8.69
+
+Tryk på et statusikon i profilfeltet for at få en forklaring på symbolet, farven og den aktuelle status. Se [versionsnoterne](docs/version-0.8.69.md).
+
 # Pejlo 0.8.68
 
 Kompakte statusikoner i det valgte profilfelt, under navnet ved siden af profilbilledet. Se [versionsnoterne](docs/version-0.8.68.md).
