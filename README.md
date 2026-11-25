@@ -1,3 +1,7 @@
+# Pejlo 0.8.74
+
+Start/stop registreret hvile fra kortforsiden. Perioder gemmes i loggen og dagens hvileoverblik; troværdig GPS-bevægelse kan stoppe dem automatisk. Se [versionsnoterne](docs/version-0.8.74.md).
+
 # Pejlo 0.8.73
 
 Det eksisterende batteriikon viser en opladningsanimation ved frisk opladningsstatus. Se [versionsnoterne](docs/version-0.8.73.md).

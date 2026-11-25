@@ -1,3 +1,4 @@
+import {createRestSession} from './features/rest-session.js';
 import {restSamples,petActivityStatus} from './shared/rest-observation.js';
 import {reportStatus} from './shared/report-status.js';
 import {updateAttachment,attachmentText} from './shared/attachment.js';
@@ -281,6 +282,7 @@ const trackerClient=createTrackerClient();
 const batteryControls=createBatteryControls({root:$('#battery-controls'),selected,request:trackerRequest,notice:toast,canEdit:()=>!!trackerUser&&ownedTrackers.some(t=>t.identifier===selected()?.trackerId&&t.is_owner!==0)});
 
 const activity=createActivity({root:$('#activity'),selected,request:trackerRequest,notice:toast,scope:()=>sessionGeneration});
+const restSession=createRestSession({root:$('#manual-rest'),selected:()=>trackerUser?selected():null,request:trackerRequest,data:()=>data(),notice:toast,scope:()=>sessionGeneration});
 
 const serverStatus=createServerStatus({element:$('#server-status'),request:()=>trackerRequest('health')});
 
@@ -1246,7 +1248,7 @@ function refresh(){
 
 
 
-  if(empty){activity.clear();wifiDiscovery.clear();wifiSetup.clear();}
+  if(empty){restSession.clear();activity.clear();wifiDiscovery.clear();wifiSetup.clear();}else restSession.sync();
 
 
 
@@ -1447,7 +1449,7 @@ function updateAge(){
 
 
 
- wifiDiscovery.update();wifiSetup.update();
+ restSession.tick();wifiDiscovery.update();wifiSetup.update();
 
 
 

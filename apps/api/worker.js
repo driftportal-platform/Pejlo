@@ -1,3 +1,4 @@
+import {restSessionAPI,observeRestSession} from './rest-session.js';
 import {restObservation} from './rest-observation.js';
 import {receiveReportState,readReportState} from './report-state.js';
 import {chargingHistory} from '../../packages/shared/charging-history.js';
@@ -97,7 +98,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   }
 
-  const routes={'/api/account/state':'GETPOST','/api/activity/gps':'GET','/api/activity':'GETPOST','/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
+  const routes={'/api/rest-session':'GETPOST','/api/account/state':'GETPOST','/api/activity/gps':'GET','/api/activity':'GETPOST','/api/position-refresh':'GETPOST','/api/battery/history':'GET','/api/battery':'GETPOST','/api/health':'GET','/api/admin/server':'GETPOST','/api/subscription':'GETPOST','/api/billing':'POST','/api/admin/subscription-requests':'GETPOST','/api/admin/access':'GET','/api/admin/users':'GETPOST','/api/admin/status':'GET','/api/admin/usage':'GET','/api/handoff':'GETPOST','/api/snooze':'GETPOST','/api/alarms':'GET','/api/family':'GETPOST','/api/alerts':'GETPOST','/api/fence':'POST','/api/push/config':'GET','/api/push/subscribe':'POST','/api/push/remove':'POST','/api/push/test':'POST','/api/tracker':'GET','/api/tracker/position':'POST','/api/tracker/action':'POST','/api/trackers':'GET','/api/trackers/claim':'POST','/api/admin/trackers':'POST'};
 
   if(!routes[path])return json({error:'Ikke fundet.'},404);
 
@@ -145,6 +146,7 @@ export async function handleAPI(request,env,fetcher=fetch){
    if(request.method==='GET'&&request.headers.get('If-None-Match')===etag)return new Response(null,{status:304,headers});
    return new Response(serialized,{headers:{...headers,'Content-Type':'application/json'}});
   }
+  if(path==='/api/rest-session')return json(await restSessionAPI({db:env.DB,uid,source:(await resolveTraccarEnv(env)).TRACCAR_SOURCE||'environment',query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
   if(path==='/api/activity')return json(await activityAPI({db:env.DB,uid,source:(await resolveTraccarEnv(env)).TRACCAR_SOURCE,query:Object.fromEntries(url.searchParams),input:request.method==='POST'?await body(request):null}));
 
   if(path==='/api/admin/server'){
@@ -617,6 +619,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   const approximatePosition=mobileLocationEnabled?approximatePoint(raw):null;
 
   const observation=restObservation(raw);if(observation&&observation.timestamp>=Date.now()-20*60000&&observation.timestamp<=Date.now())restSamples.push(observation);
+  if(profile?.id)await observeRestSession({db:env.DB,identifier,owner:ownerRow.owner_uid,profile,source:env.TRACCAR_SOURCE||'environment',samples:restSamples});
   const reportState=await readReportState(env,identifier).catch(()=>null);
   return json({restSamples,reportState,source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
 

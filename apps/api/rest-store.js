@@ -1,3 +1,4 @@
+import {registeredRest} from './rest-session-store.js';
 import {once} from './schema.js';
 import {cleanAttachment} from '../../packages/shared/attachment.js';
 import {animalType} from '../../packages/shared/activity.js';
@@ -34,11 +35,16 @@ export async function automaticRest(db,owner,scope,profile,source,from,to,now,gp
  await ensureRest(db);
  const setting=await db.prepare('SELECT enabled FROM pejlo_rest_settings WHERE owner_uid=? AND scope=?').bind(owner,scope).first();
  const enabled=setting?.enabled!==0;
- if(!enabled||!profile)return {autoRestEnabled:enabled,restDays:[],restLimited:false};
- const range=historyRange(from,to,now),args=[profile.trackerId,owner,profile.id];
+ if(!profile)return {autoRestEnabled:enabled,restDays:[],restLimited:false};
+ const range=historyRange(from,to,now);
+ const registered=await registeredRest(db,owner,profile,source,range.from,range.to,now);
+ const registeredDays=estimateRest([],from,to,now,registered);
+ const annotate=days=>days.map(d=>({...d,registeredRestMinutes:registeredDays.find(r=>r.day===d.day)?.estimatedRestMinutes||0}));
+ if(!enabled)return {autoRestEnabled:false,restDays:registered.length?annotate(registeredDays):[],restLimited:false};
+ const args=[profile.trackerId,owner,profile.id];
  const wear=(await db.prepare('SELECT at,worn FROM pejlo_rest_wear WHERE identifier=? AND owner_uid=? AND profile_id=? AND at<=? ORDER BY at,revision').bind(...args,range.to).all()).results;
  const records=(await db.prepare('SELECT at,kind,charging,motion FROM pejlo_rest_reports WHERE identifier=? AND owner_uid=? AND profile_id=? AND source=? AND at>=? AND at<=? ORDER BY at LIMIT 50001').bind(...args,source||'environment',range.from-REST_WINDOW,range.to).all()).results;
- if(records.length>50000)return {autoRestEnabled:enabled,restDays:[],restLimited:true};
+ if(records.length>50000)return {autoRestEnabled:enabled,restDays:registered.length?annotate(registeredDays):[],restLimited:true};
  const events=[...wear.map(w=>({at:w.at,kind:w.worn?'wear_on':'wear_off'})),...records.map(e=>({...e,charging:e.charging===null?null:e.charging===1,motion:e.motion===null?null:e.motion===1}))];
- return {autoRestEnabled:enabled,restDays:estimateRest(events,from,to,now,wornQuietIntervals(gpsIntervals,wear,range.to)),restLimited:false};
+ return {autoRestEnabled:enabled,restDays:annotate(estimateRest(events,from,to,now,[...wornQuietIntervals(gpsIntervals,wear,range.to),...registered])),restLimited:false};
 }

@@ -1,3 +1,4 @@
+import {runRestSessions} from './rest-session.js';
 import {runPositionRefresh} from './position-refresh.js';
 import {runBatteryAutomation} from './battery-management.js';
 import {resolveTraccarEnv} from './server-config.js';
@@ -45,7 +46,7 @@ export async function runNotifications(env,fetcher=fetch){
  let status=env.TRACCAR_TOKEN?'completed':'missing-token';
  let base=null;
  const tracked=async(url,options)=>{const upstream=!!base&&url.startsWith(base+'/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
- try{env=await resolveTraccarEnv(env);base=traccarOrigin(env);status=env.TRACCAR_TOKEN?'completed':'missing-token';try{await runBatteryAutomation(env,tracked,base);}catch{stats.errors++;}try{await runPositionRefresh(env,tracked,base);}catch{stats.errors++;}await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
+ try{env=await resolveTraccarEnv(env);base=traccarOrigin(env);status=env.TRACCAR_TOKEN?'completed':'missing-token';try{await runBatteryAutomation(env,tracked,base);}catch{stats.errors++;}try{await runPositionRefresh(env,tracked,base);}catch{stats.errors++;}try{await runRestSessions(env,tracked,base);}catch{stats.errors++;}await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
  catch{status='failed';stats.errors++;}
  finally{
   await env.DB.prepare('UPDATE pejlo_runs SET finished_at=?,status=?,checked=?,errors=?,upstream_requests=?,upstream_errors=? WHERE id=?').bind(Date.now(),status,stats.checked,stats.errors,stats.requests,stats.upstreamErrors,id).run();
