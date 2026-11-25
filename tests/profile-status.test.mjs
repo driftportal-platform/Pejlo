@@ -32,7 +32,7 @@ test('the moon shows estimated GPS rest and the pulse no longer treats reporting
 });
 test('profile icons have accessible descriptions and are cleared on profile removal',()=>{
  const doc={createElement(){return {dataset:{},attrs:{},setAttribute(k,v){this.attrs[k]=v;}};}},root={ownerDocument:doc,replaceChildren(...items){this.children=items;}};
- renderProfileStatus(root,data,profile,now);assert.equal(root.hidden,false);assert.equal(root.children.length,7);
+ renderProfileStatus(root,data,profile,now);assert.equal(root.hidden,false);assert.equal(root.children.length,6);
  for(const child of root.children){assert.equal(child.type,'button');assert.equal(child.attrs['aria-haspopup'],'dialog');assert.ok(child.attrs['aria-label'].includes(':'));assert.match(child.innerHTML,/<svg/);}
  renderProfileStatus(root,null,null,now);assert.equal(root.hidden,true);assert.ok(root.children.every(c=>c.dataset.tone==='unknown'));
 });
@@ -54,8 +54,8 @@ test('icon activation opens an explanation, updates the reading and closes on pr
  const doc={createElement(tag){return {tag,children:[],dataset:{},attrs:{},setAttribute(k,v){this.attrs[k]=v;},append(...nodes){this.children.push(...nodes);},addEventListener(name,fn){this[name]=fn;},showModal(){this.open=true;},close(){this.open=false;}};}};doc.body=doc.createElement('body');
  const help=createProfileStatusHelp(doc),root=doc.createElement('span');root.ownerDocument=doc;root.replaceChildren=(...nodes)=>root.children=nodes;
  const p={...profile,id:'loui',name:'Loui'};renderProfileStatus(root,data,p,now,help.show);
- root.children[6].onclick();const dialog=doc.body.children[0];assert.equal(dialog.open,true);assert.match(dialog.children[0].children[0].textContent,/Loui.*Opladning/);assert.match(dialog.children[2].textContent,/ikke i sig selv en fejl/);
- help.update({...data,telemetry:{...data.telemetry,charging:true}},p);assert.equal(dialog.children[1].textContent,'Aktuelt: Oplader');
+ root.children[5].onclick();const dialog=doc.body.children[0];assert.equal(dialog.open,true);assert.match(dialog.children[0].children[0].textContent,/Loui.*Batteri/);assert.match(dialog.children[2].textContent,/Animationen viser opladning/);
+ help.update({...data,telemetry:{...data.telemetry,charging:true}},p);assert.equal(dialog.children[1].textContent,'Aktuelt: 80 % · Oplader');
  help.update(data,{...p,id:'another',name:'Hund'});assert.equal(dialog.open,false);
  root.children[0].onclick();assert.equal(dialog.open,true);assert.match(dialog.children[2].textContent,/ikke målt søvn/);
  dialog.children[0].children[1].onclick();assert.equal(dialog.open,false);

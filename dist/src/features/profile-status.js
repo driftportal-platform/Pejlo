@@ -35,7 +35,8 @@ export function profileStatuses(data,profile,now=Date.now()){
  if(!offline&&fresh(t?.receivedAt,now)&&typeof t?.charging==='boolean'){charging.tone=t.charging?'good':'bad';charging.detail=t.charging?'Oplader':'Oplader ikke';}
  else charging.detail='Opladningsstatus ukendt eller for gammel';
  battery.charging=data.device.status==='online'&&charging.tone==='good';
- if(battery.charging){battery.tone='good';battery.detail+=' · Oplader';}
+ if(battery.charging)battery.tone='good';
+ if(charging.tone!=='unknown')battery.detail+=' · '+charging.detail;
  return items;
 }
 function statusIcon(s){
@@ -68,7 +69,7 @@ export function createProfileStatusHelp(doc){
  return {show(status,profile){key=status.key;profileId=profile.id;fill(status,profile);if(!dialog.open)dialog.showModal();},update(data,profile){if(!dialog.open)return;if(!profile||profile.id!==profileId){dialog.close();return;}const s=profileStatuses(data,profile).find(s=>s.key===key);if(s)fill(s,profile);},close(){if(dialog.open)dialog.close();}};
 }
 export function renderProfileStatus(root,data,profile,now=Date.now(),onExplain=null){
- const statuses=profileStatuses(data,profile,now),doc=root.ownerDocument;
+ const statuses=profileStatuses(data,profile,now).filter(s=>s.key!=='charging'),doc=root.ownerDocument;
  const previous=Array.from(root.children||[]);
  const elements=statuses.map((s,i)=>{
   const el=previous[i]||doc.createElement('button');el.type='button';el.className='profile-status-icon';el.dataset.tone=s.tone;el.dataset.charging=s.charging?'true':'false';
