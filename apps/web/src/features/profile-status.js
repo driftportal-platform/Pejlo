@@ -34,11 +34,13 @@ export function profileStatuses(data,profile,now=Date.now()){
  else battery.detail='Batteristatus ukendt eller for gammel';
  if(!offline&&fresh(t?.receivedAt,now)&&typeof t?.charging==='boolean'){charging.tone=t.charging?'good':'bad';charging.detail=t.charging?'Oplader':'Oplader ikke';}
  else charging.detail='Opladningsstatus ukendt eller for gammel';
+ battery.charging=data.device.status==='online'&&charging.tone==='good';
+ if(battery.charging){battery.tone='good';battery.detail+=' · Oplader';}
  return items;
 }
 function statusIcon(s){
  const svg=paths=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
- if(s.key==='battery')return svg('<rect x="1" y="6" width="19" height="12" rx="3"/><path d="M23 10v4"/>'+(Number.isFinite(s.percent)?'<rect x="3" y="8" width="'+Math.max(0,Math.min(100,s.percent))*15/100+'" height="8" rx="1" fill="currentColor" stroke="none"/>':'<path d="M7 12h7" opacity=".4"/>'));
+ if(s.key==='battery')return svg('<rect x="1" y="6" width="19" height="12" rx="3"/><path d="M23 10v4"/>'+(s.charging&&s.percent!==100?[0,1,2].map(i=>'<rect class="battery-charge-step battery-charge-step-'+i+'" x="'+(3+i*5.2)+'" y="8" width="4" height="8" rx=".7" fill="currentColor" stroke="none"/>').join(''):Number.isFinite(s.percent)?'<rect x="3" y="8" width="'+Math.max(0,Math.min(100,s.percent))*15/100+'" height="8" rx="1" fill="currentColor" stroke="none"/>':'<path d="M7 12h7" opacity=".4"/>'));
  if(s.key==='mobile')return svg([0,1,2,3].map(i=>'<path d="M'+(3+i*6)+' 20v-'+(3+i*5)+'" stroke-width="3.5" opacity="'+(s.tone!=='unknown'&&i<(s.level||0)?1:.22)+'"/>').join(''));
  if(s.key==='wifi')return svg(['<circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/>','<path d="M8.5 16a5.5 5.5 0 0 1 7 0"/>','<path d="M5 12a11 11 0 0 1 14 0"/>','<path d="M2 8a16 16 0 0 1 20 0"/>'].map((path,i)=>'<g opacity="'+(s.tone!=='unknown'&&i<=(s.level||0)?1:.22)+'">'+path+'</g>').join(''));
  return icon(s.symbol,21);
@@ -49,7 +51,7 @@ export const statusHelp={
  gps:'Satellitten viser, om appen har en frisk, godkendt GPS-position. Grøn er en brugbar position. Rød kan betyde nul satellitter, tidsfejl eller en position, der afventer godkendelse. Antallet af satellitter er ikke i sig selv et mål for præcision.',
  mobile:'Stregerne viser trackerens mobilnet, ikke telefonens. Grøn betyder et brugbart rapporteret signal, rød et svagt signal. Antallet af streger følger RSSI. Manglende, gammel eller ukendt signalskala vises grå.',
  wifi:'Buerne viser styrken af hjemmets valgte Wi-Fi-punkter i trackerens seneste scanning. Grøn betyder mindst ét punkt med signal på mindst −75 dBm. Rød betyder svagere signal eller ingen af hjemmets punkter i en frisk scanning. Det beviser ikke, at trackeren er udenfor. Grå betyder manglende opsætning eller en gammel/manglende scanning.',
- battery:'Batteriets fyld følger den målte procent. Grøn betyder over 20 %, rød betyder 20 % eller derunder. Grå betyder, at målingen mangler, er gammel eller at trackeren er offline.',
+ battery:'Under opladning fyldes batteriets streger i en animation. Animationen viser opladning, ikke en målt stigning i procent. Ved 100 % vises et fuldt batteri uden bevægelse. Ellers følger batteriets fyld den målte procent. Grøn betyder opladning eller over 20 %. Uden opladning betyder rød 20 % eller derunder. Grå betyder, at målingen mangler, er gammel eller at trackeren er offline.',
  charging:'Lynet viser opladning. Grøn betyder oplader. Rød betyder oplader ikke — det er normalt, når trackeren er på dyret eller genstanden, og er ikke i sig selv en fejl. Grå betyder ukendt eller gammel oplysning.'
 };
 export function createProfileStatusHelp(doc){
@@ -67,9 +69,15 @@ export function createProfileStatusHelp(doc){
 }
 export function renderProfileStatus(root,data,profile,now=Date.now(),onExplain=null){
  const statuses=profileStatuses(data,profile,now),doc=root.ownerDocument;
- root.replaceChildren(...statuses.map(s=>{
-  const el=doc.createElement('button');el.type='button';el.className='profile-status-icon';el.dataset.tone=s.tone;
-  el.setAttribute('aria-label',s.label+': '+s.detail+'. Vis forklaring');el.setAttribute('aria-haspopup','dialog');el.title=s.label+': '+s.detail;el.innerHTML=statusIcon(s);el.onclick=()=>onExplain?.(s,profile);return el;
- }));
+ const previous=Array.from(root.children||[]);
+ const elements=statuses.map((s,i)=>{
+  const el=previous[i]||doc.createElement('button');el.type='button';el.className='profile-status-icon';el.dataset.tone=s.tone;el.dataset.charging=s.charging?'true':'false';
+  el.setAttribute('aria-label',s.label+': '+s.detail+'. Vis forklaring');el.setAttribute('aria-haspopup','dialog');el.title=s.label+': '+s.detail;
+  const markup=statusIcon(s);if(el._statusMarkup!==markup){el.innerHTML=markup;el._statusMarkup=markup;}
+  el.onclick=()=>onExplain?.(s,profile);return el;
+ });
+ // The age clock runs every second. Preserve SVG nodes so charging animations
+ // can finish their cycle and keyboard focus stays on the selected icon.
+ if(previous.length!==elements.length)root.replaceChildren(...elements);
  root.hidden=!profile?.trackerId;
 }

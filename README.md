@@ -1,3 +1,7 @@
+# Pejlo 0.8.73
+
+Det eksisterende batteriikon viser en opladningsanimation ved frisk opladningsstatus. Se [versionsnoterne](docs/version-0.8.73.md).
+
 # Pejlo 0.8.72
 
 Ét automatisk skiftende statusfelt ved siden af profilnavnet: Aktiv, Mulig hvile, Dvale, Oplader, Online eller Offline. Se [versionsnoterne](docs/version-0.8.72.md).

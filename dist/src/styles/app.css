@@ -322,3 +322,9 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .profile-state[data-tone=sleep]{color:#635084;background:#efeaf7}
 .profile-state[data-tone=rest],.profile-state[data-tone=charging]{color:#285f80;background:#e7f1f8}
 @media(max-width:360px){.profile-state{font-size:10px;padding:4px 6px}.profile-open-copy>.profile-open{gap:5px}}
+
+.profile-status-icon[data-charging=true]{color:#216d4a}
+.battery-charge-step{opacity:.2;animation:pejlo-battery-charge 1.8s ease-in-out infinite}
+.battery-charge-step-1{animation-delay:.3s}.battery-charge-step-2{animation-delay:.6s}
+@keyframes pejlo-battery-charge{0%,15%,100%{opacity:.2}40%,80%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.battery-charge-step{animation:none;opacity:.65}}

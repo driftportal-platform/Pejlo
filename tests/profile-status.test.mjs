@@ -13,7 +13,7 @@ test('compact profile statuses show dated reporting, GPS, mobile, home Wi-Fi, ba
 test('sleep evidence, weak signals and charging use independent indicators',()=>{
  const s=map({...data,restSamples:[],reportState:{lastSleepAt:now-500},telemetry:{...data.telemetry,charging:true,rssi:0,satellites:0,battery:0,wifiAccessPoints:[{mac:'28:BD:89:05:5C:10',rssi:-85}]}});
  assert.equal(s.sleep.tone,'unknown');assert.equal(s.active.tone,'unknown');assert.equal(s.charging.tone,'good');
- for(const name of ['gps','mobile','battery','wifi'])assert.equal(s[name].tone,'bad',name);
+ assert.equal(s.battery.tone,'good','charging takes precedence over the low level color');for(const name of ['gps','mobile','wifi'])assert.equal(s[name].tone,'bad',name);
 });
 test('expired, missing, demo and other-profile data never leave green indicators behind',()=>{
  for(const [d,p] of [[null,profile],[data,{}],[{...data,source:'demo'},profile],[{...data,device:{identifier:'another',status:'online'}},profile]])assert.ok(Object.values(map(d,p)).every(s=>s.tone==='unknown'));
@@ -35,6 +35,18 @@ test('profile icons have accessible descriptions and are cleared on profile remo
  renderProfileStatus(root,data,profile,now);assert.equal(root.hidden,false);assert.equal(root.children.length,7);
  for(const child of root.children){assert.equal(child.type,'button');assert.equal(child.attrs['aria-haspopup'],'dialog');assert.ok(child.attrs['aria-label'].includes(':'));assert.match(child.innerHTML,/<svg/);}
  renderProfileStatus(root,null,null,now);assert.equal(root.hidden,true);assert.ok(root.children.every(c=>c.dataset.tone==='unknown'));
+});
+
+test('charging animation retains its SVG across age ticks and stops for full, stale, offline or other-profile data',()=>{
+ const doc={createElement(){return {dataset:{},attrs:{},writes:0,setAttribute(k,v){this.attrs[k]=v;},set innerHTML(v){this.markup=v;this.writes++;},get innerHTML(){return this.markup;}};}},root={ownerDocument:doc,replaceChildren(...items){this.children=items;}};
+ const charging={...data,telemetry:{...data.telemetry,charging:true,battery:10}};
+ renderProfileStatus(root,charging,profile,now);const battery=root.children[5];
+ assert.equal(battery.dataset.charging,'true');assert.equal(battery.dataset.tone,'good');assert.equal((battery.innerHTML.match(/class="battery-charge-step /g)||[]).length,3);assert.match(battery.attrs['aria-label'],/10 %.*Oplader/);
+ renderProfileStatus(root,charging,profile,now+1000);assert.equal(root.children[5],battery);assert.equal(battery.writes,1,'one-second clock must not restart the animation');
+ renderProfileStatus(root,{...charging,telemetry:{...charging.telemetry,battery:100}},profile,now);assert.ok(!battery.innerHTML.includes('battery-charge-step'));assert.match(battery.attrs['aria-label'],/100 %/);
+ for(const [d,p,t] of [[charging,profile,now+360000],[{...charging,device:{...data.device,status:'offline'}},profile,now],[charging,{...profile,trackerId:'another'},now],[{...charging,telemetry:{...charging.telemetry,charging:false}},profile,now]]){
+  renderProfileStatus(root,d,p,t);assert.equal(battery.dataset.charging,'false');assert.ok(!battery.innerHTML.includes('battery-charge-step'));
+ }
 });
 
 
