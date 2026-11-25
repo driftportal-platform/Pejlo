@@ -3,6 +3,7 @@ import {cleanAttachment} from '../../packages/shared/attachment.js';
 import {animalType} from '../../packages/shared/activity.js';
 import {historyRange} from '../../packages/shared/history.js';
 import {estimateRest,REST_WINDOW} from '../../packages/shared/rest-estimate.js';
+import {wornQuietIntervals} from '../../packages/shared/rest-observation.js';
 
 export function ensureRest(db){return once(db,'rest-estimates',async()=>{
  for(const sql of [
@@ -29,7 +30,7 @@ export async function archiveRestReports(env,identifier,events,now){
  await env.DB.prepare('DELETE FROM pejlo_rest_reports WHERE identifier=? AND owner_uid=? AND at<?').bind(identifier,row.owner_uid,now-90*86400000).run();
 }
 
-export async function automaticRest(db,owner,scope,profile,source,from,to,now){
+export async function automaticRest(db,owner,scope,profile,source,from,to,now,gpsIntervals=[]){
  await ensureRest(db);
  const setting=await db.prepare('SELECT enabled FROM pejlo_rest_settings WHERE owner_uid=? AND scope=?').bind(owner,scope).first();
  const enabled=setting?.enabled!==0;
@@ -39,5 +40,5 @@ export async function automaticRest(db,owner,scope,profile,source,from,to,now){
  const records=(await db.prepare('SELECT at,kind,charging,motion FROM pejlo_rest_reports WHERE identifier=? AND owner_uid=? AND profile_id=? AND source=? AND at>=? AND at<=? ORDER BY at LIMIT 50001').bind(...args,source||'environment',range.from-REST_WINDOW,range.to).all()).results;
  if(records.length>50000)return {autoRestEnabled:enabled,restDays:[],restLimited:true};
  const events=[...wear.map(w=>({at:w.at,kind:w.worn?'wear_on':'wear_off'})),...records.map(e=>({...e,charging:e.charging===null?null:e.charging===1,motion:e.motion===null?null:e.motion===1}))];
- return {autoRestEnabled:enabled,restDays:estimateRest(events,from,to,now),restLimited:false};
+ return {autoRestEnabled:enabled,restDays:estimateRest(events,from,to,now,wornQuietIntervals(gpsIntervals,wear,range.to)),restLimited:false};
 }

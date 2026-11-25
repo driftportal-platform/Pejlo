@@ -1,3 +1,4 @@
+import {restSamples,petActivityStatus} from './shared/rest-observation.js';
 import {reportStatus} from './shared/report-status.js';
 import {updateAttachment,attachmentText} from './shared/attachment.js';
 import {createD1StateAdapter} from './features/d1-state.js';
@@ -559,7 +560,7 @@ function updatePositionRequest(){
  const connectionLabel=!identifier?'Eksempeldata':d?.device?.status==='online'?'Online':d?.device?.status==='offline'?'Offline':'Forbindelse ukendt';
  $('#tracker-mode-connection').textContent=connectionLabel+(identifier&&Number.isFinite(d?.device?.lastContact)?' · kontakt '+ageText(d.device.lastContact):'');
  $('#tracker-mode-connection').dataset.tone=identifier&&d?.device?.status==='online'?'online':identifier&&d?.device?.status==='offline'?'offline':'unknown';
- const mode=reportStatus(d);$('#tracker-mode-status').textContent=mode.label;$('#tracker-mode-status').dataset.tone=mode.tone;$('#tracker-mode-note').textContent=mode.note;
+ const activityMode=petActivityStatus(d,profile);$('#tracker-mode-status').textContent=activityMode.label;$('#tracker-mode-status').dataset.tone=activityMode.state;$('#tracker-activity-note').textContent=activityMode.detail;const mode=reportStatus(d);$('#tracker-mode-note').textContent=mode.note;
 
 
 
@@ -908,7 +909,7 @@ function connectTracker(){
 
 
 
- trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;accountMobile={enabled:typeof value.mobileLocationEnabled==='boolean'?value.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;accountMobile.error=true;updateTrackerStatus();},trackerActions.get(id)?.until);
+ trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,restSamples:restSamples([...(trackerData.restSamples||[]),...(value.restSamples||[])]).filter(p=>p.timestamp>=Date.now()-20*60000).slice(-2000),route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;accountMobile={enabled:typeof value.mobileLocationEnabled==='boolean'?value.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;accountMobile.error=true;updateTrackerStatus();},trackerActions.get(id)?.until);
 
 
 

@@ -1,3 +1,4 @@
+import {petActivityStatus} from '../shared/rest-observation.js';
 import {icon} from '../components/icons.js';
 import {reportStatus} from '../shared/report-status.js';
 import {homeWifiStatus} from '../shared/home-wifi.js';
@@ -7,15 +8,14 @@ import {gpsStatus} from '../shared/gps-status.js';
 const fresh=(at,now,age=300000)=>Number.isFinite(at)&&at<=now+10000&&now-at<=age;
 export function profileStatuses(data,profile,now=Date.now()){
  const item=(key,symbol,label,tone='unknown',detail='Ukendt')=>({key,symbol,label,tone,detail});
- const items=[item('sleep','moon','Dvale'),item('active','pulse','Aktiv'),item('gps','satellite','GPS'),item('mobile','mobile','Mobilnet'),item('wifi','wifi','Wi-Fi'),item('battery','battery','Batteri'),item('charging','charge','Opladning')];
+ const items=[item('sleep','moon','Hvile'),item('active','pulse','Bevægelse'),item('gps','satellite','GPS'),item('mobile','mobile','Mobilnet'),item('wifi','wifi','Wi-Fi'),item('battery','battery','Batteri'),item('charging','charge','Opladning')];
  if(!profile?.trackerId||data?.source!=='traccar'||data?.device?.identifier!==profile.trackerId)return items;
  const [sleep,active,gps,mobile,wifi,battery,charging]=items,t=data.telemetry,offline=data.device.status==='offline',mode=reportStatus(data,now);
- sleep.detail=mode.note;
- if(mode.tone==='sleep'){sleep.tone='good';sleep.detail='Dvalerapport modtaget inden for 15 minutter. '+mode.note;}
- const lastReport=Math.max(data.reportState?.lastPositionReportAt||0,data.reportState?.lastQueryReportAt||0);
- if(offline){active.tone='bad';active.detail='Tracker offline';}
- else if(data.device.status==='online'&&fresh(lastReport,now)){active.tone='good';active.detail='Sender rapporter. Det beviser ikke bevægelse eller at dyret er vågent.';}
- else active.detail='Aktuel rapportering ukendt; en heartbeat alene bekræfter ikke aktivitet.';
+ const activity=petActivityStatus(data,profile,now);
+ sleep.detail=activity.detail+' '+mode.note;
+ if(activity.state==='rest')sleep.tone='good';
+ if(offline){active.tone='bad';active.detail='Tracker offline; aktivitet ukendt.';}
+ else{active.tone=activity.state==='moving'?'good':'unknown';active.detail=activity.label+'. '+activity.detail;}
  const signals=signalStatus(data,now);
  mobile.level=signals.mobile.level;
  mobile.detail=signals.mobile.value+' · '+signals.mobile.note;
@@ -44,8 +44,8 @@ function statusIcon(s){
  return icon(s.symbol,21);
 }
 export const statusHelp={
- sleep:'Månen viser, om der er modtaget en frisk dvalerapport. En grå måne betyder, at den aktuelle dvale er ukendt — ikke at dyret er vågent. Det er trackerens rapport, ikke målt søvn.',
- active:'Pulsen viser, om trackeren sender positionsrapporter. Grøn betyder en rapport inden for fem minutter fra en online tracker. Rød betyder offline. Rapportering beviser ikke fysisk bevægelse eller at dyret er vågent.',
+ sleep:'Månen viser mulig hvile ud fra mindst 15 minutters lav GPS-hastighed og positioner inden for 25 meter. Trackeren skal være markeret som påsat og må ikke oplade. Grøn betyder et frisk estimat – ikke målt søvn. Grå betyder, at hvile ikke kan vurderes. En gammel dvalerapport beviser ikke aktuel hvile.',
+ active:'Pulsen viser GPS-vurderet bevægelse. Grøn kræver to friske målinger med hastighed og forskydning. Grå betyder, at bevægelse ikke kan bekræftes; det beviser ikke hvile. Rød betyder offline. At trackeren sender rapporter, er ikke i sig selv bevægelse.',
  gps:'Satellitten viser, om appen har en frisk, godkendt GPS-position. Grøn er en brugbar position. Rød kan betyde nul satellitter, tidsfejl eller en position, der afventer godkendelse. Antallet af satellitter er ikke i sig selv et mål for præcision.',
  mobile:'Stregerne viser trackerens mobilnet, ikke telefonens. Grøn betyder et brugbart rapporteret signal, rød et svagt signal. Antallet af streger følger RSSI. Manglende, gammel eller ukendt signalskala vises grå.',
  wifi:'Buerne viser styrken af hjemmets valgte Wi-Fi-punkter i trackerens seneste scanning. Grøn betyder mindst ét punkt med signal på mindst −75 dBm. Rød betyder svagere signal eller ingen af hjemmets punkter i en frisk scanning. Det beviser ikke, at trackeren er udenfor. Grå betyder manglende opsætning eller en gammel/manglende scanning.',

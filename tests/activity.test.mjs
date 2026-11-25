@@ -96,6 +96,14 @@ test('GPS rendering preserves unsaved kilometre, rest and goal fields; save conf
  assert.equal(f.fields.km.value,'3.25');assert.equal(f.fields.rest.value,'6.5');assert.equal(f.fields.goal.value,'4');
  f.setError(true);f.fields['day-form'].onsubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));assert.equal(f.calls.at(-1).body.km,3.25);assert.equal(f.fields.km.value,'3.25');assert.match(f.fields.status.textContent,/Konflikt/);
 });
+
+test('GPS rest totals reach the history table while preserving an unsaved manual correction',async()=>{
+ const f=uiFixture(),today=danishDate();f.setGps({historyAvailable:true,route:[],restDays:[{day:today,estimatedRestHours:.3}],autoRestEnabled:true,restLimited:false});
+ await f.ui.load();await new Promise(r=>setImmediate(r));
+ assert.match(f.fields.summary.textContent,/Samlet hvile: 0,3/);
+ const row=f.fields.rows.children[0];assert.match(row.children[3].textContent,/0,3 t.*anslået/);
+ f.fields.rest.value='4';await f.fields.gps.onclick();assert.equal(f.fields.rest.value,'4');
+});
 test('late activity loads cannot expose the previous profile after a switch',async()=>{
  const f=uiFixture();let finish;f.setDeferred(r=>finish=r);const pending=f.ui.load();f.setProfile({id:'other',type:'dog',name:'Hund'});f.ui.sync();finish(f.result());await pending;assert.equal(f.fields.rows.children.length,0);assert.equal(f.fields['day-fields'].disabled,true);
 });

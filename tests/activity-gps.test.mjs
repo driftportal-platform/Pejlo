@@ -7,6 +7,8 @@ import {removeActivityProfile} from '../apps/api/activity-store.js';
 import {deleteUserData} from '../apps/api/user-data.js';
 import {newProfile} from '../packages/shared/profiles.js';
 import {handleAPI} from '../apps/api/worker.js';
+import {ensureRest} from '../apps/api/rest-store.js';
+import {mergeActivity} from '../packages/shared/activity.js';
 const now=Date.parse('2026-11-24T15:00:00Z'),identifier='317309';
 async function fixture(){
  const raw=new DatabaseSync(':memory:');raw.exec('CREATE TABLE trackers(identifier TEXT PRIMARY KEY,owner_uid TEXT)');
@@ -19,12 +21,38 @@ async function fixture(){
 }
 const point=(time,latitude=56.5,extra={})=>({deviceId:7,fixTime:time,latitude,longitude:8.3,valid:true,attributes:{},...extra});
 
+test('GPS rest is gated by wear history, uses the warm cache, unions dvale and obeys disabled/manual zero',async()=>{
+ const f=await fixture(),start=Date.parse('2026-11-24T12:00:00Z'),day='2026-11-24',scope='profile:'+f.profile.id;
+ await ensureRest(f.db);
+ f.points=Array.from({length:10},(_,i)=>point(new Date(start+i*120000).toISOString(),56.5+(i%2)*.00001,{speed:0,attributes:{charge:false,sat:15}}));
+ assert.equal((await f.api()).restDays.find(r=>r.day===day).estimatedRestHours,null,'no historical confirmation of wear');
+ f.raw.prepare('INSERT INTO pejlo_rest_wear VALUES(?,?,?,?,?,?)').run(identifier,'owner',f.profile.id,1,start-60000,1);
+ const a=await f.api();assert.equal(f.calls,1,'wear is applied after the cached GPS analysis');assert.equal(a.restDays.find(r=>r.day===day).estimatedRestMinutes,18);
+ assert.ok(a.days.every(d=>!Object.hasOwn(d,'gpsRestIntervals')),'only day totals are sent to the app');
+ for(const [kind,at,charge] of [['position_report',start,0],['sleep_report',start,null],['heartbeat',start+600000,null]])f.raw.prepare('INSERT INTO pejlo_rest_reports VALUES(?,?,?,?,?,?,?,?)').run(identifier,'server-a','owner',f.profile.id,at,kind,charge,null);
+ const union=await f.api();assert.equal(union.restDays.find(r=>r.day===day).estimatedRestMinutes,18);
+ assert.equal(mergeActivity([day],[{day,rest_hours:0}],union.days,union.restDays)[0].restHours,0);
+ f.raw.prepare('INSERT INTO pejlo_rest_settings VALUES(?,?,0)').run('owner',scope);
+ assert.deepEqual((await f.api()).restDays,[]);assert.equal(f.calls,1);
+});
+
+test('GPS rest history breaks at invalid charging reports and needs new evidence after removal',async()=>{
+ const f=await fixture(),start=Date.parse('2026-11-24T12:00:00Z'),day='2026-11-24';await ensureRest(f.db);
+ f.raw.prepare('INSERT INTO pejlo_rest_wear VALUES(?,?,?,?,?,?)').run(identifier,'owner',f.profile.id,1,start,1);
+ f.points=Array.from({length:10},(_,i)=>point(new Date(start+i*120000).toISOString(),56.5,{speed:0,attributes:{charge:false,sat:15},...(i===4?{valid:false,attributes:{charge:true}}:{})}));
+ assert.equal((await f.api()).restDays.find(r=>r.day===day).estimatedRestHours,null);
+ f.points=Array.from({length:10},(_,i)=>point(new Date(start+i*120000).toISOString(),56.5,{speed:0,attributes:{charge:false,sat:15}}));
+ f.raw.prepare('DELETE FROM pejlo_activity_gps').run();
+ f.raw.prepare('INSERT INTO pejlo_rest_wear VALUES(?,?,?,?,?,?)').run(identifier,'owner',f.profile.id,2,start+600000,0);
+ assert.equal((await f.api()).restDays.find(r=>r.day===day).estimatedRestHours,null,'short segments are not turned into rest');
+});
+
 test('cached pet summaries recalculate under the charging algorithm and never count charging as rest',async()=>{
  const f=await fixture();
  f.points=[point('2026-11-23T10:00:00Z'),point('2026-11-23T10:02:00Z',56.5003,{attributes:{charge:true}}),point('2026-11-23T10:04:00Z',56.5006)];
  const a=await f.api();assert.equal(a.days[0].km,null);assert.equal(a.days[0].observedMinutes,0);assert.equal(a.days[0].quietMinutes,0);assert.equal(a.chargingExcluded,1);
  assert.equal((await f.api()).chargingExcluded,1);assert.equal(f.calls,1);
- f.raw.prepare("UPDATE pejlo_activity_gps SET context=replace(context,'[3,','[2,')").run();
+ f.raw.prepare("UPDATE pejlo_activity_gps SET context=replace(context,'[4,','[3,')").run();
  const b=await f.api();assert.equal(f.calls,2);assert.equal(b.cachedDays,0);assert.equal(b.chargingExcluded,1);
 });
 
@@ -49,7 +77,9 @@ test('tracker history filters pet charging by default, supports inspection and r
  const env={DB:f.db,TRACCAR_URL:'https://traccar.example.com',TRACCAR_TOKEN:'private-token'};
  const read=async extra=>{const r=await handleAPI(new Request('https://pejlo.test/api/tracker?identifier='+identifier+extra,{headers:{Authorization:'Bearer test'}}),env,fetcher);assert.equal(r.status,200);return r.json();};
  const normal=await read('');assert.equal(normal.route.length,2);assert.equal(normal.chargingExcluded,2);assert.equal(normal.telemetry.charging,true);assert.equal(normal.route[1].breakBefore,true);
+ assert.ok(normal.restSamples.some(p=>p.charging===true),'charging observations remain barriers for rest even when excluded from the map route');
  const inspection=await read('&includeCharging=1');assert.equal(inspection.route.length,4);assert.equal(inspection.chargingIncluded,true);assert.equal(inspection.chargingExcluded,0);assert.deepEqual(inspection.position,normal.position);
+ assert.deepEqual(inspection.restSamples,normal.restSamples,'showing charging routes does not enable animal rest');
  f.raw.prepare('UPDATE pejlo_profiles SET profile=?').run(JSON.stringify({...f.profile,type:'object'}));
  const object=await read('');assert.equal(object.route.length,4);assert.equal(object.chargingExcluded,0);
 });

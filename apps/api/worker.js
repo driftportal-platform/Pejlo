@@ -1,3 +1,4 @@
+import {restObservation} from './rest-observation.js';
 import {receiveReportState,readReportState} from './report-state.js';
 import {chargingHistory} from '../../packages/shared/charging-history.js';
 import {accountStateAPI,legacyAccount} from './account-state.js';
@@ -513,7 +514,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   if(!device||!Number.isSafeInteger(device.id))throw new Failure(404,'Trackeren findes ikke på Traccar-kontoen.');
 
-  if(path==='/api/activity/gps')return json(await activityGpsAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),device,traccar,source:(env.TRACCAR_SOURCE||'environment')+':'+base,now:Date.now()}));
+  if(path==='/api/activity/gps')return json(await activityGpsAPI({db:env.DB,uid,query:Object.fromEntries(url.searchParams),device,traccar,source:(env.TRACCAR_SOURCE||'environment')+':'+base,reportSource:env.TRACCAR_SOURCE||'environment',now:Date.now()}));
   if(positionRefreshRequest)return json(await positionRefreshAPI({env,identifier,uid,input}));
   if(batteryHistoryRequest)return json(await getBatteryHistory({env,identifier,device,traccar,days:Number(url.searchParams.get('days')||1)}));
   if(requestBattery)return json(await managedBattery({env,identifier,uid,device,input,traccar,traccarFetch}));
@@ -552,13 +553,15 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
 
-  let route=[],chargingReports=[],historyAvailable=true,historyTruncated=false;
+  let route=[],chargingReports=[],restSamples=[],historyAvailable=true,historyTruncated=false;
 
   if(url.searchParams.get('live')!=='1')try{
 
    const points=await traccar('/api/reports/route?'+new URLSearchParams({deviceId:String(device.id),from:from.toISOString(),to:to.toISOString()}));
 
    if(!Array.isArray(points))throw new Error();
+
+   restSamples=points.filter(p=>p.deviceId===device.id).map(restObservation).filter(p=>p&&p.timestamp>=Date.now()-20*60000&&p.timestamp<=Date.now()).slice(-2000);
 
    chargingReports=points.filter(p=>p.deviceId===device.id&&p.attributes?.charge===true).map(p=>({timestamp:Date.parse(p.fixTime),charging:true})).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime());
    route=points.filter(p=>p.deviceId===device.id).map(point).filter(p=>p&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime()).sort((a,b)=>a.timestamp-b.timestamp);historyTruncated=route.length>10000;route=route.slice(-10000);
@@ -613,8 +616,9 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const approximatePosition=mobileLocationEnabled?approximatePoint(raw):null;
 
+  const observation=restObservation(raw);if(observation&&observation.timestamp>=Date.now()-20*60000&&observation.timestamp<=Date.now())restSamples.push(observation);
   const reportState=await readReportState(env,identifier).catch(()=>null);
-  return json({reportState,source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
+  return json({restSamples,reportState,source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
 
  }catch(error){return json({error:error.status?error.message:'Trackerdata kunne ikke hentes. Prøv igen.'},error.status||502);}
 
