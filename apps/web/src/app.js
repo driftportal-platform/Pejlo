@@ -556,6 +556,9 @@ function updatePositionRequest(){
 
 
  $('#tracker-details-name').textContent=profile.name;
+ const connectionLabel=!identifier?'Eksempeldata':d?.device?.status==='online'?'Online':d?.device?.status==='offline'?'Offline':'Forbindelse ukendt';
+ $('#tracker-mode-connection').textContent=connectionLabel+(identifier&&Number.isFinite(d?.device?.lastContact)?' · kontakt '+ageText(d.device.lastContact):'');
+ $('#tracker-mode-connection').dataset.tone=identifier&&d?.device?.status==='online'?'online':identifier&&d?.device?.status==='offline'?'offline':'unknown';
  const mode=reportStatus(d);$('#tracker-mode-status').textContent=mode.label;$('#tracker-mode-status').dataset.tone=mode.tone;$('#tracker-mode-note').textContent=mode.note;
 
 

@@ -1,3 +1,5 @@
+0.8.70 forenkler statusfeltet i trackeroplysninger. Upload oven på 0.8.69 med samme mapper via GitHub og lad Cloudflare bygge normalt. Ingen nye server-, Firebase- eller Cloudflare-indstillinger.
+
 0.8.69 tilføjer trykbare forklaringer til profilens statusikoner. Upload oven på 0.8.68 med samme mapper og lad det normale Cloudflare-build køre. Ingen ny serveropsætning eller nye Firebase-/Cloudflare-indstillinger.
 
 0.8.68 viser statusikoner i profilfeltet. Upload oven på 0.8.67 med samme mapper og lad Cloudflare bygge som normalt. Ingen serverkommandoer eller nye Firebase-/Cloudflare-indstillinger. Se [versionsnoterne](docs/version-0.8.68.md).

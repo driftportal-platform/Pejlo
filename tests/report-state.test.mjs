@@ -41,7 +41,7 @@ test('sleep evidence expires, heartbeats do not prolong it and reporting never b
  const data={device:{status:'online'},reportState:{lastSleepAt:now-60000,lastHeartbeatAt:now}};
  assert.equal(reportStatus(data,now).tone,'sleep');
  const later={...data,reportState:{...data.reportState,lastQueryReportAt:now-1000}};
- assert.equal(reportStatus(later,now).tone,'unknown');assert.match(reportStatus(later,now).label,/Sender rapporter/);assert.match(reportStatus(later,now).note,/beviser ikke bevægelse/);
+ assert.equal(reportStatus(later,now).tone,'unknown');assert.equal(reportStatus(later,now).label,'Dvale: ukendt');assert.match(reportStatus(later,now).note,/ikke.*dvale nu/);
  assert.equal(reportStatus(data,now+900000).tone,'unknown');
  assert.equal(reportStatus({...data,device:{status:'offline'}},now).tone,'unknown');
  assert.equal(reportStatus({reportState:{lastSleepAt:now+120000}},now).sleepAt,null);
@@ -59,4 +59,12 @@ test('normal tracker readers receive status only through their existing tracker 
  const request=()=>handleAPI(new Request('https://pejlo.test/api/tracker?identifier='+identifier,{headers:{Authorization:'Bearer login'}}),f.env,fetcher);
  const response=await request();assert.equal(response.status,200);assert.equal((await response.json()).reportState.lastSleepAt,now-60000);
  uid='stranger';assert.equal((await request()).status,403);
+});
+
+
+test('current sleep status stays unknown despite fresh reporting and a historical sleep timestamp',()=>{
+ const d={device:{status:'online'},reportState:{lastSleepAt:now-8*3600000,lastPositionReportAt:now-60000}};
+ const r=reportStatus(d,now);assert.equal(r.label,'Dvale: ukendt');assert.match(r.note,/Seneste dvalerapport/);assert.match(r.note,/ikke.*dvale nu/);assert.doesNotMatch(r.note,/bekræftet/);
+ assert.equal(reportStatus({device:{status:'online'},reportState:{lastSleepAt:now-60000}},now).label,'Dvale: rapport modtaget');
+ assert.equal(reportStatus({device:{status:'offline'},reportState:{lastSleepAt:now-60000}},now).label,'Dvale: ukendt');
 });

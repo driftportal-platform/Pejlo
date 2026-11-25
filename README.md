@@ -1,3 +1,7 @@
+# Pejlo 0.8.70
+
+Tydeligere trackerstatus: forbindelse og aktuel dvale vises hver for sig. Historiske dvalerapporter ligger under Om dvalestatus. Se [versionsnoterne](docs/version-0.8.70.md).
+
 # Pejlo 0.8.69
 
 Tryk på et statusikon i profilfeltet for at få en forklaring på symbolet, farven og den aktuelle status. Se [versionsnoterne](docs/version-0.8.69.md).
