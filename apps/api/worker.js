@@ -555,7 +555,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
 
-  let route=[],chargingReports=[],restSamples=[],historyAvailable=true,historyTruncated=false;
+  let route=[],chargingReports=[],restSamples=[],sessionSamples=[],historyAvailable=true,historyTruncated=false;
 
   if(url.searchParams.get('live')!=='1')try{
 
@@ -563,6 +563,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
    if(!Array.isArray(points))throw new Error();
 
+   sessionSamples=points.length<10000?points.filter(p=>p.deviceId===device.id&&Date.parse(p.fixTime)>=from.getTime()&&Date.parse(p.fixTime)<=to.getTime()).map(restObservation).filter(Boolean):[];
    restSamples=points.filter(p=>p.deviceId===device.id).map(restObservation).filter(p=>p&&p.timestamp>=Date.now()-20*60000&&p.timestamp<=Date.now()).slice(-2000);
 
    chargingReports=points.filter(p=>p.deviceId===device.id&&p.attributes?.charge===true).map(p=>({timestamp:Date.parse(p.fixTime),charging:true})).filter(p=>Number.isFinite(p.timestamp)&&p.timestamp>=from.getTime()&&p.timestamp<=to.getTime());
@@ -619,7 +620,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   const approximatePosition=mobileLocationEnabled?approximatePoint(raw):null;
 
   const observation=restObservation(raw);if(observation&&observation.timestamp>=Date.now()-20*60000&&observation.timestamp<=Date.now())restSamples.push(observation);
-  if(profile?.id)await observeRestSession({db:env.DB,identifier,owner:ownerRow.owner_uid,profile,source:env.TRACCAR_SOURCE||'environment',samples:restSamples});
+  if(profile?.id)await observeRestSession({db:env.DB,identifier,owner:ownerRow.owner_uid,profile,source:env.TRACCAR_SOURCE||'environment',samples:[...sessionSamples,...restSamples],historical:sessionSamples.length>0});
   const reportState=await readReportState(env,identifier).catch(()=>null);
   return json({restSamples,reportState,source:'traccar',serverRevision:env.TRACCAR_SOURCE||'environment',device:{identifier,name:String(device.name||'Pejlo'),status:['online','offline','unknown'].includes(device.status)?device.status:'unknown',lastContact:Number.isFinite(Date.parse(device.lastUpdate))&&Date.parse(device.lastUpdate)<=Date.now()+60000?Date.parse(device.lastUpdate):null},actions:{find:!!actions.find,sound:!!actions.sound},position,approximatePosition,mobileLocationEnabled,route,telemetry,positionLookupFailed,gpsUncertain:!!(positionLookupFailed||gps.uncertain||(raw&&!latestPosition)||(position&&!latestPosition)),gpsProvisional:!!(position&&gps.provisional),gpsRejected:filtered.rejected,chargingExcluded:includeCharging?0:charging.excluded,chargingIncluded:includeCharging,historyAvailable,historyTruncated,range:{from:from.toISOString(),to:to.toISOString()},checkedAt:Date.now()});
 

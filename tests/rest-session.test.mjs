@@ -46,6 +46,36 @@ test('auto stop requires three new credible fixes and records the first movement
  await f.observe([fix(3)],start+180000);const result=await f.api();assert.equal(result.active,null);assert.equal(result.history[0].endedAt,start+60000);assert.equal(result.history[0].reason,'movement');
  assert.equal(f.raw.prepare('SELECT samples FROM pejlo_rest_sessions').get().samples,'[]');
 });
+test('four coherent positions can confirm relocation while instantaneous speed reports remain zero',()=>{
+ const rows=[1,3,5,7].map(m=>fix(m,56.5+m*.00015,{speedKph:0})),now=start+7*60000;
+ assert.equal(restMovement(rows.slice(0,3),start,'cat',now),null);
+ const move=restMovement(rows,start,'cat',now);assert.equal(move.fixes,4);assert.equal(move.at,rows[0].timestamp);
+ for(const points of [rows.map(p=>({...p,lat:56.5})),[fix(1,56.5,{speedKph:0}),fix(3,56.502,{speedKph:0}),fix(5,56.50201,{speedKph:0}),fix(7,56.50201,{speedKph:0})],rows.map((p,i)=>({...p,satellites:i===2?0:15})),rows.map((p,i)=>({...p,lat:i===3?56.5:p.lat}))])assert.equal(restMovement(points,start,'cat',now),null);
+});
+test('a single large jump followed by small GPS drift cannot stop rest through the four-fix path',()=>{
+ const rows=[fix(1,56.5,{speedKph:0}),fix(3,56.502,{speedKph:0}),fix(5,56.50215,{speedKph:0}),fix(7,56.5023,{speedKph:0})];
+ assert.equal(restMovement(rows,start,'cat',start+7*60000),null);
+ const drift=[[56.556615,8.329767],[56.556614,8.329768],[56.556611,8.329785],[56.556602,8.329769],[56.556541,8.329666],[56.556530,8.329640],[56.556507,8.329603],[56.556508,8.329623]];
+ assert.equal(restMovement(drift.map(([lat,lon],i)=>fix(i+1,lat,{lon,speedKph:0})),start,'cat',start+8*60000),null);
+});
+test('history recovery closes a still-open session at the original movement time, not when the app reopens',async()=>{
+ const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()});
+ const rows=[1,3,5,7].map(m=>fix(m,56.5+m*.00015,{speedKph:0})),later=start+3*3600000;
+ await f.observe(rows,later);assert.ok((await f.api()).active,'old fixes are not a live measurement');
+ await f.observe(rows,later,{historical:true});const state=await f.api();assert.equal(state.active,null);assert.equal(state.history[0].endedAt,rows[0].timestamp);assert.equal(state.history[0].reason,'movement');
+ await f.observe(rows,later+60000,{historical:true});assert.equal((await f.api()).history[0].endedAt,rows[0].timestamp);
+});
+test('server recovery reads saved movement even if latest position is stationary or offline',async()=>{
+ const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()});const later=start+3*3600000;
+ const rows=[1,3,5,7].map(m=>fix(m,56.5+m*.00015,{speedKph:0})),requests=[];
+ const fetcher=async(url,options)=>{requests.push(url);assert.ok(!options.method||options.method==='GET');
+  if(url.includes('/api/devices?'))return Response.json([{id:7,uniqueId:identifier,status:'offline'}]);
+  assert.ok(url.includes('/api/reports/route?'));
+  return Response.json(rows.map(p=>({deviceId:7,fixTime:new Date(p.timestamp).toISOString(),serverTime:new Date(p.timestamp+1000).toISOString(),valid:true,latitude:p.lat,longitude:p.lon,speed:0,attributes:{charge:false,sat:15}})));
+ };
+ await runRestSessions({DB:f.db,TRACCAR_TOKEN:'test',TRACCAR_SOURCE:source},fetcher,'https://traccar.test',later);
+ assert.equal((await f.api()).active,null);assert.equal((await f.api()).history[0].endedAt,rows[0].timestamp);assert.equal(requests.length,2);
+});
 test('GPS jumps back, poor fixes, old/future fixes, missing speed and gaps never prove movement',()=>{
  const samples=[fix(1),fix(2),fix(3)],now=start+180000;
  assert.ok(restMovement(samples,start,'cat',now));
@@ -84,7 +114,7 @@ test('background checking works with the app closed and only reads the tracker s
   if(url.includes('/api/devices?'))return Response.json([{id:7,uniqueId:identifier,status:'online',positionId:1}]);
   const p=fix((at-start)/60000);return Response.json([{id:1,deviceId:7,fixTime:new Date(at).toISOString(),serverTime:new Date(at).toISOString(),valid:true,latitude:p.lat,longitude:p.lon,speed:4/1.852,attributes:{charge:false,sat:15}}]);};
  for(let i=1;i<=3;i++){at=start+i*60000;await runRestSessions({DB:f.db,TRACCAR_TOKEN:'test',TRACCAR_SOURCE:source},fetcher,'https://traccar.test',at);}
- assert.equal((await f.api()).active,null);assert.equal((await f.api()).history[0].reason,'movement');assert.equal(requests.length,6);assert.ok(requests.every(u=>!u.includes('commands')));
+ assert.equal((await f.api()).active,null);assert.equal((await f.api()).history[0].reason,'movement');assert.equal(requests.length,7);assert.ok(requests.every(u=>!u.includes('commands')));
 });
 test('manual rest button starts/stops one period, logs its duration and ignores a late profile response',async()=>{
  const fields=Object.fromEntries(['toggle','status','log'].map(k=>[k,{children:[],attrs:{},setAttribute(k,v){this.attrs[k]=v;},replaceChildren(){this.children=[];},append(p){this.children.push(p);}}]));

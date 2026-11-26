@@ -1,3 +1,7 @@
+# Pejlo 0.8.76
+
+Automatisk stop af manuelt startet hvile håndterer nu flytning mellem målinger med lav hastighed og kan kontrollere gemt historik. Statusvisningen er uændret. Se [versionsnoterne](docs/version-0.8.76.md).
+
 # Pejlo 0.8.75
 
 Det separate lyn er fjernet fra profilfeltet. Batteriikonet viser opladning, og dets forklaring viser både procent og opladningsstatus.

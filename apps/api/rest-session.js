@@ -36,19 +36,20 @@ export async function restSessionAPI({db,uid,query,input,source='environment',no
  const history=await db.prepare('SELECT * FROM pejlo_rest_sessions WHERE identifier=? AND owner_uid=? AND profile_id=? AND source=? ORDER BY started_at DESC LIMIT 20').bind(...args).all();
  return {active:clean(active),history:history.results.map(clean),canEdit:editable,checkedAt:now};
 }
-export async function observeRestSession({db,identifier,owner,profile,source='environment',samples,now=Date.now()}){
+export async function observeRestSession({db,identifier,owner,profile,source='environment',samples,now=Date.now(),historical=false}){
  await ensureRestSessions(db);
  const row=await db.prepare('SELECT * FROM pejlo_rest_sessions WHERE identifier=? AND owner_uid=? AND profile_id=? AND source=? AND ended_at IS NULL').bind(identifier,owner,profile.id,source).first();
  if(!row)return;
- const attachment=cleanAttachment(profile.attachment,identifier,now),current=restSamples(samples,now).filter(p=>p.timestamp>row.started_at&&now-p.timestamp<=300000);
+ const attachment=cleanAttachment(profile.attachment,identifier,now),current=restSamples(samples,now).filter(p=>p.timestamp>row.started_at&&(historical||now-p.timestamp<=900000));
  let previous=[];try{previous=JSON.parse(row.samples);}catch{}
- const combined=restSamples([...previous,...current],now).filter(p=>now-p.timestamp<=300000&&p.timestamp>row.started_at).slice(-12);
- const move=restMovement(combined,row.started_at,profile.type,now);
+ const all=restSamples([...previous,...current],now).filter(p=>p.timestamp>row.started_at),combined=all.filter(p=>now-p.timestamp<=900000).slice(-12);
+ const move=restMovement(historical?all:combined,row.started_at,profile.type,now,historical);
  const charging=current.find(p=>p.charging===true);
- let end=null,reason='';
- if(!animalType(profile.type)||attachment?.state!=='worn'){end=Math.max(row.started_at,Math.min(now,attachment?.since??now));reason='removed';}
- else if(charging){end=charging.timestamp;reason='charging';}
- else if(move){end=move.at;reason='movement';}
+ const candidates=[];
+ if(!animalType(profile.type)||attachment?.state!=='worn')candidates.push({at:Math.max(row.started_at,Math.min(now,attachment?.since??now)),reason:'removed'});
+ if(charging)candidates.push({at:charging.timestamp,reason:'charging'});
+ if(move)candidates.push({at:move.at,reason:'movement'});
+ const first=candidates.sort((a,b)=>a.at-b.at)[0],end=first?.at??null,reason=first?.reason||'';
  if(end!==null)await db.prepare("UPDATE pejlo_rest_sessions SET ended_at=?,reason=?,checked_at=?,last_fix=?,samples='[]' WHERE id=? AND ended_at IS NULL").bind(end,reason,now,move?.confirmedAt??charging?.timestamp??null,row.id).run();
  else await db.prepare('UPDATE pejlo_rest_sessions SET checked_at=?,last_fix=?,samples=? WHERE id=? AND ended_at IS NULL AND samples=?').bind(now,combined.filter(p=>p.valid).at(-1)?.timestamp??null,JSON.stringify(combined),row.id,row.samples).run();
 }
@@ -62,8 +63,21 @@ export async function runRestSessions(env,fetcher,base,now=Date.now()){
  for(const row of rows.results){
   const profile=JSON.parse(row.profile);if(profile.id!==row.profile_id)continue;
   const device=(await get('/api/devices?uniqueId='+encodeURIComponent(row.identifier))).find(d=>d.uniqueId===row.identifier);
+  if(!Number.isSafeInteger(device?.id))continue;
   const positions=device?.status==='online'&&device.positionId?await get('/api/positions?id='+encodeURIComponent(device.positionId)):[];
   const raw=positions.find(p=>p.deviceId===device.id&&p.id===device.positionId),p=raw?restObservation(raw):null;
   await observeRestSession({db:env.DB,identifier:row.identifier,owner:row.owner_uid,profile,source,samples:p?[p]:[],now});
+  const claimed=await env.DB.prepare('UPDATE pejlo_rest_sessions SET history_checked_at=? WHERE id=? AND ended_at IS NULL AND history_checked_at<=? RETURNING reviewed_until').bind(now,row.id,now-300000).first();
+  if(claimed){
+   const from=Math.max(row.started_at,(claimed.reviewed_until||row.started_at)-15*60000),to=Math.min(now,from+86400000);
+   // Bounded recovery of missed checks, using stored positions, never a query
+   // command to the device. Only advance the cursor after a complete response.
+   const history=await get('/api/reports/route?'+new URLSearchParams({deviceId:String(device.id),from:new Date(from).toISOString(),to:new Date(to).toISOString()}));
+   if(Array.isArray(history)&&history.length<10000){
+    const samples=history.filter(p=>p.deviceId===device.id&&Date.parse(p.fixTime)>=from&&Date.parse(p.fixTime)<=to).map(restObservation).filter(Boolean);
+    await observeRestSession({db:env.DB,identifier:row.identifier,owner:row.owner_uid,profile,source,samples,now,historical:true});
+    await env.DB.prepare('UPDATE pejlo_rest_sessions SET reviewed_until=? WHERE id=? AND reviewed_until=?').bind(to,row.id,claimed.reviewed_until).run();
+   }
+  }
  }
 }

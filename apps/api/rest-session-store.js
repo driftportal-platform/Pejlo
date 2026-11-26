@@ -2,6 +2,7 @@ import {once} from './schema.js';
 export const ensureRestSessions=db=>once(db,'rest-sessions',async()=>{
  await db.prepare(`CREATE TABLE IF NOT EXISTS pejlo_rest_sessions(id TEXT PRIMARY KEY,identifier TEXT NOT NULL,owner_uid TEXT NOT NULL,profile_id TEXT NOT NULL,source TEXT NOT NULL,started_at INTEGER NOT NULL,ended_at INTEGER,reason TEXT NOT NULL DEFAULT '',actor_uid TEXT,checked_at INTEGER NOT NULL DEFAULT 0,last_fix INTEGER,samples TEXT NOT NULL DEFAULT '[]')`).run();
  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS pejlo_rest_one_active ON pejlo_rest_sessions(identifier,owner_uid,profile_id,source) WHERE ended_at IS NULL').run();
+ for(const column of ['reviewed_until','history_checked_at'])try{await db.prepare('ALTER TABLE pejlo_rest_sessions ADD COLUMN '+column+' INTEGER NOT NULL DEFAULT 0').run();}catch(e){if(!/duplicate column/i.test(String(e.message)))throw e;}
 });
 export async function registeredRest(db,owner,profile,source,from,to,now){
  if(!profile)return [];
