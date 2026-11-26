@@ -1,3 +1,7 @@
+# Pejlo 0.8.83
+
+Trackeropdateringer sættes på pause i skjulte faner og genoptages, når fanen bliver synlig. Kortet henter dagens rute sjældnere, når den ikke vises. Alarmjobbet kører før vedligeholdelsesopgaverne og logger varigheden siden seneste forsøg. Byg web og API sammen ved udgivelse. På Windows kræver Python-testene tidszonedata (`python -m pip install tzdata`).
+
 # Pejlo 0.8.76
 
 Automatisk stop af manuelt startet hvile håndterer nu flytning mellem målinger med lav hastighed og kan kontrollere gemt historik. Statusvisningen er uændret. Se [versionsnoterne](docs/version-0.8.76.md).
