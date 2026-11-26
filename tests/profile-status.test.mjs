@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {profileStatuses,renderProfileStatus,createProfileStatusHelp} from '../dist/src/features/profile-status.js';
 const now=Date.now(),id='080608317309',profile={type:'cat',attachment:{state:'worn',since:now-3600000,trackerId:id},trackerId:id,homeWifi:{macs:['28:BD:89:05:5C:10']}};
-const moving=[0,1].map(i=>({timestamp:now-121000+i*120000,lat:56.5+i*.0004,lon:8.3,valid:true,charging:false,speedKph:3}));
+const moving=[0,1].map(i=>({timestamp:now-121000+i*120000,lat:56.5+i*.0004,lon:8.3,valid:true,charging:false,speedKph:3,satellites:15}));
 const data={restSamples:moving,source:'traccar',device:{identifier:id,status:'online'},position:{timestamp:now-1000,valid:true},telemetry:{receivedAt:now-1000,battery:80,batteryMeasuredAt:now-1000,charging:false,rssi:21,rssiMax:31,satellites:17,wifiMeasuredAt:now-1000,wifiAccessPoints:[{mac:'28:BD:89:05:5C:10',rssi:-60}]},reportState:{lastPositionReportAt:now-1000}};
 const map=(d=data,p=profile,at=now)=>Object.fromEntries(profileStatuses(d,p,at).map(s=>[s.key,s]));
 test('compact profile statuses show dated reporting, GPS, mobile, home Wi-Fi, battery and charging',()=>{

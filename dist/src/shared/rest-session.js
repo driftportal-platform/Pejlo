@@ -1,5 +1,6 @@
 import {distance,validPoint} from './geo.js';
 import {gpsSpeedLimit} from './gps-filter.js';
+import {gpsMovingPair} from './gps-motion.js';
 export const REST_STOP_DISTANCES=[10,20,30,40,50];
 export const restStopDistance=value=>REST_STOP_DISTANCES.includes(value)?value:40;
 // Speed-supported travel with a confirmed arrival, or sustained displacement.
@@ -15,6 +16,7 @@ export function restMovement(samples,started,type,now=Date.now(),historical=fals
   if(last&&(p.timestamp-last.timestamp>300000||distance(last,p)/( (p.timestamp-last.timestamp)/1000)>maxSpeed))run=[];
   run.push(p);if(run.length>4)run.shift();
   if(!historical&&now-p.timestamp>300000)continue;
+  if(run.length>=2){const pair=gpsMovingPair(run.at(-2),p,type,threshold);if(pair)return {at:pair.at,confirmedAt:pair.confirmedAt,fixes:2};}
   if(run.length>=3){const [a,b,c]=run.slice(-3),ab=distance(a,b),bc=distance(b,c),net=distance(a,c);
    if([a,b,c].every(q=>q.speedKph>=2)&&c.timestamp-a.timestamp>=20000&&ab>=legMinimum&&bc>=legMinimum&&net>=threshold&&ab+bc<=net*1.8)return {at:a.timestamp,confirmedAt:c.timestamp,fixes:3};
    // A walk can end between two reports. Two moving fixes at least a minute

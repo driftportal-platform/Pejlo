@@ -1,5 +1,6 @@
 import {distance,validPoint} from './geo.js';
-export const gpsSpeedLimit=type=>({cat:12,dog:15,horse:25,animal:15,bicycle:20,car:70,object:20}[type]??20);
+import {gpsSpeedLimit,gpsMovingPair} from './gps-motion.js';
+export {gpsSpeedLimit} from './gps-motion.js';
 function isMirrored(point,reference){
  return validPoint(point)&&validPoint(reference)&&
   distance(reference,{lat:-point.lat,lon:-point.lon})<=25000&&distance(reference,point)>1000000;
@@ -30,11 +31,25 @@ export function advanceGps(previous,point,type='object',home=null){
  if(!state.provisional&&d>Math.max(1000,100*dt)){
   state.uncertain=true;state.pending=null;return {state,accepted:false};
  }
+ // Two high-quality fixes with travel supported by the reported speed do not
+ // require the animal to stop in a 75 m cluster before the marker can move.
+ if(!mirrored&&gpsMovingPair(anchor,point,type,10,false)){
+  state.trusted=point;state.pending=null;state.provisional=false;state.uncertain=false;
+  return {state,accepted:true};
+ }
  // Sparse reports can make a large jump look plausible by speed alone.
  const maxUnconfirmedDistance=type==='cat'?95:Infinity;
  const suspicious=mirrored||d>Math.min(maxUnconfirmedDistance,Math.max(30,speed*Math.min(dt,30)));
  if(!suspicious){state.trusted=point;state.pending=null;state.provisional=false;state.uncertain=false;return {state,accepted:true};}
  const pending=state.pending,elapsed=pending?(point.timestamp-pending.timestamp)/1000:0;
+ const moving=pending&&gpsMovingPair(pending,point,type,10);
+ // Recover a previously held marker too, including anchors saved before speed
+ // and satellite metadata were retained. Reject an out-and-back jump here.
+ if(!mirrored&&moving&&d>=distance(anchor,pending)-15&&distance(anchor,pending)+moving.meters<=d*1.8){
+  const replaced=state.provisional?{timestamp:anchor.timestamp,confirmed:pending}:null;
+  state.trusted=point;state.pending=null;state.provisional=false;state.uncertain=false;
+  return {state,accepted:true,replaced};
+ }
  const confirmationWindow=type==='cat'?600:180;
  const confirmationRadius=Math.min(type==='cat'?75:Infinity,Math.max(35,speed*Math.min(Math.max(elapsed,0),10)));
  const consistent=pending&&distance(pending,point)<=confirmationRadius;
@@ -59,3 +74,4 @@ export function filterGps(points,type='object',initial={},home=null){
  if(state.provisional&&state.pending&&accepted[0]?.timestamp===state.trusted?.timestamp)accepted.shift();
  return {state,points:accepted,rejected:points.filter(Boolean).length-accepted.length};
 }
+

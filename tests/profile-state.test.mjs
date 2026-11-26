@@ -13,7 +13,7 @@ test('one profile state prioritizes offline, charging and a fresh sleep report o
  assert.equal(profileState({...data,reportState:{lastSleepAt:now-3600000,lastPositionReportAt:now-1000}},profile,now).label,'Online','yesterday sleep cannot look current');
 });
 test('active requires movement and possible rest remains an estimate in the same field',()=>{
- const moving=[0,1].map(i=>({timestamp:now-120000+i*120000,lat:56.5+i*.0004,lon:8.3,valid:true,speedKph:3,charging:false}));
+ const moving=[0,1].map(i=>({timestamp:now-120000+i*120000,lat:56.5+i*.0004,lon:8.3,valid:true,speedKph:3,charging:false,satellites:15}));
  assert.equal(profileState({...data,restSamples:moving},profile,now).label,'Aktiv');
  const quiet=Array.from({length:10},(_,i)=>({...moving[0],timestamp:now-(18-i*2)*60000,speedKph:0}));
  const rest=profileState({...data,restSamples:quiet},profile,now);assert.equal(rest.label,'Mulig hvile');assert.match(rest.detail,/ikke målt søvn/);

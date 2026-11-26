@@ -1,7 +1,7 @@
 import {distance,validPoint} from './geo.js';
 import {cleanAttachment} from './attachment.js';
 import {animalType} from './activity.js';
-import {gpsSpeedLimit} from './gps-filter.js';
+import {gpsMovingPair} from './gps-motion.js';
 import {reportStatus} from './report-status.js';
 
 export const QUIET_DURATION=15*60000,QUIET_GAP=5*60000,QUIET_RADIUS=25;
@@ -52,9 +52,6 @@ export function petActivityStatus(data,profile,now=Date.now()){
  if(!usable(last)||last.charging!==false)return unknown('GPS eller opladningsstatus er utilstrækkelig til at vurdere aktivitet.');
  const quiet=quietGps(samples,now).at(-1);
  if(quiet&&quiet[1]===last.timestamp)return {state:'rest',label:'Mulig hvile',detail:'Mindst 15 minutters lav hastighed og positioner inden for 25 meter. Trackeren er markeret som påsat og oplader ikke. GPS-estimat – ikke målt søvn.',since:quiet[0],until:quiet[1]};
- if(usable(previous)&&previous.charging===false&&last.timestamp-previous.timestamp<=QUIET_GAP&&!last.breakBefore&&previous.speedKph>=2&&last.speedKph>=2){
-  const meters=distance(previous,last),seconds=(last.timestamp-previous.timestamp)/1000;
-  if(meters>=10&&meters/seconds<=gpsSpeedLimit(profile.type)&&last.speedKph/3.6<=gpsSpeedLimit(profile.type)&&previous.speedKph/3.6<=gpsSpeedLimit(profile.type))return {state:'moving',label:'I bevægelse',detail:'To friske GPS-målinger viser hastighed og en sammenhængende forskydning. Det er en GPS-vurdering.',since:previous.timestamp,until:last.timestamp};
- }
+ if(gpsMovingPair(previous,last,profile.type,10))return {state:'moving',label:'I bevægelse',detail:'To friske GPS-målinger viser hastighed og en sammenhængende forskydning. Det er en GPS-vurdering.',since:previous.timestamp,until:last.timestamp};
  return unknown('Afventer mindst 15 minutters sammenhængende ro eller tydelig bevægelse.');
 }

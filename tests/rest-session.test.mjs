@@ -58,7 +58,7 @@ test('each selected distance controls real displacement while poor fixes and iso
   assert.ok(restMovement(rows,start,'cat',start+180000,false,threshold));
   assert.equal(restMovement(rows.map((p,i)=>({...p,lat:metres(i/2*(threshold-1))})),start,'cat',start+180000,false,threshold),null);
   assert.equal(restMovement(rows.map(p=>({...p,satellites:3})),start,'cat',start+180000,false,threshold),null);
-  assert.equal(restMovement([rows[0],rows[2],{...rows[2],timestamp:rows[2].timestamp+60000,lat:rows[0].lat}],start,'cat',start+240000,false,threshold),null);
+  assert.equal(restMovement([{...rows[0],speedKph:0},rows[2],{...rows[2],speedKph:0,timestamp:rows[2].timestamp+60000,lat:rows[0].lat}],start,'cat',start+240000,false,threshold),null);
  }
 });
 test('changing the active threshold never reinterprets earlier fixes and records the new choice on the session',async()=>{
@@ -122,20 +122,19 @@ test('GPS jumps back, poor fixes, old/future fixes, missing speed and gaps never
  for(const rows of [[fix(1),fix(2,57),fix(3)],samples.map(p=>({...p,speedKph:0})),samples.map(p=>({...p,satellites:0})),samples.map(p=>({...p,accuracy:80})),samples.map(p=>({...p,valid:false})),[fix(1),fix(4),fix(7)],[fix(1),fix(1),fix(2)],samples.map(p=>({...p,timestamp:p.timestamp+3600000}))])assert.equal(restMovement(rows,start,'cat',now),null);
  assert.equal(restMovement(samples,start,'cat',now+3600000),null);
 });
-test('the actual evening walk closes rest after arrival confirmation despite zero instantaneous speed',async()=>{
+test('the actual evening walk closes rest at the second good moving fix without waiting for an arrival',async()=>{
  const rows=eveningWalk(),now=rows.at(-1).timestamp+4000,started=Date.parse('2026-11-26T21:00:00+01:00');
- assert.equal(restMovement(rows.slice(0,3),started,'cat',now),null,'two moving fixes alone are insufficient');
- const result=restMovement(rows,started,'cat',now);assert.equal(result.at,Date.parse('2026-11-26T22:04:02+01:00'));assert.equal(result.confirmedAt,Date.parse('2026-11-26T22:06:11+01:00'));
+ assert.equal(restMovement(rows.slice(0,3),started,'cat',now).fixes,2);
+ const result=restMovement(rows,started,'cat',now);assert.equal(result.at,Date.parse('2026-11-26T22:04:02+01:00'));assert.equal(result.confirmedAt,Date.parse('2026-11-26T22:06:03+01:00'));
  const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()},'owner',started);
  for(const row of rows)await f.observe([row],row.timestamp+4000);
  const state=await f.api(null,'owner',now);assert.equal(state.active,null);assert.equal(state.history[0].reason,'movement');assert.equal(state.history[0].endedAt,result.at);
 });
-test('arrival proof rejects weak GPS, charging, single speed spikes, return jumps and reused fixes',()=>{
+test('movement proof rejects weak GPS, charging, single speed spikes and reused fixes',()=>{
  const rows=eveningWalk().slice(1),now=rows.at(-1).timestamp+4000,started=rows[0].timestamp-1000;
  const variants=[
   rows.map(p=>({...p,satellites:3})),rows.map(p=>({...p,charging:null})),rows.map(p=>({...p,charging:true})),rows.map(p=>({...p,accuracy:60})),
   rows.map((p,i)=>i===0?{...p,speedKph:0}:p),rows.map((p,i)=>i===1?{...p,speedKph:0}:p),
-  [rows[0],rows[1],{...rows[2],lat:rows[0].lat,lon:rows[0].lon}],
   [rows[0],rows[1],{...rows[2],timestamp:rows[1].timestamp}],
   rows.map(p=>({...p,lat:56.5,lon:8.3}))
  ];
