@@ -336,3 +336,25 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .page-tabs button{font-size:0.875rem;min-height:44px}
 #kort>.page-tabs{order:-1}
 #kort>.overview:not(.tab-hidden) .status-card{margin:0 0 12px;box-shadow:none}
+
+/* The map comes before rest controls at every viewport size. Earlier mobile
+   rules assigned order:1 to the map but left rest controls at order:0. */
+#kort{display:flex;flex-direction:column}
+#kort>*{order:1}
+#kort>.page-tabs{order:-1;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:6px;padding:2px 0 8px;margin:0}
+#kort>.page-tabs button{padding:8px 12px;min-height:44px;font-size:.8125rem}
+#kort>.map-card,#kort>#polygon-tools{order:0}
+#kort>.map-card{margin-top:0;margin-bottom:8px}
+#kort>.manual-rest{order:2;margin-top:8px}
+@media(max-width:700px){
+ body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar{padding:8px 18px;gap:6px}
+ body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar .account-brand{width:70px}
+ body:not(.admin-document):has(#kort:not([hidden])) .account-actions{gap:6px}
+ body:not(.admin-document):has(#kort:not([hidden])) .account-actions button{padding:8px 10px;min-height:40px;font-size:12px}
+ body:not(.admin-document):has(#kort:not([hidden])) .account-details{gap:4px 10px;font-size:12px}
+ body:not(.admin-document):has(#kort:not([hidden])) #account-email{display:none}
+ body:not(.admin-document):has(#kort:not([hidden])) #server-status{flex-basis:auto}
+ body:not(.admin-document):has(#kort:not([hidden])) #sync-state{font-size:11px}
+ body:has(#kort:not([hidden])) .profile-bar{margin-bottom:8px}
+ #kort{gap:6px}
+}
