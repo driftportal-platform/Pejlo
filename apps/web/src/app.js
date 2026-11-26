@@ -283,7 +283,7 @@ const trackerDetails=$('#tracker-details');
 
 
 
-const trackerClient=createTrackerClient();
+const trackerClient=createTrackerClient({routeInterval:()=>$('#show-route').checked||currentPage==='ture'||currentPage==='indstillinger'?60000:300000});
 const batteryControls=createBatteryControls({root:$('#battery-controls'),selected,request:trackerRequest,notice:toast,canEdit:()=>!!trackerUser&&ownedTrackers.some(t=>t.identifier===selected()?.trackerId&&t.is_owner!==0)});
 
 const activity=createActivity({root:$('#activity'),selected,request:trackerRequest,notice:toast,scope:()=>sessionGeneration});
@@ -916,7 +916,7 @@ function connectTracker(){
 
 
 
- trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,restSamples:restSamples([...(trackerData.restSamples||[]),...(value.restSamples||[])]).filter(p=>p.timestamp>=Date.now()-20*60000).slice(-2000),route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;accountMobile={enabled:typeof value.mobileLocationEnabled==='boolean'?value.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};trackerError='';const pending=currentPage==='indstillinger'&&settingsDirty?Array.from(document.querySelectorAll('#profile-form input,#profile-form select,#home-form input,#home-form select'),e=>[e,e.type==='checkbox'?e.checked:e.value]):[];refresh();for(const [element,value] of pending)if(element.type==='checkbox')element.checked=value;else element.value=value;},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;accountMobile.error=true;updateTrackerStatus();},trackerActions.get(id)?.until);
+ trackerClient.start(trackerUser,id,(value,live)=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerData=live&&trackerData?.device.identifier===id&&trackerData.serverRevision===value.serverRevision?{...trackerData,...value,restSamples:restSamples([...(trackerData.restSamples||[]),...(value.restSamples||[])]).filter(p=>p.timestamp>=Date.now()-20*60000).slice(-2000),route:trackerData.route,historyAvailable:trackerData.historyAvailable,historyTruncated:trackerData.historyTruncated}:value;accountMobile={enabled:typeof value.mobileLocationEnabled==='boolean'?value.mobileLocationEnabled:null,checkedAt:Date.now(),error:false};trackerError='';refreshTrackerData();},message=>{if(gen!==sessionGeneration||pollingId!==id)return;trackerError=message;accountMobile.error=true;updateTrackerStatus({updateOptions:false});},trackerActions.get(id)?.until);
 
 
 
@@ -924,7 +924,7 @@ function connectTracker(){
 
 
 
-function updateTrackerStatus(){
+function updateTrackerStatus({updateOptions=true}={}){
 
 
 
@@ -952,7 +952,7 @@ function updateTrackerStatus(){
 
 
 
- options($('#profile-tracker'),[['','Ingen tracker · vis eksempeldata'],...ownedTrackers.map(t=>[t.identifier,t.name+' · '+t.identifier]),...(!ownedTrackers.some(t=>t.identifier===value)&&value?[[value,value]]:[])],value);
+ if(updateOptions)options($('#profile-tracker'),[['','Ingen tracker · vis eksempeldata'],...ownedTrackers.map(t=>[t.identifier,t.name+' · '+t.identifier]),...(!ownedTrackers.some(t=>t.identifier===value)&&value?[[value,value]]:[])],value);
 
 
 
@@ -1255,7 +1255,7 @@ function refresh(){
 
 
 
-  if(empty){restSession.clear();activity.clear();wifiDiscovery.clear();wifiSetup.clear();}else restSession.sync();
+  if(empty){restSession.clear();activity.clear();wifiDiscovery.clear();wifiSetup.clear();}
 
 
 
@@ -1279,7 +1279,7 @@ function refresh(){
 
 
 
-  const p=selected(),d=data(),meta=types[p.type];
+  const p=selected(),meta=types[p.type];
   activity.sync();
 
 
@@ -1336,10 +1336,6 @@ function refresh(){
 
 
 
-  $('#home-distance').textContent=d.position&&p.homeConfirmed?formatDistance(distance(p.home,d.position)):'—';
-
-
-
   $('#home-title').textContent=meta.noun;
 
 
@@ -1376,10 +1372,6 @@ function refresh(){
 
 
 
-  $('#history-description').textContent=isLinked()?(d.historyAvailable?'Vælg i dag, i går eller en periode på højst 31 dage. Datoer og klokkeslæt er dansk tid.':'Dagens historik kunne ikke hentes. Prøv igen senere.'):'En opdigtet rute viser, hvordan positionshistorikken kan fungere.';
-
-
-
   $('#route-label').textContent=isLinked()?'DAGENS GPS-PUNKTER · DANSK TID':'DAGENS EKSEMPELRUTE';
 
 
@@ -1392,10 +1384,6 @@ function refresh(){
 
 
 
-  $('#point-count').textContent=d.route.length;
-
-
-
   $('#point-label').textContent=isLinked()?'GPS-punkter':'eksempelpunkter';
 
 
@@ -1404,29 +1392,29 @@ function refresh(){
 
 
 
-  $('#trip-distance').textContent=isLinked()&&d.route.length<2?'—':formatDistance(routeAnalysis(d.route).meters);
-
-
-
-
-
-
-
-  $('#navigate').hidden=displayPosition(d)?.approximate===true||!d.position;
-
-
-
-  if(d.position)$('#navigate').href=`https://www.google.com/maps/search/?api=1&query=${d.position.lat},${d.position.lon}`;
-
-
-
-  renderMap(overviewMap);renderMap(searchMap);updateAge();updateSearch();showPage(currentPage);
+  refreshTrackerData();showPage(currentPage);
 
 
 
 }
 
 
+
+function refreshTrackerData(){
+ const p=selected(),d=data();
+ if(!p)return;
+ updateTrackerStatus({updateOptions:false});
+ $('#home-distance').textContent=d.position&&p.homeConfirmed?formatDistance(distance(p.home,d.position)):'—';
+ $('#history-description').textContent=isLinked()?(d.historyAvailable?'Vælg i dag, i går eller en periode på højst 31 dage. Datoer og klokkeslæt er dansk tid.':'Dagens historik kunne ikke hentes. Prøv igen senere.'):'En opdigtet rute viser, hvordan positionshistorikken kan fungere.';
+ $('#point-count').textContent=d.route.length;
+ $('#trip-distance').textContent=isLinked()&&d.route.length<2?'—':formatDistance(routeAnalysis(d.route).meters);
+ $('#navigate').hidden=displayPosition(d)?.approximate===true||!d.position;
+ if(d.position)$('#navigate').href=`https://www.google.com/maps/search/?api=1&query=${d.position.lat},${d.position.lon}`;
+ restSession.sync();
+ if(currentPage==='kort')renderMap(overviewMap);
+ if(currentPage==='soeg'){renderMap(searchMap);updateSearch();}
+ updateAge();
+}
 
 function updateGeofence(){
 
@@ -1760,11 +1748,11 @@ $('#profile-select').onchange=e=>{mapTools?.close();wifiDiscovery.clear();wifiSe
 
 
 
-$('#fit-route').onclick=()=>{
+$('#fit-route').onclick=async()=>{
 
 
 
- const option=$('#show-route'),d=data();
+ const option=$('#show-route'),profileId=selected()?.id;
 
 
 
@@ -1776,7 +1764,7 @@ $('#fit-route').onclick=()=>{
 
 
 
-  $('#follow-tracker').checked=true;overviewMap?.center(displayPosition(d));
+  $('#follow-tracker').checked=true;overviewMap?.center(displayPosition(data()));
 
 
 
@@ -1784,7 +1772,13 @@ $('#fit-route').onclick=()=>{
 
 
 
-  if(!d||!overviewMap?.fitRoute(d.route))return toast('Der er ingen rute at vise endnu.');
+  if(isLinked()){
+   const button=$('#fit-route');
+   button.disabled=true;
+   try{await trackerClient.refreshRoute();}finally{button.disabled=false;}
+   if(profileId!==selected()?.id||currentPage!=='kort')return;
+  }
+  if(!data()||!overviewMap?.fitRoute(data().route))return toast('Der er ingen rute at vise endnu.');
 
 
 
@@ -1810,7 +1804,10 @@ $('#wifi-setup-open').onclick=()=>{trackerDetails.close();go('indstillinger','pr
 
 
 
-for(const id of overviewOptions)$('#'+id).onchange=()=>renderMap(overviewMap);
+for(const id of overviewOptions)$('#'+id).onchange=()=>{
+ renderMap(overviewMap);
+ if(id==='show-route'&&$('#show-route').checked&&isLinked())trackerClient.refreshRoute();
+};
 
 
 
@@ -2002,7 +1999,7 @@ window.addEventListener('pageshow',event=>{if(event.persisted&&trackerUser)conne
 
 
 
-refresh();showPage(window.location.hash.slice(1));selectLayer(loadMapLayer(mapConfig.defaultLayer));setInterval(()=>{updateAge();if(currentPage==='soeg')updateSearch();},1000);
+refresh();showPage(window.location.hash.slice(1));selectLayer(loadMapLayer(mapConfig.defaultLayer));setInterval(()=>{if(!document.hidden){updateAge();if(currentPage==='soeg')updateSearch();}},1000);
 
 
 
