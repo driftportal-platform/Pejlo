@@ -46,7 +46,17 @@ export async function runNotifications(env,fetcher=fetch){
  let status=env.TRACCAR_TOKEN?'completed':'missing-token';
  let base=null;
  const tracked=async(url,options)=>{const upstream=!!base&&url.startsWith(base+'/');if(upstream)stats.requests++;try{const r=await fetcher(url,options);if(upstream&&!r.ok)stats.upstreamErrors++;return r;}catch(e){if(upstream)stats.upstreamErrors++;throw e;}};
- try{env=await resolveTraccarEnv(env);base=traccarOrigin(env);status=env.TRACCAR_TOKEN?'completed':'missing-token';try{await runBatteryAutomation(env,tracked,base);}catch{stats.errors++;}try{await runPositionRefresh(env,tracked,base);}catch{stats.errors++;}try{await runRestSessions(env,tracked,base);}catch{stats.errors++;}await processNotifications(env,tracked,stats,base);if(stats.errors||stats.upstreamErrors)status='partial';}
+ try{
+  env=await resolveTraccarEnv(env);base=traccarOrigin(env);
+  status=env.TRACCAR_TOKEN?'completed':'missing-token';
+  for(const job of [
+   ()=>processNotifications(env,tracked,stats,base),
+   ()=>runBatteryAutomation(env,tracked,base),
+   ()=>runPositionRefresh(env,tracked,base),
+   ()=>runRestSessions(env,tracked,base)
+  ])try{await job();}catch{stats.errors++;}
+  if(stats.errors||stats.upstreamErrors)status='partial';
+ }
  catch{status='failed';stats.errors++;}
  finally{
   await env.DB.prepare('UPDATE pejlo_runs SET finished_at=?,status=?,checked=?,errors=?,upstream_requests=?,upstream_errors=? WHERE id=?').bind(Date.now(),status,stats.checked,stats.errors,stats.requests,stats.upstreamErrors,id).run();
@@ -57,11 +67,14 @@ async function processNotifications(env,fetcher,stats,base){
  if(!env.DB||!env.TRACCAR_TOKEN)return;
  if(!base)throw Error('Ugyldig Traccar-adresse.');
  await ensureNotifications(env.DB);await ensureFamily(env.DB);await ensureArchive(env.DB);
- const rows=await env.DB.prepare(`SELECT t.identifier,t.owner_uid,t.name AS tracker_name,f.name AS fence_name,f.config,f.state,f.enabled FROM trackers t LEFT JOIN pejlo_fences f ON f.identifier=t.identifier AND f.owner_uid=t.owner_uid WHERE f.enabled=1 OR EXISTS(SELECT 1 FROM pejlo_alerts a WHERE a.identifier=t.identifier) ORDER BY COALESCE((SELECT MIN(a.checked_at) FROM pejlo_alerts a WHERE a.identifier=t.identifier),f.checked_at,0) LIMIT 8`).all();
+ const rows=await env.DB.prepare(`SELECT t.identifier,t.owner_uid,t.name AS tracker_name,f.name AS fence_name,f.config,f.state,f.enabled,COALESCE((SELECT MIN(a.checked_at) FROM pejlo_alerts a WHERE a.identifier=t.identifier),f.checked_at,0) AS last_attempt FROM trackers t LEFT JOIN pejlo_fences f ON f.identifier=t.identifier AND f.owner_uid=t.owner_uid WHERE f.enabled=1 OR EXISTS(SELECT 1 FROM pejlo_alerts a WHERE a.identifier=t.identifier) ORDER BY last_attempt,t.identifier LIMIT 8`).all();
+ let successful=0,oldestAttemptAgeMs=0,firstChecks=0;
  const get=async path=>{const r=await fetcher(base+path,{headers:{Authorization:'Bearer '+env.TRACCAR_TOKEN},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('upstream');return r.json();};
  for(const row of rows.results){
   try{
    stats.checked++;const now=Date.now();
+   if(row.last_attempt)oldestAttemptAgeMs=Math.max(oldestAttemptAgeMs,now-row.last_attempt);
+   else firstChecks++;
    await env.DB.prepare('UPDATE pejlo_fences SET checked_at=? WHERE identifier=?').bind(now,row.identifier).run();
    await env.DB.prepare('UPDATE pejlo_alerts SET checked_at=? WHERE identifier=?').bind(now,row.identifier).run();
    const devices=await get('/api/devices?uniqueId='+encodeURIComponent(row.identifier)),device=devices.find(d=>d.uniqueId===row.identifier);
@@ -105,8 +118,10 @@ async function processNotifications(env,fetcher,stats,base){
      if(enabled&&!quiet&&ready&&!paused)await env.DB.prepare('INSERT OR IGNORE INTO pejlo_events(id,identifier,uid,kind,payload,created_at) VALUES(?,?,?,?,?,?)').bind(id,row.identifier,uid,kind,JSON.stringify(kind===transition?{...payload,areaId}:payload),now).run();
     }
    }
+   if(raw||!device.positionId)successful++;
   }catch{stats.errors++; /* Upstream failures cannot create geofence or battery events. */ }
  }
+ if(rows.results.length)console.info('pejlo.alarm-checks',JSON.stringify({selected:rows.results.length,successful,firstChecks,oldestAttemptAgeMs}));
  await env.DB.prepare('DELETE FROM pejlo_alarm_history WHERE created_at<?').bind(Date.now()-90*86400000).run();
  await pruneHandoffs(env.DB,Date.now());
  if(!pushReady(env))return;
