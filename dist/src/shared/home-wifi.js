@@ -23,11 +23,21 @@ export function cleanWifiConfig(raw){
  return {macs,samples};
 }
 export function wifiObservation(data,config,now=Date.now()){
+ const observations=wifiObservations(data,config,now);
+ if(observations.length)return observations.at(-1);
  const c=cleanWifiConfig(config),t=data?.telemetry;
- const at=t?.wifiMeasuredAt;
- const all=cleanAccessPoints(t?.wifiAccessPoints),points=all.filter(p=>c.macs.includes(p.mac));
- const fresh=Number.isFinite(at)&&at<=now+10000&&now-at<=WIFI_MAX_AGE&&data?.device?.status==='online';
- return {config:c,at,all,points,fresh};
+ return {config:c,at:t?.wifiMeasuredAt,all:[],points:[],fresh:false};
+}
+// Keep measurement times: subsequent GPS packets and repeated polls are not scans.
+export function wifiObservations(data,config,now=Date.now()){
+ const c=cleanWifiConfig(config),t=data?.telemetry;
+ const scans=[...(Array.isArray(t?.wifiScans)?t.wifiScans.slice(-64):[]),t?.lastWifi,{at:t?.wifiMeasuredAt,points:t?.wifiAccessPoints}],found=new Map();
+ for(const scan of scans){
+  const at=scan?.at,all=cleanAccessPoints(scan?.points);
+  if(!all.length||!Number.isFinite(at)||at<=0||at>now+10000)continue;
+  found.set(at,{config:c,at,all,points:all.filter(p=>c.macs.includes(p.mac)),fresh:now-at<=WIFI_MAX_AGE&&data?.device?.status==='online'});
+ }
+ return [...found.values()].sort((a,b)=>a.at-b.at).slice(-64);
 }
 export function homeWifiStatus(data,config,now=Date.now()){
  const o=wifiObservation(data,config,now),base={...o,label:'Usikkert',kind:'unknown'};

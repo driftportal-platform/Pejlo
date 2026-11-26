@@ -1,19 +1,22 @@
-import {wifiObservation,normalizeMac} from '../shared/home-wifi.js';
+import {wifiObservation,wifiObservations,normalizeMac} from '../shared/home-wifi.js';
 
 // Keep unconfirmed neighbours in memory only. Repeated API polls are not new scans.
 export function createWifiScan(){
  const points=new Map();let lastAt=null,scans=0;
  return {
   observe(data,now=Date.now()){
-   const o=wifiObservation(data,{},now);
-   if(!o.fresh||!o.all.length||lastAt!==null&&o.at<=lastAt)return false;
+   let changed=false;
+   for(const o of wifiObservations(data,{},now)){
+   if(!o.fresh||!o.all.length||lastAt!==null&&o.at<=lastAt)continue;
+   changed=true;
    lastAt=o.at;scans++;
    for(const p of o.all){
     const previous=points.get(p.mac);
     if(!previous&&points.size>=64)continue;
     points.set(p.mac,{mac:p.mac,rssi:p.rssi,strongest:Math.max(previous?.strongest??-100,p.rssi),seen:(previous?.seen??0)+1,lastAt:o.at});
    }
-   return true;
+   }
+   return changed;
   },
   snapshot:()=>({scans,lastAt,points:[...points.values()].map(p=>({...p})).sort((a,b)=>b.strongest-a.strongest)})
  };
@@ -39,7 +42,7 @@ export function createWifiDiscovery({root,selected,data,canEdit,ready,readMacs,o
   if(!available)running=false;
   if(running)scan.observe(data(),now());
   const snapshot=scan.snapshot(),o=wifiObservation(data(),{},now());
-  start.disabled=!available||running;start.textContent=snapshot.scans?'Start ny søgning':'Find hjemmets Wi-Fi';
+  start.disabled=!available||running;start.textContent=snapshot.scans?'Start ny indsamling':'Se Wi-Fi fra trackeren';
   stop.hidden=!running;use.hidden=!snapshot.points.length;
   for(const p of snapshot.points){
    let row=rows.get(p.mac);
@@ -59,9 +62,9 @@ export function createWifiDiscovery({root,selected,data,canEdit,ready,readMacs,o
   else if(!ready())status.textContent='Gem dit valg af tracker på profilen før søgning.';
   else if(used)status.textContent='De valgte punkter er tilføjet til feltet nedenfor. Tryk Gem profil for at gemme dem.';
   else if(saved)status.textContent='Hjemmets Wi-Fi er gemt på profilen. Du kan nu gemme målinger inde og ude nedenfor.';
-  else if(!running)status.textContent=snapshot.scans?'Søgning stoppet. '+snapshot.points.length+' punkter fundet i '+snapshot.scans+' målinger. Vælg dine egne punkter.':'Start søgningen, og flyt trackeren til forskellige steder i huset.';
+  else if(!running)status.textContent=snapshot.scans?'Søgning stoppet. '+snapshot.points.length+' punkter fundet i '+snapshot.scans+' målinger. Vælg dine egne punkter.':'Start indsamlingen, og flyt trackeren til forskellige steder i huset. Appen læser trackerens rapporter; den sender ikke en scanningskommando.';
   else if(data()?.device?.status!=='online')status.textContent='Søgning startet. Afventer, at trackeren kommer online. Fundne punkter bevares.';
-  else if(!o.fresh||!o.all.length)status.textContent='Afventer en frisk Wi-Fi-måling fra trackeren. '+snapshot.points.length+' punkter fundet indtil nu.';
+  else if(!o.fresh||!o.all.length)status.textContent='Afventer en ny Wi-Fi-måling fra trackeren. '+snapshot.points.length+' punkter fundet indtil nu.'+(Number.isFinite(o.at)?' Seneste Wi-Fi-scanning er '+Math.max(0,Math.floor((now()-o.at)/60000))+' min. gammel.':'')+' Et godt signal på mobilen betyder ikke, at trackeren har sendt en scanning.';
   else status.textContent='Søger · '+snapshot.points.length+' punkter fra '+snapshot.scans+' forskellige målinger. Flyt trackeren rundt, og vent på nye målinger.';
  }
  start.onclick=()=>{

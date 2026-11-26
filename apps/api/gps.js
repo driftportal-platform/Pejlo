@@ -43,7 +43,8 @@ export function trackerTelemetry(raw,now=Date.now()){
  const charge=raw?.attributes?.charge;
  const wifiAccessPoints=cleanAccessPoints(raw?.network?.wifiAccessPoints);
  const deviceTime=Date.parse(raw?.deviceTime);
- const wifiMeasuredAt=!wifiAccessPoints.length||receivedAt==null||deviceTime>now+10000?null:(Number.isFinite(deviceTime)?Math.min(receivedAt,deviceTime):receivedAt);
+ const measuredTime=Number.isFinite(deviceTime)?deviceTime:fixTime;
+ const wifiMeasuredAt=!wifiAccessPoints.length||receivedAt==null||measuredTime>now+10000?null:(Number.isFinite(measuredTime)?Math.min(receivedAt,measuredTime):receivedAt);
  return {
   battery:batteryLevel(raw),
   charging:typeof charge==='boolean'?charge:null,

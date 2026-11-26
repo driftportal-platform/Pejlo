@@ -346,6 +346,14 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 #kort>.map-card,#kort>#polygon-tools{order:0}
 #kort>.map-card{margin-top:0;margin-bottom:8px}
 #kort>.manual-rest{order:2;margin-top:8px}
+.wifi-setup-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:12px 0}
+.wifi-setup-steps li{border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:14px;color:#52635a}
+.wifi-setup-steps li.is-current{background:#e9efdf;border-color:#8ba16f;color:var(--green);font-weight:700}
+.wifi-setup-live{padding:14px;border:1px solid var(--line);border-radius:14px;background:#f7f9f5;margin:12px 0}
+.wifi-setup-live strong{display:block;font-size:20px;margin:8px 0;overflow-wrap:anywhere}
+.wifi-setup-live[data-strength=strong] strong{color:#216d4a}.wifi-setup-live[data-strength=medium] strong{color:#9a6206}.wifi-setup-live[data-strength=weak] strong{color:#a72f38}
+.wifi-setup-live p{margin:6px 0;font-size:14px;line-height:1.5}
+.wifi-setup-progress{font-size:16px;font-weight:700}.wifi-setup-comparison{line-height:1.6}
 @media(max-width:700px){
  body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar{padding:8px 18px;gap:6px}
  body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar .account-brand{width:70px}

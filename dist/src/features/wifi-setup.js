@@ -1,4 +1,4 @@
-import {createWifiSetup,wifiSetupQuality} from '../shared/wifi-setup.js';
+import {createWifiSetup,wifiSetupQuality,wifiSetupReadout} from '../shared/wifi-setup.js';
 import {cleanWifiConfig,wifiObservation} from '../shared/home-wifi.js';
 
 export function createWifiSetupGuide({root,selected,data,canEdit,ready,scope=()=>'',save,notice,now=Date.now,doc=root.ownerDocument}){
@@ -20,6 +20,13 @@ export function createWifiSetupGuide({root,selected,data,canEdit,ready,scope=()=
  }
  function render(){
   const available=!!key&&canEdit()&&ready()&&!busy,view=session?.snapshot(),config=cleanWifiConfig(selected()?.homeWifi);
+  const live=wifiSetupReadout(data(),view?{...config,macs:view.macs}:config,now());
+  const card=q('live'),signal=q('signal'),age=q('age'),comparison=q('comparison');
+  if(card){card.dataset.strength=live.strength;card.hidden=!key;}
+  if(signal)signal.textContent=live.rssi===null?(live.seen?'Hjemmets valgte punkter er ikke med':'Ingen Wi-Fi-måling endnu'):(live.fresh?'':'Sidst målt: ')+live.rssi+' dBm'+(live.fresh?' · '+{strong:'Stærkt',medium:'Middel',weak:'Svagt',unknown:'Ukendt'}[live.strength]:'');
+  if(age){const seconds=live.at===null?null:Math.max(0,Math.floor((now()-live.at)/1000));age.textContent=(seconds===null?'Afventer en scanning fra trackeren.':(seconds<60?seconds+' sek.':Math.floor(seconds/60)+' min.')+' siden · '+live.seen+' punkter set'+(live.configured?' · '+live.matched+' matcher hjemmet':''))+(live.fresh?'':' · bruges ikke som en ny måling.');}
+  if(comparison)comparison.textContent=live.difference===null?'Inde/ude-sammenligningen vises, når begge trin er gemt.':'Gemt: inde '+live.inside+' dBm · ude '+live.outside+' dBm · forskel '+live.difference+' dB. Stærkeste punkt pr. måling, gennemsnit. '+(wifiSetupQuality(config)==='distinct'?'Mønstrene kan skelnes i dine målinger.':'Mønstrene er endnu usikre; prøv et andet sted ude.');
+  for(const step of root.querySelectorAll?.('[data-wifi-step]')||[]){const current=!view?'inside':view.phase==='choose'?'choose':['outside','done'].includes(view.phase)?'outside':'inside';step.classList.toggle('is-current',step.dataset.wifiStep===current);if(step.dataset.wifiStep===current)step.setAttribute('aria-current','step');else step.removeAttribute('aria-current');}
   q('start').disabled=!available||!!session&&!done;
   q('start').textContent=config.samples.length?'Start ny inde/ude-opsætning':'Start – trackeren er inde';
   q('resume').hidden=!!session||config.samples.filter(s=>s.label==='inside').length<3||config.samples.filter(s=>s.label==='outside').length>=3;

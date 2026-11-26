@@ -1,4 +1,12 @@
-import {cleanWifiConfig,normalizeMac,wifiObservation,homeWifiStatus} from './home-wifi.js';
+import {cleanWifiConfig,normalizeMac,wifiObservation,wifiObservations,homeWifiStatus} from './home-wifi.js';
+
+export function wifiSetupReadout(data,config,now=Date.now()){
+ const o=wifiObservation(data,config,now),p=(o.config.macs.length?o.points:o.all)[0];
+ const average=label=>{const rows=o.config.samples.filter(s=>s.label===label);return rows.length?Math.round(rows.reduce((n,s)=>n+Math.max(...s.points.map(p=>p.rssi)),0)/rows.length):null;};
+ const inside=average('inside'),outside=average('outside');
+ return {at:Number.isFinite(o.at)?o.at:null,fresh:o.fresh,rssi:p?.rssi??null,seen:o.all.length,matched:o.points.length,configured:o.config.macs.length,
+  strength:!o.fresh||!p?'unknown':p.rssi>=-60?'strong':p.rssi>=-75?'medium':'weak',inside,outside,difference:inside===null||outside===null?null:Math.abs(inside-outside)};
+}
 
 export function wifiSetupQuality(config){
  const c=cleanWifiConfig(config),counts={inside:0,outside:0};
@@ -24,14 +32,18 @@ export function createWifiSetup(config,now=Date.now(),resumeOutside=false){
   snapshot:()=>copy({phase,macs,confirmed,inside,outside,startedAt}),
   observe(data,at=Date.now()){
    if(!['inside','outside'].includes(phase))return false;
-   const o=wifiObservation(data,{macs},at);
+   let changed=false;
+   for(const o of wifiObservations(data,{macs},at)){
+   if(!['inside','outside'].includes(phase))break;
    const points=confirmed?o.points:o.all;
-   if(!o.fresh||!points.length||o.at<startedAt||o.at<=lastAt||lastAt&&o.at-lastAt<20000)return false;
+   if(!o.fresh||!points.length||o.at<startedAt||o.at<=lastAt||lastAt&&o.at-lastAt<20000)continue;
+   changed=true;
    lastAt=o.at;
    const samples=phase==='inside'?inside:outside;
    samples.push({label:phase,at:o.at,points:copy(points)});
    if(samples.length===3)phase=phase==='inside'?(confirmed?'inside-ready':'choose'):'done';
-   return true;
+   }
+   return changed;
   },
   candidates(){
    const found=new Map();

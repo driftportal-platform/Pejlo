@@ -1,7 +1,7 @@
-import {cleanAccessPoints} from './home-wifi.js';
+import {cleanAccessPoints,wifiObservations} from './home-wifi.js';
 export function rememberWifi(previous,telemetry,now=Date.now()){
  const clean=v=>{const points=cleanAccessPoints(v?.points),at=v?.at;return points.length&&Number.isFinite(at)&&at>0&&at<=now+10000?{points,at}:null;};
- const old=clean(previous),next=clean({points:telemetry?.wifiAccessPoints,at:telemetry?.wifiMeasuredAt});
+ const old=clean(previous),observation=wifiObservations({telemetry},{},now).at(-1),next=clean({points:observation?.all,at:observation?.at});
  return next&&(!old||next.at>old.at)?next:old;
 }
 export function wifiDisplay(status,last){

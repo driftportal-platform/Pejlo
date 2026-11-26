@@ -1,3 +1,4 @@
+import {trackerWifiScans} from './wifi-observations.js';
 import {restSessionAPI,observeRestSession} from './rest-session.js';
 import {restObservation} from './rest-observation.js';
 import {receiveReportState,readReportState} from './report-state.js';
@@ -555,7 +556,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
   const now=new Date();let range;try{range=historyRange(url.searchParams.get('from')||danishDate(),url.searchParams.get('to')||url.searchParams.get('from')||danishDate());}catch(e){throw new Failure(400,e.message);}const from=new Date(range.from),to=new Date(range.to);
 
-  let route=[],chargingReports=[],restSamples=[],sessionSamples=[],historyAvailable=true,historyTruncated=false;
+  let route=[],chargingReports=[],restSamples=[],sessionSamples=[],wifiScans=[],historyAvailable=true,historyTruncated=false;
 
   if(url.searchParams.get('live')!=='1')try{
 
@@ -563,6 +564,7 @@ export async function handleAPI(request,env,fetcher=fetch){
 
    if(!Array.isArray(points))throw new Error();
 
+   wifiScans=trackerWifiScans(points,device.id);
    sessionSamples=points.length<10000?points.filter(p=>p.deviceId===device.id&&Date.parse(p.fixTime)>=from.getTime()&&Date.parse(p.fixTime)<=to.getTime()).map(restObservation).filter(Boolean):[];
    restSamples=points.filter(p=>p.deviceId===device.id).map(restObservation).filter(p=>p&&p.timestamp>=Date.now()-20*60000&&p.timestamp<=Date.now()).slice(-2000);
 
@@ -586,6 +588,7 @@ export async function handleAPI(request,env,fetcher=fetch){
   // Historical queries must never rewind the shared live filter.
 
   const telemetry=trackerTelemetry(raw);
+  if(wifiScans.length)telemetry.wifiScans=wifiScans;
 
   const gps=await trustedGps(env.DB,identifier,ownerRow.owner_uid,samples,type,home,{
 
