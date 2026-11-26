@@ -36,3 +36,51 @@ test('Find polls every 10 seconds until its faster polling window ends',async()=
   assert.equal([...pending.values()][0].delay,15000);
  }finally{client.stop();Date.now=now;}
 });
+
+test('visibility suspends polling and a route can be refreshed on demand',async()=>{
+ const visibility=new EventTarget();
+ visibility.hidden=false;
+ let timerId=0;
+ const timers=new Map(),urls=[];
+ const client=createTrackerClient({
+  visibility,routeInterval:()=>300000,
+  fetcher:async url=>{urls.push(url);return Response.json({source:'traccar',device:{identifier:'abc'}});},
+  setTimer:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},
+  clearTimer:id=>timers.delete(id)
+ });
+ try{
+  client.start({getIdToken:async()=> 'token'},'abc',()=>{},assert.fail);
+  await flush();
+  visibility.hidden=true;
+  visibility.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(timers.size,0);
+  assert.equal(await client.refreshRoute(),false);
+  visibility.hidden=false;
+  visibility.dispatchEvent(new Event('visibilitychange'));
+  await flush();
+  assert.equal(await client.refreshRoute(),true);
+  assert.deepEqual(urls.map(url=>url.includes('&live=1')),[false,true,false]);
+ }finally{client.stop();}
+});
+
+test('polling backs off after errors and resets after success',async()=>{
+ let timerId=0,attempt=0;
+ const timers=new Map();
+ const client=createTrackerClient({
+  fetcher:async()=>++attempt<3
+   ?Response.json({error:'Midler­tidig fejl'},{status:503})
+   :Response.json({source:'traccar',device:{identifier:'abc'}}),
+  setTimer:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},
+  clearTimer:id=>timers.delete(id)
+ });
+ try{
+  client.start({getIdToken:async()=> 'token'},'abc',()=>{},()=>{});
+  await flush();
+  for(const delay of [30000,60000]){
+   const [timer]=timers.values();
+   assert.equal(timer.delay,delay);
+   await timer.callback();
+  }
+  assert.equal([...timers.values()][0].delay,15000);
+ }finally{client.stop();}
+});

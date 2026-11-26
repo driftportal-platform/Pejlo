@@ -19,3 +19,29 @@ test('fence API enforces ownership and stores only a validated shape',async()=>{
 
 test('named fences survive account normalization; deletion stays deleted and legacy area migrates once',()=>{const base={id:'x',name:'Loui',type:'cat',home,homeConfirmed:true,geofenceEnabled:true};let profile=cleanProfile(base);assert.equal(profile.fencePresets[0].name,'Hjemme');const other={id:'holiday',name:'Sommerhus',home:{...home,lat:57,buffer:2}};profile.fencePresets.push(other);profile.activeFenceId=other.id;profile.home=other.home;profile=cleanProfile(JSON.parse(JSON.stringify(profile)));assert.equal(profile.activeFenceId,'holiday');assert.equal(profile.home.buffer,2);assert.equal(profile.fencePresets.length,2);profile=cleanProfile({...profile,fencePresets:[],activeFenceId:null,homeConfirmed:false,geofenceEnabled:false});assert.equal(profile.fencePresets.length,0);assert.equal(cleanProfile(profile).fencePresets.length,0);assert.equal(cleanProfile(base).home.buffer,5);});
 test('a 5 m or zero margin detects near-boundary exits that a 15 m margin suppresses',()=>{const now=Date.now(),raw=step=>({latitude:56+110/111195,longitude:8,valid:true,fixTime:new Date(now+step).toISOString()});for(const buffer of [0,5,15]){let result={state:{outside:false,last:now-1,pending:0}};for(let i=0;i<2;i++)result=advanceFence({...home,buffer},raw(i),result.state,now+i);assert.equal(result.transition,buffer===15?undefined:'exit');}});
+
+test('alarm batches rotate past eight trackers when an upstream response is slow or fails',async()=>{
+ const DB=database();
+ await ensureNotifications(DB);
+ for(let i=0;i<10;i++){
+  const id='tracker-'+i;
+  await DB.prepare('INSERT INTO trackers(identifier,owner_uid) VALUES(?,?)').bind(id,'owner').run();
+  await DB.prepare('INSERT INTO pejlo_fences(identifier,owner_uid,name,config,enabled) VALUES(?,?,?,?,1)').bind(id,'owner',id,JSON.stringify(home)).run();
+ }
+ const requested=[];
+ const fetcher=async url=>{
+  const id=new URL(url).searchParams.get('uniqueId');
+  if(!id)return Response.json([]);
+  requested.push(id);
+  if(id==='tracker-0'){
+   await new Promise(resolve=>setTimeout(resolve,20));
+   return Response.json({}, {status:503});
+  }
+  return Response.json([{id:Number(id.at(-1))+1,uniqueId:id}]);
+ };
+ const env={DB,TRACCAR_TOKEN:'test'};
+ await runNotifications(env,fetcher);
+ assert.equal(requested.length,8);
+ await runNotifications(env,fetcher);
+ assert.deepEqual(requested.slice(8,10),['tracker-8','tracker-9']);
+});

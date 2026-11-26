@@ -12,9 +12,11 @@ test('legacy account keys cannot override application map configuration',()=>{
 test('build injects the shared public key, defaults to streets and rejects URLs',()=>{
  const root=mkdtempSync(join(tmpdir(),'pejlo-build-'));
  try{
-  for(const name of ['apps','packages','scripts'])cpSync(name,join(root,name),{recursive:true});
+  for(const name of ['apps','packages','scripts','package.json'])cpSync(name,join(root,name),{recursive:true});
   const run=key=>spawnSync(process.execPath,['scripts/build.mjs'],{cwd:root,env:{...process.env,MAPTILER_API_KEY:key},encoding:'utf8'});
   assert.equal(run('test-public-key_123').status,0);
+  const {version}=JSON.parse(readFileSync(join(root,'package.json'),'utf8'));
+  assert.ok(readFileSync(join(root,'dist/index.html'),'utf8').includes('Pejlo '+version));
   const config=readFileSync(join(root,'dist/src/config/maps.js'),'utf8');
   assert.match(config,/"apiKey":"test-public-key_123"/);assert.match(config,/"defaultLayer":"satellite"/);
   assert.equal(run('').status,0);assert.match(readFileSync(join(root,'dist/src/config/maps.js'),'utf8'),/"apiKey":""/);
