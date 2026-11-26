@@ -51,6 +51,7 @@ import {installCspDiagnostics} from './features/csp-diagnostics.js';
 
 
 import {initSettingsTabs} from './features/settings-tabs.js';
+import {initPageTabs} from './features/page-tabs.js';
 
 
 
@@ -179,6 +180,7 @@ const state=emptyState();
 
 
 const settingsTabs=initSettingsTabs();collapseHints();
+const pageTabs=initPageTabs(document,{mapChanged:()=>requestAnimationFrame(()=>overviewMap?.invalidate()),tripsChanged:(key)=>{if(key!=='ruter')history.stop();else requestAnimationFrame(()=>history.resize());}});
 
 
 
@@ -1152,6 +1154,7 @@ function showPage(name){
 
 
   currentPage=name;
+  pageTabs?.sync();
 
 
 
@@ -2087,7 +2090,7 @@ startAuthentication(async(user,{auth})=>{
 
 
 
- fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();profileSheet.update([],null);snooze.clear();handoff.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;batteryControls.clear();serverStatus.stop();trackerActions.clear();accountMobile={enabled:null,checkedAt:null,error:false};ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
+ fenceEditor.reset();family=new Map();invitationPresented=false;pairingPresented=false;settingsTabs?.reset();pageTabs?.reset();profileSheet.update([],null);snooze.clear();handoff.clear();$('#system-admin-link').hidden=true;$('#pause-action').hidden=true;familyReady=false;settingsDirty=false;lastInviteProfile=null;lastInviteText='';familyLoading=false;familySaving=false;alertsId=null;alertsConfig=cleanAlerts();alertsGeneration++;historyProfile=null;history.clear();alarms.clear();wake.stop();$('#keep-awake').checked=false;$('#family-result').textContent='';$('#join-result').textContent='';$('#push-status').textContent='';cancelDrawing();geofenceMonitor.clear();trackerClient.stop();trackerData=null;trackerError='';trackerUser=null;batteryControls.clear();serverStatus.stop();trackerActions.clear();accountMobile={enabled:null,checkedAt:null,error:false};ownedTrackers=[];pollingId=null;$('#claim-code').value='';$('#claim-result').textContent='';
 
 
 

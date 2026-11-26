@@ -40,6 +40,6 @@ export function createHistoryView({request,selected,layer,key,notice}){
  $('#history-slider').oninput=()=>{stop();point();};
  $('#history-play').onclick=()=>{if(timer){stop();return;}if(!value?.analysis.points.length)return notice('Hent først en periode med GPS-punkter.');if(+$('#history-slider').value>=+$('#history-slider').max)$('#history-slider').value=0;$('#history-play').textContent='Pause';timer=setInterval(()=>{const n=+$('#history-slider').value+1;if(n>+$('#history-slider').max){stop();return;}$('#history-slider').value=n;point();},500);};
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
- return {load,clear,stop};
+ return {load,clear,stop,resize(){map?.resize?.();}};
 }
 
