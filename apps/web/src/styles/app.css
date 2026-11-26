@@ -354,6 +354,18 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 .wifi-setup-live[data-strength=strong] strong{color:#216d4a}.wifi-setup-live[data-strength=medium] strong{color:#9a6206}.wifi-setup-live[data-strength=weak] strong{color:#a72f38}
 .wifi-setup-live p{margin:6px 0;font-size:14px;line-height:1.5}
 .wifi-setup-progress{font-size:16px;font-weight:700}.wifi-setup-comparison{line-height:1.6}
+.map-tools-open{position:absolute;right:12px;top:76px;z-index:450;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--green);box-shadow:0 3px 14px #183e3526;font-size:14px;font-weight:700}
+.map-tools{position:fixed;inset:0 0 0 auto;margin:0;width:min(390px,100%);max-width:100%;height:100dvh;max-height:100dvh;box-sizing:border-box;border:0;border-left:1px solid var(--line);border-radius:20px 0 0 20px;padding:calc(18px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));overflow-y:auto;text-align:left}
+.map-tools::backdrop{background:#102a245c}
+.map-tools .dialog-header{align-items:center;margin-bottom:12px}.map-tools h2{margin:0;font-size:23px}.map-tools h3{font-size:16px;margin:20px 0 10px}
+.map-tools .map-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}.map-tools button{min-height:44px;font-size:14px}.map-tools .map-actions button{white-space:normal;margin:0;padding:12px 8px}
+.map-tools .map-bottom{position:static;inset:auto;display:flex;flex-direction:column;align-items:stretch;gap:8px;margin:0;pointer-events:auto;z-index:auto}
+.map-tools .map-bottom button{max-width:100%;border:1px solid var(--line);border-radius:10px;white-space:normal;box-shadow:none}
+.map-tools .map-caption{display:none}.map-tools .position-request-status{font-size:14px;line-height:1.5}
+.map-tools .remember{font-size:14px;display:flex;align-items:center;gap:8px;margin:0 0 12px}.map-tools input[type=checkbox]{width:22px;height:22px;flex-shrink:0}
+.map-tools .map-options{margin:0}.map-tools .map-options summary{font-size:14px}.map-tools .overlay-options{flex-direction:column;gap:14px;font-size:14px;padding:10px 0 18px}.map-tools .overlay-options label{line-height:1.5}
+.map-tools-open:focus-visible{outline:3px solid var(--green);outline-offset:3px}
+@media(max-width:700px){.map-tools{inset:auto 0 0;width:100%;height:auto;max-height:82dvh;border-left:0;border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding-top:18px}}
 @media(max-width:700px){
  body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar{padding:8px 18px;gap:6px}
  body:not(.admin-document):has(#kort:not([hidden])) .account-toolbar .account-brand{width:70px}

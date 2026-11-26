@@ -52,6 +52,7 @@ import {installCspDiagnostics} from './features/csp-diagnostics.js';
 
 import {initSettingsTabs} from './features/settings-tabs.js';
 import {initPageTabs} from './features/page-tabs.js';
+import {createMapTools} from './features/map-tools.js';
 
 
 
@@ -179,8 +180,9 @@ const state=emptyState();
 
 
 
+let mapTools=null;
 const settingsTabs=initSettingsTabs();collapseHints();
-const pageTabs=initPageTabs(document,{mapChanged:()=>requestAnimationFrame(()=>overviewMap?.invalidate()),tripsChanged:(key)=>{if(key!=='ruter')history.stop();else requestAnimationFrame(()=>history.resize());}});
+const pageTabs=initPageTabs(document,{mapChanged:key=>{if(key!=='kort')mapTools?.close();requestAnimationFrame(()=>overviewMap?.invalidate());},tripsChanged:(key)=>{if(key!=='ruter')history.stop();else requestAnimationFrame(()=>history.resize());}});
 
 
 
@@ -1154,6 +1156,7 @@ function showPage(name){
 
 
   currentPage=name;
+  if(name!=='kort')mapTools?.close();
   pageTabs?.sync();
 
 
@@ -1752,7 +1755,7 @@ overviewMap=createMap('map',{notice:toast,onManual:()=>{$('#follow-tracker').che
 
 
 
-$('#profile-select').onchange=e=>{wifiDiscovery.clear();wifiSetup.clear();settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
+$('#profile-select').onchange=e=>{mapTools?.close();wifiDiscovery.clear();wifiSetup.clear();settingsDirty=false;cancelDrawing();stopLocation(false);state.activeId=e.target.value;persist();refresh();};
 
 
 
@@ -2904,6 +2907,7 @@ $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('t
 
 
 
+mapTools=createMapTools();
 initPageScroll();
 
 
