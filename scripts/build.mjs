@@ -1,7 +1,8 @@
 import {cpSync,mkdirSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 rmSync('dist/src',{recursive:true,force:true});
 mkdirSync('dist',{recursive:true});
-const index=readFileSync('apps/web/index.html','utf8');
+const {version}=JSON.parse(readFileSync('package.json','utf8'));
+const index=readFileSync('apps/web/index.html','utf8').replaceAll('{{PEJLO_VERSION}}',version);
 const auth=index.match(/<!-- shared-auth:start -->([\s\S]*?)<!-- shared-auth:end -->/)?.[1];
 if(!auth)throw new Error('Fælles login mangler i index.html.');
 const admin=readFileSync('apps/web/admin.html','utf8').replace('<!-- shared-auth -->',()=>auth);
