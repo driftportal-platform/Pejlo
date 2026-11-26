@@ -53,6 +53,7 @@ import {installCspDiagnostics} from './features/csp-diagnostics.js';
 import {initSettingsTabs} from './features/settings-tabs.js';
 import {initPageTabs} from './features/page-tabs.js';
 import {createMapTools} from './features/map-tools.js';
+import {createMapViewport} from './features/map-viewport.js';
 
 
 
@@ -2907,7 +2908,8 @@ $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('t
 
 
 
-mapTools=createMapTools();
+mapTools=createMapTools(document,{section:key=>pageTabs?.map.select(key)});
+createMapViewport({resized:()=>overviewMap?.resize()});
 initPageScroll();
 
 
