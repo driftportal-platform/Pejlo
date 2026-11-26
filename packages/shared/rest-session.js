@@ -1,6 +1,6 @@
 import {distance,validPoint} from './geo.js';
 import {gpsSpeedLimit} from './gps-filter.js';
-// Three speed-supported fixes or four fixes confirming a larger displacement.
+// Speed-supported travel with a confirmed arrival, or sustained displacement.
 // A lone jump, a jump back, an old upload or a heartbeat cannot stop manual rest.
 export function restMovement(samples,started,type,now=Date.now(),historical=false){
  const maxSpeed=gpsSpeedLimit(type),rows=[...samples].filter(p=>p&&Number.isFinite(p.timestamp)&&p.timestamp>started&&p.timestamp<=now&&(historical||now-p.timestamp<=15*60000)).sort((a,b)=>a.timestamp-b.timestamp);
@@ -14,6 +14,11 @@ export function restMovement(samples,started,type,now=Date.now(),historical=fals
   if(!historical&&now-p.timestamp>300000)continue;
   if(run.length>=3){const [a,b,c]=run.slice(-3),ab=distance(a,b),bc=distance(b,c),net=distance(a,c);
    if([a,b,c].every(q=>q.speedKph>=2)&&c.timestamp-a.timestamp>=20000&&ab>=10&&bc>=10&&net>=35&&ab+bc<=net*1.8)return {at:a.timestamp,confirmedAt:c.timestamp,fixes:3};
+   // A walk can end between two reports. Two moving fixes at least a minute
+   // apart, followed by an independent fix near the arrival, still show travel.
+   // Keep the 40 m displacement and all GPS quality checks; one speed spike or
+   // a jump straight back cannot close a resting session.
+   if(a.speedKph>=2&&b.speedKph>=2&&c.speedKph<=1&&b.timestamp-a.timestamp>=60000&&c.timestamp-b.timestamp>=5000&&c.timestamp-b.timestamp<=120000&&ab>=40&&bc<=15&&net>=40)return {at:a.timestamp,confirmedAt:c.timestamp,fixes:3};
   }
   // Point speed is instantaneous: a walking animal may have stopped at each fix.
   // Require a stronger four-fix spatial proof rather than inventing a speed.

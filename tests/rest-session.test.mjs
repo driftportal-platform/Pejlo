@@ -10,6 +10,15 @@ import {deleteUserData} from '../apps/api/user-data.js';
 import {createRestSession} from '../dist/src/features/rest-session.js';
 const start=Date.parse('2026-11-25T12:00:00Z'),identifier='080608317309',source='a',day='2026-11-25';
 const fix=(min,lat=56.5+min*.0003,extra={})=>({timestamp:start+min*60000,lat,lon:8.3,valid:true,speedKph:4,charging:false,satellites:15,accuracy:null,...extra});
+// Actual JT808 position bodies from the walk on 26 November. Device clock is
+// decoded as Asia/Shanghai, matching the installed Traccar device setting.
+const eveningBodies=[
+ '00000000004c0003035efc21007f19a5004e0000006f26112705020230010f310112',
+ '00000000004c0003035efbd6007f1996004c0034015d26112705040230010d310112',
+ '00000000004c0003035efb10007f16220045002b003826112705060330011031010f',
+ '00000000004c0003035efb22007f165900440000004026112705061130010e310110'
+];
+function eveningWalk(){return eveningBodies.map(hex=>{const b=Buffer.from(hex,'hex'),t=b.subarray(22,28).toString('hex').match(/../g).map(Number);return {timestamp:Date.UTC(2000+t[0],t[1]-1,t[2],t[3],t[4],t[5])-8*3600000,lat:b.readUInt32BE(8)/1e6,lon:b.readUInt32BE(12)/1e6,valid:!!(b.readUInt32BE(4)&2),speedKph:b.readUInt16BE(18)/10,satellites:b.at(-1),charging:false,accuracy:null};});}
 async function fixture(){
  const raw=new DatabaseSync(':memory:');raw.exec('CREATE TABLE trackers(identifier TEXT PRIMARY KEY,owner_uid TEXT)');
  const db={prepare(sql){const s=raw.prepare(sql);let a=[];return {bind(...v){a=v;return this;},async first(){return s.get(...a)||null;},async run(){return s.run(...a);},async all(){return {results:s.all(...a)};}};}};
@@ -81,6 +90,27 @@ test('GPS jumps back, poor fixes, old/future fixes, missing speed and gaps never
  assert.ok(restMovement(samples,start,'cat',now));
  for(const rows of [[fix(1),fix(2,57),fix(3)],samples.map(p=>({...p,speedKph:0})),samples.map(p=>({...p,satellites:0})),samples.map(p=>({...p,accuracy:80})),samples.map(p=>({...p,valid:false})),[fix(1),fix(4),fix(7)],[fix(1),fix(1),fix(2)],samples.map(p=>({...p,timestamp:p.timestamp+3600000}))])assert.equal(restMovement(rows,start,'cat',now),null);
  assert.equal(restMovement(samples,start,'cat',now+3600000),null);
+});
+test('the actual evening walk closes rest after arrival confirmation despite zero instantaneous speed',async()=>{
+ const rows=eveningWalk(),now=rows.at(-1).timestamp+4000,started=Date.parse('2026-11-26T21:00:00+01:00');
+ assert.equal(restMovement(rows.slice(0,3),started,'cat',now),null,'two moving fixes alone are insufficient');
+ const result=restMovement(rows,started,'cat',now);assert.equal(result.at,Date.parse('2026-11-26T22:04:02+01:00'));assert.equal(result.confirmedAt,Date.parse('2026-11-26T22:06:11+01:00'));
+ const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()},'owner',started);
+ for(const row of rows)await f.observe([row],row.timestamp+4000);
+ const state=await f.api(null,'owner',now);assert.equal(state.active,null);assert.equal(state.history[0].reason,'movement');assert.equal(state.history[0].endedAt,result.at);
+});
+test('arrival proof rejects weak GPS, charging, single speed spikes, return jumps and reused fixes',()=>{
+ const rows=eveningWalk().slice(1),now=rows.at(-1).timestamp+4000,started=rows[0].timestamp-1000;
+ const variants=[
+  rows.map(p=>({...p,satellites:3})),rows.map(p=>({...p,charging:null})),rows.map(p=>({...p,charging:true})),rows.map(p=>({...p,accuracy:60})),
+  rows.map((p,i)=>i===0?{...p,speedKph:0}:p),rows.map((p,i)=>i===1?{...p,speedKph:0}:p),
+  [rows[0],rows[1],{...rows[2],lat:rows[0].lat,lon:rows[0].lon}],
+  [rows[0],rows[1],{...rows[2],timestamp:rows[1].timestamp}],
+  rows.map(p=>({...p,lat:56.5,lon:8.3}))
+ ];
+ for(const points of variants)assert.equal(restMovement(points,started,'cat',now),null);
+ assert.equal(restMovement(rows,started,'cat',now+3600000),null);
+ assert.ok(restMovement(rows,started,'cat',now+3600000,true),'saved route can recover a missed confirmation');
 });
 test('absence of data leaves manual rest open; charging or removing the tracker ends it with a reason',async()=>{
  for(const kind of ['charging','removed']){
