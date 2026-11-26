@@ -1,1 +1,1 @@
-export const mapConfig = {"apiKey":"","defaultLayer":"streets"};
+export const mapConfig = {"apiKey":"","defaultLayer":"satellite"};
