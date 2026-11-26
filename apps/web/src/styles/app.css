@@ -330,6 +330,9 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
 @media(prefers-reduced-motion:reduce){.battery-charge-step{animation:none;opacity:.65}}
 
 .manual-rest{padding:14px 16px;margin:0 0 16px;background:#fff;border:1px solid var(--line);border-radius:14px}.manual-rest[hidden]{display:none}.manual-rest>button{width:100%;min-height:44px}.manual-rest p{font-size:12px;line-height:1.6;margin:8px 0}.manual-rest details{margin:10px 0 0}.manual-rest summary{font-size:12px}.rest-session-active{background:#216d4a;color:#fff}
+.manual-rest [data-rest-settings] label{display:block;margin:12px 0 8px;font-size:14px}
+.manual-rest [data-rest-distance]{display:block;width:100%;padding:10px;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--green);font-size:16px}
+.manual-rest [data-rest-save]{min-height:44px;margin:6px 0;font-size:14px}
 
 /* Section menus share the settings appearance and wrap on small screens. */
 .page-tabs{flex-wrap:wrap;overflow:visible;position:relative;top:auto}

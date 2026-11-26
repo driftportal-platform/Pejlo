@@ -40,6 +40,37 @@ test('manual rest is idempotent, limited to one active session and writable only
  const next=crypto.randomUUID();await f.api({action:'start',id:next},'owner',start+700000);await f.api({action:'stop',id},'owner',start+800000);assert.equal((await f.api()).active.id,next,'late stop must not close a new session');
  assert.equal((await f.api(null,'owner',start,{source:'b'})).history.length,0);
 });
+test('distance choice is profile scoped, revision checked, persisted and available only to editors',async()=>{
+ const f=await fixture();assert.equal((await f.api()).settings.distanceMeters,40);
+ const save=(distanceMeters,revision=0,activeId=null,who='owner')=>f.api({action:'settings',distanceMeters,revision,activeId},who);
+ await assert.rejects(()=>save(10,0,null,'viewer'),{status:403});
+ for(const v of [0,15,60,'20',null])await assert.rejects(()=>save(v),{status:400});
+ const r=await save(20,0,null,'editor');assert.equal(r.settings.distanceMeters,20);assert.equal(r.settings.revision,1);
+ await assert.rejects(()=>save(30),{status:409});assert.equal((await f.api(null,'owner',start,{source:'b'})).settings.distanceMeters,40);
+ const id=crypto.randomUUID();await f.api({action:'start',id});assert.equal((await f.api()).active.distanceMeters,20);
+ await assert.rejects(()=>save(10,1,null),{status:409});
+ await f.api({action:'stop',id});assert.equal((await f.api()).settings.distanceMeters,20);
+});
+test('each selected distance controls real displacement while poor fixes and isolated jumps remain rejected',()=>{
+ const metres=m=>56.5+m/111195;
+ for(const threshold of [10,20,30,40,50]){
+  const rows=[0,.5,1].map((part,i)=>fix(i+1,metres(part*(threshold+1))));
+  assert.ok(restMovement(rows,start,'cat',start+180000,false,threshold));
+  assert.equal(restMovement(rows.map((p,i)=>({...p,lat:metres(i/2*(threshold-1))})),start,'cat',start+180000,false,threshold),null);
+  assert.equal(restMovement(rows.map(p=>({...p,satellites:3})),start,'cat',start+180000,false,threshold),null);
+  assert.equal(restMovement([rows[0],rows[2],{...rows[2],timestamp:rows[2].timestamp+60000,lat:rows[0].lat}],start,'cat',start+240000,false,threshold),null);
+ }
+});
+test('changing the active threshold never reinterprets earlier fixes and records the new choice on the session',async()=>{
+ const f=await fixture(),id=crypto.randomUUID();await f.api({action:'start',id});
+ const rows=[1,2,3].map((m,i)=>fix(m,56.5+i*11/111195));await f.observe(rows,start+180000);assert.ok((await f.api()).active);
+ const changed=await f.api({action:'settings',distanceMeters:20,revision:0,activeId:id},'owner',start+240000);
+ assert.equal(changed.active.distanceMeters,20);assert.equal(changed.active.conditionsSinceAt,start+240000);
+ await f.observe(rows,start+250000,{historical:true});assert.ok((await f.api()).active,'old movement cannot end the session under a new threshold');
+ const fresh=rows.map(p=>({...p,timestamp:p.timestamp+240000}));await f.observe(fresh,start+420000);
+ const ended=(await f.api()).history[0];assert.equal(ended.reason,'movement');assert.equal(ended.endedAt,start+300000);assert.equal(ended.distanceMeters,20);
+ await deleteUserData(f.db,'owner');assert.equal(f.raw.prepare('SELECT count(*) n FROM pejlo_rest_session_settings').get().n,0);
+});
 test('manual start requires a worn tracker and rejects a recent charging report',async()=>{
  const f=await fixture();f.raw.prepare('UPDATE pejlo_profiles SET profile=?').run(JSON.stringify({...f.profile,attachment:null}));
  await assert.rejects(()=>f.api({action:'start',id:crypto.randomUUID()}),{status:409});
@@ -155,6 +186,16 @@ test('manual rest button starts/stops one period, logs its duration and ignores 
  fields.toggle.onclick();await new Promise(r=>setImmediate(r));assert.equal(fields.toggle.attrs['aria-pressed'],'true');assert.equal(fields.toggle.textContent,'Stop hvile');
  fields.toggle.onclick();await new Promise(r=>setImmediate(r));assert.equal(fields.toggle.attrs['aria-pressed'],'false');assert.match(fields.log.children[0].textContent,/0 t 10 min.*Stoppet manuelt/);
  profile={id:'car',type:'car'};ui.sync();assert.equal(root.hidden,true);assert.equal(calls.filter(c=>c?.action==='start').length,1);
+});
+test('rest settings form saves the chosen distance and revision without restarting the period',async()=>{
+ const fields=Object.fromEntries(['toggle','status','log','settings','distance','save','setting-note'].map(k=>[k,{children:[],attrs:{},value:'',setAttribute(k,v){this.attrs[k]=v;},replaceChildren(){this.children=[];},append(v){this.children.push(v);}}]));
+ const root={ownerDocument:{createElement:()=>({})},querySelector:s=>fields[s.match(/rest-([\w-]+)/)[1]]};
+ const profile={type:'cat',id:'loui',name:'Loui',trackerId:identifier,attachment:{state:'worn'}};
+ let state={canEdit:true,active:{id:'active',startedAt:Date.now()-600000,distanceMeters:40},history:[],settings:{distanceMeters:40,revision:2}};const calls=[];
+ const request=async(path,input)=>{if(input){calls.push(input);state={...state,active:{...state.active,distanceMeters:input.distanceMeters},settings:{distanceMeters:input.distanceMeters,revision:3}};}return state;};
+ const ui=createRestSession({root,selected:()=>profile,request,data:()=>null,notice(){}});ui.sync();await new Promise(r=>setImmediate(r));
+ assert.equal(fields.distance.value,'40');fields.distance.value='20';fields.distance.onchange();assert.equal(fields.save.disabled,false);
+ await fields.settings.onsubmit({preventDefault(){}});assert.equal(calls.length,1);assert.equal(calls[0].action,'settings');assert.equal(calls[0].revision,2);assert.equal(calls[0].activeId,'active');assert.equal(fields.distance.value,'20');assert.match(fields.status.textContent,/Stopgrænse 20 m/);assert.equal(fields.toggle.textContent,'Stop hvile');
 });
 test('a late start response cannot activate the button or expose a log after switching profiles',async()=>{
  const fields=Object.fromEntries(['toggle','status','log'].map(k=>[k,{attrs:{},setAttribute(k,v){this.attrs[k]=v;},replaceChildren(){this.children=[];},append(p){this.children.push(p);}}]));
