@@ -142,12 +142,21 @@ test('movement proof rejects weak GPS, charging, single speed spikes and reused 
  assert.equal(restMovement(rows,started,'cat',now+3600000),null);
  assert.ok(restMovement(rows,started,'cat',now+3600000,true),'saved route can recover a missed confirmation');
 });
-test('absence of data leaves manual rest open; charging or removing the tracker ends it with a reason',async()=>{
- for(const kind of ['charging','removed']){
-  const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()});await f.observe([],start+600000);assert.ok((await f.api()).active);
-  await f.observe(kind==='charging'?[fix(11,56.5,{charging:true,valid:false})]:[],start+660000,kind==='removed'?{profile:{...f.profile,attachment:{...f.profile.attachment,state:'removed',since:start+600000}}}:{});
-  const r=(await f.api()).history[0];assert.equal(r.reason,kind);assert.ok(r.endedAt>=start);
- }
+test('charging keeps manual rest open and movement must start after the charging report',async()=>{
+ const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()});
+ await f.observe([],start+600000);assert.ok((await f.api()).active);
+ const charge=fix(11,56.5,{charging:true,valid:false});
+ await f.observe([fix(9,56.5),fix(10,56.501),charge],start+660000);
+ assert.ok((await f.api()).active,'charging must not end rest or use earlier movement');
+ await f.observe([charge,fix(12,56.502)],start+720000);
+ assert.ok((await f.api()).active,'a single fix after charging cannot bridge across the charger');
+ await f.observe([fix(12,56.502),fix(14,56.503)],start+840000);
+ assert.equal((await f.api()).history[0].reason,'movement');
+});
+test('removing the tracker explicitly still ends the recorded period',async()=>{
+ const f=await fixture();await f.api({action:'start',id:crypto.randomUUID()});
+ await f.observe([],start+660000,{profile:{...f.profile,attachment:{...f.profile.attachment,state:'removed',since:start+600000}}});
+ const r=(await f.api()).history[0];assert.equal(r.reason,'removed');assert.ok(r.endedAt>=start);
 });
 test('registered periods appear in daily overview without doubling GPS rest and preserve manual zero',async()=>{
  const f=await fixture(),id=crypto.randomUUID();await f.api({action:'start',id});await f.api({action:'stop',id},'owner',start+15*60000);

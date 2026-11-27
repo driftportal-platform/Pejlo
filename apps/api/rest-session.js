@@ -54,14 +54,15 @@ export async function observeRestSession({db,identifier,owner,profile,source='en
  const attachment=cleanAttachment(profile.attachment,identifier,now),current=restSamples(samples,now).filter(p=>p.timestamp>row.started_at&&(historical||now-p.timestamp<=900000));
  let previous=[];try{previous=JSON.parse(row.samples);}catch{}
  const all=restSamples([...previous,...current],now).filter(p=>p.timestamp>row.started_at),combined=all.filter(p=>now-p.timestamp<=900000).slice(-12);
- const move=restMovement(historical?all:combined,Math.max(row.started_at,row.movement_since||0),profile.type,now,historical,restStopDistance(row.distance_metres));
- const charging=current.find(p=>p.charging===true);
+ // Charging is not evidence that the animal woke up. Start a new movement
+ // sequence after the latest charging report; never bridge across the charger.
+ const chargingAt=all.filter(p=>p.charging===true).reduce((at,p)=>Math.max(at,p.timestamp),0);
+ const move=restMovement(historical?all:combined,Math.max(row.started_at,row.movement_since||0,chargingAt),profile.type,now,historical,restStopDistance(row.distance_metres));
  const candidates=[];
  if(!animalType(profile.type)||attachment?.state!=='worn')candidates.push({at:Math.max(row.started_at,Math.min(now,attachment?.since??now)),reason:'removed'});
- if(charging)candidates.push({at:charging.timestamp,reason:'charging'});
  if(move)candidates.push({at:move.at,reason:'movement'});
  const first=candidates.sort((a,b)=>a.at-b.at)[0],end=first?.at??null,reason=first?.reason||'';
- if(end!==null)await db.prepare("UPDATE pejlo_rest_sessions SET ended_at=?,reason=?,checked_at=?,last_fix=?,samples='[]' WHERE id=? AND ended_at IS NULL AND distance_metres=? AND movement_since=?").bind(end,reason,now,move?.confirmedAt??charging?.timestamp??null,row.id,row.distance_metres,row.movement_since).run();
+ if(end!==null)await db.prepare("UPDATE pejlo_rest_sessions SET ended_at=?,reason=?,checked_at=?,last_fix=?,samples='[]' WHERE id=? AND ended_at IS NULL AND distance_metres=? AND movement_since=?").bind(end,reason,now,move?.confirmedAt??null,row.id,row.distance_metres,row.movement_since).run();
  else await db.prepare('UPDATE pejlo_rest_sessions SET checked_at=?,last_fix=?,samples=? WHERE id=? AND ended_at IS NULL AND samples=? AND distance_metres=? AND movement_since=?').bind(now,combined.filter(p=>p.valid).at(-1)?.timestamp??null,JSON.stringify(combined),row.id,row.samples,row.distance_metres,row.movement_since).run();
 }
 // Uses ordinary Traccar reads. It never wakes the tracker or changes its interval.
