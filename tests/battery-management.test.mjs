@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {managedBattery,runBatteryAutomation,ensureBatteryPolicy} from '../apps/api/battery-management.js';
 import {nextBatteryTarget} from '../packages/shared/battery-policy.js';
-import {createBatteryPolicy} from '../apps/web/src/features/battery-policy.js';
+import {createBatteryPolicy,batteryPolicySummary} from '../apps/web/src/features/battery-policy.js';
 import {deleteUserData} from '../apps/api/user-data.js';
 
 const identifier='080608317309',uid='owner',start=1800000000000;
@@ -112,4 +112,46 @@ test('policy UI sends an explicit duration and ignores a late response after pro
  fields['[data-battery-find-minutes]'].value='15';let resolve,updates=0;const calls=[];
  const ui=createBatteryPolicy({root:{querySelector:k=>fields[k]},selected:()=>({trackerId:identifier}),canEdit:()=>true,updated:()=>updates++,request:(path,input)=>{calls.push(input);return new Promise(r=>resolve=r);}});
  ui.render({enabled:true});const pending=fields['[data-battery-find]'].onclick();assert.equal(calls[0].minutes,15);ui.clear();resolve({enabled:true});await pending;assert.equal(updates,0);assert.equal(fields.fieldset.disabled,true);
+});
+
+test('restarting an expired Find preserves the original interval even before cron restores it',async()=>{
+ const f=fixture();await f.call({seconds:120,testConfirmed:true});
+ await f.call({action:'find',minutes:5},start+61000);
+ await f.call({action:'find',minutes:10},start+362000);
+ assert.equal(f.policy().resume_seconds,120);
+ await f.tick(start+963000);assert.deepEqual(f.seconds(),[120,30,120]);
+ assert.equal(f.policy().find_until,0);
+});
+
+test('saving automation during Find keeps its deadline and restores the selected policy afterwards',async()=>{
+ const f=fixture();profile(f);await f.call({action:'find',minutes:15});
+ await f.call({action:'auto',enabled:true,testConfirmed:true},start+61000);
+ assert.equal(f.policy().find_until,start+900000);assert.deepEqual(f.seconds(),[30]);
+ await f.tick(start+901000);assert.deepEqual(f.seconds(),[30,60]);assert.equal(f.policy().auto_enabled,1);
+});
+
+test('Find accepts all four UI durations and still rejects arbitrary input',async()=>{
+ for(const minutes of [5,10,15,30]){const f=fixture();await f.call({action:'find',minutes});assert.equal(f.policy().find_until,start+minutes*60000);}
+ for(const minutes of [0,1,60,'10',null]){const f=fixture();await assert.rejects(()=>f.call({action:'find',minutes}),{status:400});assert.equal(f.sent.length,0);}
+});
+
+test('countdown distinguishes elapsed Find awaiting restoration from completed restoration',()=>{
+ assert.match(batteryPolicySummary({find_until:start+61000},start),/1:01/);
+ assert.match(batteryPolicySummary({find_until:start},start),/afventer tilbagevending/);
+ assert.match(batteryPolicySummary({find_until:0,restore_pending:1},start),/afventer tilbagevending/);
+ assert.match(batteryPolicySummary({find_until:0,restore_pending:0,auto_enabled:1},start),/slået til/);
+});
+
+test('live policy reads preserve an unsaved toggle, pause while hidden, and discard stale responses',async()=>{
+ const fields=Object.fromEntries(['fieldset','[data-battery-auto]','[data-battery-auto-save]','[data-battery-policy-status]','[data-battery-policy-summary]','[data-battery-find]','[data-battery-find-minutes]','[data-battery-stop]'].map(k=>[k,{}]));
+ const doc={hidden:false};let tick,cleared=0,resolver,calls=0;
+ const win={setInterval(fn){tick=fn;return 1;},clearInterval(){cleared++;}};
+ const ui=createBatteryPolicy({root:{ownerDocument:doc,querySelector:k=>fields[k]},selected:()=>({trackerId:identifier}),canEdit:()=>true,updated:()=>{},win,now:()=>start,request:()=>{calls++;return new Promise(r=>resolver=r);}});
+ ui.render({enabled:true,policy:{auto_enabled:0}});
+ fields['[data-battery-auto]'].checked=true;fields['[data-battery-auto]'].onchange();
+ const read=ui.refresh();resolver({enabled:true,policy:{auto_enabled:0}});await read;
+ assert.equal(fields['[data-battery-auto]'].checked,true);assert.equal(fields['[data-battery-auto-save]'].disabled,false);
+ doc.hidden=true;tick();assert.equal(calls,1);
+ doc.hidden=false;const late=ui.refresh();ui.clear();resolver({enabled:true,policy:{auto_enabled:1,find_until:start+60000}});await late;
+ assert.equal(fields.fieldset.disabled,true);assert.equal(fields['[data-battery-auto]'].checked,false);assert.equal(cleared,1);
 });

@@ -399,3 +399,8 @@ html{scroll-padding-top:calc(var(--status-area) + 12px)}
  body:has(#kort:not([hidden])) .profile-bar{margin-bottom:8px}
  #kort{gap:6px}
 }
+.battery-policy-summary{font-weight:700;color:var(--green);background:#e9efdf;border-radius:12px;padding:12px 14px;line-height:1.5}.battery-policy-summary:empty{display:none}[data-battery-policy] fieldset{min-width:0}[data-battery-policy] .remember{display:flex;align-items:flex-start;gap:10px}[data-battery-policy] .remember input{flex:0 0 22px;width:22px;height:22px;margin:2px 0}[data-battery-policy] select{font-size:16px;min-height:44px}[data-battery-policy] button{min-height:44px}
+@media(max-width:700px){
+ body{padding-bottom:calc(var(--mobile-nav-height,78px) + 12px)}
+ .sidebar{position:fixed;top:var(--mobile-nav-top,auto);bottom:var(--mobile-nav-bottom,0px);left:0;right:0;width:100%;height:auto;margin:0;transform:translateZ(0);backface-visibility:hidden;background:#fafbf7;transition:none}
+}

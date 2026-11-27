@@ -1,29 +1,47 @@
-export function createBatteryPolicy({root,selected,request,canEdit,updated}){
+export function batteryPolicySummary(policy,now=Date.now()){
+ if(policy?.find_until>now){const seconds=Math.ceil((policy.find_until-now)/1000);return 'Find aktiv · '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+' tilbage · ønsket interval 30 sek.';}
+ if(policy?.find_until||policy?.restore_pending)return 'Find afsluttet eller indstilling ændret · intervallet afventer tilbagevending.';
+ return policy?.auto_enabled?'Automatisk interval er slået til':'Automatisk interval er slået fra';
+}
+export function createBatteryPolicy({root,selected,request,canEdit,updated,win=root?.ownerDocument?.defaultView,now=()=>Date.now()}){
  if(!root)return {clear(){},render(){}};
- const q=s=>root.querySelector(s);let generation=0,busy=false,enabled=false;
- const notes={offline:'Trackeren er offline. Tilbagevending afventer forbindelse.',cooldown:'Afventer mindst ét minut mellem ændringer.',uncertain:'Afsendelsen er uafklaret. Kontrollér intervallet i Traccar før et nyt manuelt ønske.',unsupported:'Intervalkommandoen kunne ikke bruges.',missing:'Trackeren blev ikke fundet.',error:'Serveren kunne ikke kontrollere trackeren. Nyt forsøg ved næste kontrol.',home:'Wi-Fi-mønstret ligner hjemme. Senest ønsket: 120 sekunder.',learning:'Samler friske Wi-Fi-målinger før skift til 120 sekunder.',outside:'Wi-Fi-mønstret ligner ude. Senest ønsket: 60 sekunder.',unknown:'Wi-Fi-vurderingen er usikker eller gammel. Senest ønsket: 60 sekunder.',normal:'Tilbagevending til det tidligere interval er behandlet.',find:'Find-intervallet er behandlet.'};
- function lock(){q('fieldset').disabled=busy||!enabled||!canEdit();}
- function clear(){generation++;busy=false;enabled=false;lock();q('[data-battery-auto]').checked=false;q('[data-battery-policy-status]').textContent='Vælg en tilknyttet tracker.';}
+ const q=s=>root.querySelector(s);let generation=0,busy=false,enabled=false,model=null,dirty=false,key=null,timer=null,lastPoll=0,polling=false,error='';
+ const notes={offline:'Trackeren er offline. Intervalændringen afventer forbindelse.',cooldown:'Afventer mindst ét minut mellem ændringer.',uncertain:'Afsendelsen er uafklaret. Kontrollér kommandolog og tracker før et nyt forsøg.',unsupported:'Trackeren understøtter ikke intervalkommandoen.',missing:'Trackeren blev ikke fundet.',error:'Serverkontrol mislykkedes. Der forsøges ved næste kontrol.',home:'Stabilt Wi-Fi-hjemmemønster: ønsket interval 120 sekunder.',learning:'Samler tre friske Wi-Fi-målinger over mindst to minutter. Ønsket interval 60 sekunder.',outside:'Wi-Fi-mønstret ligner ude: ønsket interval 60 sekunder.',unknown:'Wi-Fi er usikkert eller gammelt: ønsket interval 60 sekunder.',normal:'Det tidligere interval er sendt til Traccar.',manual:'Det manuelle interval er sendt til Traccar.',find:'Find-intervallet er sendt til Traccar.'};
+ const visible=()=>!root.ownerDocument?.hidden&&(!root.getClientRects||root.getClientRects().length>0);
+ function paint(){
+  const p=model?.policy,active=p?.find_until>now(),pending=!!p?.find_until||!!p?.restore_pending;
+  q('fieldset').disabled=busy||!enabled||!canEdit();
+  if(!dirty)q('[data-battery-auto]').checked=!!p?.auto_enabled;
+  q('[data-battery-auto-save]').disabled=!dirty;
+  q('[data-battery-find]').disabled=active||pending;
+  q('[data-battery-stop]').disabled=!active;
+  const summary=q('[data-battery-policy-summary]');if(summary)summary.textContent=enabled?batteryPolicySummary(p,now()):'Intervalstyring er ikke tilgængelig for denne tracker.';
+  const sendState=model?.last?.status;
+  q('[data-battery-policy-status]').textContent=error||(!enabled?'Automatik er ikke tilgængelig for denne tracker.':!p?'Vælg automatik eller start en tidsbegrænset Find-periode.':(notes[p.note]||'Afventer næste kontrol på serveren.')+(sendState==='sent'?' Afsendelsen er registreret; trackerens interval er ikke læst tilbage.':sendState?' Seneste afsendelse: '+({pending:'afventer svar',rejected:'afvist',uncertain:'uafklaret'}[sendState]||'ukendt')+'.':'')+(dirty?' Du har en ændring, som ikke er gemt.':''));
+ }
+ function stopTimer(){if(timer!==null){win?.clearInterval(timer);timer=null;}}
+ function clear(){generation++;stopTimer();busy=false;polling=false;enabled=false;model=null;dirty=false;key=null;error='';lastPoll=0;paint();}
  function render(result){
-  enabled=result.enabled===true;lock();const p=result.policy;
-  q('[data-battery-auto]').checked=!!p?.auto_enabled;
-  const active=p?.find_until>Date.now();
-  q('[data-battery-stop]').disabled=!p?.find_until&&!p?.restore_pending;
-  q('[data-battery-policy-status]').textContent=!enabled?'Automatik er ikke tilgængelig for denne tracker.':!p?'Automatik er slået fra.':(active?'Find ønsket frem til '+new Date(p.find_until).toLocaleTimeString('da-DK',{timeZone:'Europe/Copenhagen',hour:'2-digit',minute:'2-digit'})+'. ':p.find_until||p.restore_pending?'Afventer tilbagevending til normalt interval. ':'')+(p.auto_enabled?'Automatik slået til. ':'Automatik slået fra. ')+(notes[p.note]||'Afventer næste kontrol på serveren.');
+  const id=selected()?.trackerId;if(key!==id){generation++;dirty=false;key=id;error='';}
+  enabled=result.enabled===true;model=result;paint();
+  if(timer===null&&win)timer=win.setInterval(()=>{if(!visible())return;paint();if(now()-lastPoll>=15000)void refresh();},1000);
+ }
+ async function refresh(){
+  const id=key;if(!id||busy||polling||!visible())return;const gen=generation;polling=true;lastPoll=now();
+  try{const result=await request('battery?identifier='+encodeURIComponent(id));if(gen===generation&&selected()?.trackerId===id){error='';render(result);}}
+  catch(e){if(gen===generation){error='Status kunne ikke opdateres: '+e.message;paint();}}
+  finally{if(gen===generation)polling=false;}
  }
  async function send(input){
   const id=selected()?.trackerId;if(!id||busy||!enabled||!canEdit())return;
-  const gen=generation;busy=true;lock();
-  try{const result=await request('battery',{identifier:id,...input});if(gen===generation&&selected()?.trackerId===id)updated(result);}
-  catch(e){if(gen===generation)q('[data-battery-policy-status]').textContent=e.message;}
-  finally{if(gen===generation){busy=false;lock();}}
+  const gen=++generation;polling=false;busy=true;error='';paint();
+  try{const result=await request('battery',{identifier:id,...input});if(gen===generation&&selected()?.trackerId===id){if(input.action==='auto')dirty=false;lastPoll=now();updated(result);render(result);}}
+  catch(e){if(gen===generation)error=e.message;}
+  finally{if(gen===generation){busy=false;paint();}}
  }
- q('[data-battery-auto-save]').onclick=()=>{
-  const on=q('[data-battery-auto]').checked;
-  if(on&&!confirm('Afprøv automatisk 120 sekunder ved et stabilt hjemmemønster og 60 sekunder ved usikkerhed eller ude. Skal automatikken køre, også når appen er lukket?'))return;
-  return send({action:'auto',enabled:on,testConfirmed:on});
- };
+ q('[data-battery-auto]').onchange=()=>{dirty=q('[data-battery-auto]').checked!==!!model?.policy?.auto_enabled;paint();};
+ q('[data-battery-auto-save]').onclick=()=>send({action:'auto',enabled:q('[data-battery-auto]').checked,testConfirmed:true});
  q('[data-battery-find]').onclick=()=>send({action:'find',minutes:Number(q('[data-battery-find-minutes]').value)});
  q('[data-battery-stop]').onclick=()=>send({action:'stop'});
- clear();return {clear,render};
+ clear();return {clear,render,refresh};
 }

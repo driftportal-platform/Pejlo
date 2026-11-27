@@ -71,7 +71,7 @@ export async function managedBattery(options){
  const action=input.action||'manual';
  if(!['manual','auto','find','stop'].includes(action))fail(400,'Vælg en batterifunktion.');
  if(action==='manual'&&!batteryIntervals.includes(input.seconds))fail(400,'Vælg 30, 60 eller 120 sekunder.');
- if(action==='find'&&![5,15].includes(input.minutes))fail(400,'Vælg Find i 5 eller 15 minutter.');
+ if(action==='find'&&![5,10,15,30].includes(input.minutes))fail(400,'Vælg Find i 5, 10, 15 eller 30 minutter.');
  if(action==='auto'&&typeof input.enabled!=='boolean')fail(400,'Vælg om automatik skal være aktiv.');
  if(action==='auto'&&input.enabled){
   if(input.testConfirmed!==true)fail(400,'Bekræft afprøvning af automatisk intervalskift.');
@@ -98,7 +98,7 @@ export async function managedBattery(options){
    return {...result,policy:row};
   }
   if(action==='find'){
-   if(row.find_until<=now){
+   if(!row.find_until&&!row.restore_pending){
     const last=(await batteryControls({...options,input:null})).last;
     row.resume_seconds=last?.status==='sent'&&batteryIntervals.includes(last.seconds)?last.seconds:60;
    }
@@ -106,7 +106,8 @@ export async function managedBattery(options){
   }else if(action==='stop'){
    if(row.find_until>0){row.find_until=0;row.restore_pending=1;}
   }else{
-   row.auto_enabled=input.enabled?1:0;row.find_until=0;row.restore_pending=1;row.resume_seconds=60;
+   // Saving automation must not cancel an active Find or overwrite its return interval.
+   row.auto_enabled=input.enabled?1:0;row.restore_pending=1;
    row.inside_count=0;row.inside_since=0;row.sample_at=0;
   }
   await save(env.DB,env,row);

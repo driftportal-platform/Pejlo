@@ -39,6 +39,7 @@ import {createMySubscription} from './features/subscription.js';
 
 
 import {initPageScroll} from './features/page-scroll.js';
+import {createMobileNavigation} from './features/mobile-navigation.js';
 
 
 
@@ -2908,6 +2909,7 @@ $('#map-fence').onclick=()=>fenceEditor.open();$('#map-trips').onclick=()=>go('t
 mapTools=createMapTools(document,{section:key=>pageTabs?.map.select(key)});
 createMapViewport({resized:()=>overviewMap?.resize()});
 initPageScroll();
+createMobileNavigation();
 
 
 
